@@ -28,12 +28,12 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
-@st.cache_resource
+# 🛠️ REMOÇÃO DO @st.cache_resource PARA LIMPAR ERROS TRAVADOS NA MEMÓRIA
 def obter_base_dados_global():
     if not os.path.exists("dados.csv"):
         return pd.DataFrame()
         
-    # 🛠️ CORREÇÃO IMPEDIDORA DE ERRO: O próprio leitor barra valores nulos nativamente sem acionar o erro do NumPy
+    # Carrega substituindo valores nulos por texto vazio automaticamente
     df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     df = pd.DataFrame()
     
@@ -41,25 +41,24 @@ def obter_base_dados_global():
     
     def extrair(nome_chave):
         col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
-        if col_real:
-            # Converte explicitamente para Series do Pandas limpando espaços
-            return pd.Series(df_raw[col_real]).astype(str).str.strip()
-        else:
-            return pd.Series([''] * len(df_raw))
+        if col_real is not None:
+            return pd.Series(df_raw[col_real]).fillna('').astype(str).str.strip()
+        return pd.Series([''] * len(df_raw))
 
     df['fonte_clean'] = extrair('fonte').str.split('.').str[0].str.lower().str.replace('-', '', regex=False)
     df['emenda_clean'] = extrair('emenda').str.split('.').str[0]
     df['plano_clean'] = extrair('plano').str.split('.').str[0]
     
-    df['EMPENHO_COL'] = extrair('empenho').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['NOTA_COL'] = extrair('nota').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['PDF_GERAL'] = extrair('pdf').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['URL_REAL_LINK'] = extrair('urllink').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    # Processa item por item como string pura da biblioteca nativa, impedindo arrays do NumPy
+    df['EMPENHO_COL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('empenho')]
+    df['NOTA_COL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('nota')]
+    df['PDF_GERAL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('pdf')]
+    df['URL_REAL_LINK'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('urllink')]
     
-    df['secretaria'] = extrair('secretaria').apply(lambda x: 'Não Especificada' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['deputado'] = extrair('deputado').apply(lambda x: 'Não Informado' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['desc_clean'] = extrair('descricao').apply(lambda x: 'Sem descrição informada' if str(x).strip() in ['', 'nan'] else str(x).strip())
-    df['conta corrente'] = extrair('conta').apply(lambda x: 'Não Informada' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['secretaria'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Especificada' for x in extrair('secretaria')]
+    df['deputado'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Informado' for x in extrair('deputado')]
+    df['desc_clean'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Sem descrição informada' for x in extrair('descricao')]
+    df['conta corrente'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Informada' for x in extrair('conta')]
 
     coluna_data = next((limpa for limpa in colunas_originais if 'data' in limpa and 'venc' not in limpa and 'nota' not in limpa), None)
     df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
