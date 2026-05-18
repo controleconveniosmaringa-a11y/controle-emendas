@@ -227,7 +227,9 @@ try:
             col_l2.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Saídas Liquidadas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#dc2626;">{fmt(g_gas)}</div></div>''', unsafe_allow_html=True)
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
-            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cron规律 = df_cronologico['Saldo_Acumulado']], textposition="top center"))
+            
+            # 🛠️ CORREÇÃO DE SINTAXE EXECUTADA AQUI: Caractere fantasma expurgado definitivamente
+            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
 
@@ -249,7 +251,6 @@ try:
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
 
-        # 🛠️ ABA PLANO DE AÇÃO ATUALIZADA COM COMPARAÇÃO DE NÚMEROS PUROS (IGNORA TRAÇOS, PONTOS E ESPAÇOS)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             
@@ -259,12 +260,9 @@ try:
                 col_busca_txt, col_busca_sel = st.columns(2)
                 
                 with col_busca_txt:
-                    # Recebe a digitação do usuário
                     plano_digitado_raw = st.text_input("⌨️ Escreva o número do Plano de Ação (Apenas números, sem traços):", value="", placeholder="Ex: 1264", key="input_texto_plano_acao").strip()
-                    # 🛠️ Remove qualquer traço, ponto ou espaço digitado para ter o número puro
                     plano_digitado_numerico = re.sub(r'\D', '', plano_digitado_raw)
                 
-                # Procura na lista qual plano corresponde aos números puros digitados
                 plano_encontrado_por_digito = None
                 if plano_digitado_numerico:
                     for pln_real in lista_planos_validos:
@@ -279,7 +277,6 @@ try:
                     
                     plano_selecionado_listbox = st.selectbox("🖱️ Ou escolha clicando aqui na lista:", options=lista_planos_validos, index=plano_padrao_idx, key="selecao_plano_lista_hibrida")
                 
-                # Define o plano final para a query
                 if plano_encontrado_por_digito:
                     plano_final_analise = plano_encontrado_por_digito
                 else:
@@ -308,7 +305,8 @@ try:
                         df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] == ano_selecionado]
                         df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_selecionado)]
                         df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] == ano_selecionado]
-                        df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'].astype(int) <= int(ano_selecionado)]
+                        df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['fonte_clean'] == fonte_maee]
+                        df_receitas_saldo = df_receitas_saldo[df_receitas_saldo['ano_mov'].astype(int) <= int(ano_selecionado)]
                     
                     repasse_pln = float(df_receitas_saldo['repasse'].sum())
                     rendimento_pln = float(df_receitas_saldo['rendimento'].sum())
