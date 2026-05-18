@@ -107,23 +107,25 @@ try:
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
-        anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
-        opcoes_anos_completas = ["Exibir Histórico Acumulado Completo"] + anos_disponiveis
-
-        # 🛠️ TOPO DEFINITIVO COM APENAS O TÍTULO PRINCIPAL (Filtro geral removido!)
+        
         st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
         
         tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE (Ganha filtro de ano exclusivo)
+        # 1. 🎯 ABA POR FONTE (Filtro de Ano Dinâmico por Fonte)
         with tab_ativa:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
-            ano_fonte_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Fonte:", options=opcoes_anos_completas, key="filtro_ano_exclusivo_fonte")
             
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
+                
+                # 🛠️ CAPTURA DINÂMICA DE ANOS DA FONTE SELECIONADA
+                anos_da_fonte = sorted(list(set([str(a) for a in df_final['ano_mov'].unique() if a not in ['', 'nan']])))
+                opcoes_anos_fonte = ["Exibir Histórico Acumulado Completo"] + anos_da_fonte
+                ano_fonte_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Fonte:", options=opcoes_anos_fonte, key="filtro_ano_exclusivo_fonte")
+                
                 if not df_final.empty:
                     dep_vinculo = df_final['deputado'].unique()[0]
                     eme_vinculo = df_final['emenda_clean'].unique()[0]
@@ -216,7 +218,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO (Ganha filtro de ano exclusivo)
+        # 2. 📋 ABA POR PLANO DE AÇÃO (Filtro de Ano Dinâmico por Plano)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -238,15 +240,16 @@ try:
                     if plano_encontrado_por_digito in lista_planos_validos: plano_padrao_idx = lista_planos_validos.index(plano_encontrado_por_digito)
                     plano_selecionado_listbox = st.selectbox("🖱️ Ou escolha clicando aqui na lista:", options=lista_planos_validos, index=plano_padrao_idx, key="selecao_plano_lista_hibrida")
                 
-                # Inserção do seletor de ano exclusivo para o plano de ação abaixo dos filtros primários
-                ano_plano_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Plano:", options=opcoes_anos_completas, key="filtro_ano_exclusivo_plano")
-                
                 if plano_encontrado_por_digito: plano_final_analise = plano_encontrado_por_digito
-                else:
-                    if plano_digitado_raw and not plano_encontrado_por_digito: st.warning(f"⚠️ O plano contendo apenas os números '{plano_digitado_numerico}' não foi localizado. Usando a lista suspensa abaixo.")
-                    plano_final_analise = plano_selecionado_listbox
+                else: plano_final_analise = plano_selecionado_listbox
                 
                 df_pln_ativo = df[df['plano_clean'].str.upper() == plano_final_analise]
+                
+                # 🛠️ CAPTURA DINÂMICA DE ANOS DO PLANO SELECIONADO
+                anos_do_plano = sorted(list(set([str(a) for a in df_pln_ativo['ano_mov'].unique() if a not in ['', 'nan']])))
+                opcoes_anos_plano = ["Exibir Histórico Acumulado Completo"] + anos_do_plano
+                ano_plano_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Plano:", options=opcoes_anos_plano, key="filtro_ano_exclusivo_plano")
+                
                 if not df_pln_ativo.empty:
                     fonte_maee = df_pln_ativo['fonte_clean'].iloc[0].lower().strip(); df_fonte_maee_completa = df[df['fonte_clean'] == fonte_maee]
                     dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]; eme_vinculo_pln = df_pln_ativo['emenda_clean'].unique()[0]; conta_vinculo_pln = df_pln_ativo['conta corrente'].iloc[0]
@@ -342,7 +345,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
 
-        # 3. 🏛️ ABA POR SECRETARIA (Ganha filtro de ano exclusivo)
+        # 3. 🏛️ ABA POR SECRETARIA (Filtro de Ano Dinâmico por Secretaria)
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria / Pasta</div>", unsafe_allow_html=True)
             lista_sec_validas = sorted([str(s).upper() for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']])
@@ -356,15 +359,16 @@ try:
                     if sec_digitada_raw in lista_sec_validas: sec_padrao_idx = lista_sec_validas.index(sec_digitada_raw)
                     sec_selecionada_listbox = st.selectbox("🖱️ Ou selecione diretamente na lista clicando aqui:", options=lista_sec_validas, index=sec_padrao_idx, key="selecao_secretaria_lista_mestre")
                 
-                # Inserção do seletor de ano exclusivo para a secretaria abaixo dos filtros primários
-                ano_sec_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Secretaria:", options=opcoes_anos_completas, key="filtro_ano_exclusivo_secretaria")
-                
                 if sec_digitada_raw and sec_digitada_raw in lista_sec_validas: secretaria_final_analise = sec_digitada_raw
-                else:
-                    if sec_digitada_raw and sec_digitada_raw not in lista_sec_validas: st.warning(f"⚠️ A pasta '{sec_digitada_raw}' não foi localizado. Exibindo dados da secretaria selecionada na lista abaixo.")
-                    secretaria_final_analise = sec_selecionada_listbox
+                else: secretaria_final_analise = sec_selecionada_listbox
                 
                 df_sec_ativa = df[df['secretaria'].str.upper() == secretaria_final_analise]
+                
+                # 🛠️ CAPTURA DINÂMICA DE ANOS DA SECRETARIA SELECIONADA
+                anos_da_sec = sorted(list(set([str(a) for a in df_sec_ativa['ano_mov'].unique() if a not in ['', 'nan']])))
+                opcoes_anos_sec = ["Exibir Histórico Acumulado Completo"] + anos_da_sec
+                ano_sec_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Secretaria:", options=opcoes_anos_sec, key="filtro_ano_exclusivo_secretaria")
+                
                 if not df_sec_ativa.empty:
                     lbl_ano_sec = "Histórico Total" if ano_sec_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_sec_ativo}"
                     if ano_sec_ativo == "Exibir Histórico Acumulado Completo": df_sec_fluxo = df_sec_ativa; df_sec_saldo = df_sec_ativa
@@ -425,7 +429,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
 
-        # 4. 🔍 ABA POR DEPUTADO (Ganha filtro de ano exclusivo)
+        # 4. 🔍 ABA POR DEPUTADO (Filtro de Ano Dinâmico por Deputado)
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar: Investigação por Deputado / Autor</div>", unsafe_allow_html=True)
             lista_deps_validos = sorted([str(d).upper() for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'Não Informado']])
@@ -439,15 +443,16 @@ try:
                     if dep_digitado_raw in lista_deps_validas: dep_padrao_idx = lista_deps_validas.index(dep_digitado_raw)
                     dep_selecionado_listbox = st.selectbox("🖱️ Ou selecione o parlamentar diretamente na lista abaixo:", options=lista_deps_validas, index=dep_padrao_idx, key="selecao_deputado_lista_mestre")
                 
-                # Inserção do seletor de ano exclusivo para o deputado abaixo dos filtros primários
-                ano_dep_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Deputado:", options=opcoes_anos_completas, key="filtro_ano_exclusivo_deputado")
-                
                 if dep_digitado_raw and dep_digitado_raw in lista_deps_validas: deputado_final_analise = dep_digitado_raw
-                else:
-                    if dep_digitado_raw and dep_digitado_raw not in lista_deps_validas: st.warning(f"⚠️ O parlamentar '{dep_digitado_raw}' não foi localizado. Exibindo dados do deputado selecionado na lista.")
-                    deputado_final_analise = dep_selecionado_listbox
+                else: deputado_final_analise = dep_selecionado_listbox
                 
                 df_dep_ativo = df[df['deputado'].str.upper() == deputado_final_analise]
+                
+                # 🛠️ CAPTURA DINÂMICA DE ANOS DO DEPUTADO SELECIONADO
+                anos_do_dep = sorted(list(set([str(a) for a in df_dep_ativo['ano_mov'].unique() if a not in ['', 'nan']])))
+                opcoes_anos_dep = ["Exibir Histórico Acumulado Completo"] + anos_do_dep
+                ano_dep_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Deputado:", options=opcoes_anos_dep, key="filtro_ano_exclusivo_deputado")
+                
                 if not df_dep_ativo.empty:
                     lbl_ano_dep = "Histórico Total" if ano_dep_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_dep_ativo}"
                     if ano_dep_ativo == "Exibir Histórico Acumulado Completo": df_dep_fluxo = df_dep_ativo; df_dep_saldo = df_dep_ativo
@@ -508,7 +513,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. 🌐 ABA PANORAMA GERAL (Esta aba exibe o histórico de anos consolidado nativo)
+        # 5. 🌐 ABA PANORAMA GERAL (Esta aba mantém a listagem global completa de anos nativos)
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
             g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
