@@ -137,7 +137,7 @@ try:
         with tab_ativa:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
             
-            if fonte_sel:
+            if font_sel := fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
                 anos_da_fonte = sorted(list(set([str(a) for a in df_final['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_fonte = ["Exibir Histórico Acumulado Completo"] + anos_da_fonte
@@ -352,7 +352,7 @@ try:
                             df_dep_split['Despesas Liquidadas'] = df_dep_split['bruto'].apply(fmt)
                             st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
                     
-                    st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Períono — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
                         lista_links_pln = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_pln_validos['URL_REAL_LINK']]
@@ -421,16 +421,16 @@ try:
                     st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ Distribuição do Caixa por Fonte Orçamentária / Emenda ({lbl_ano_sec})</div>", unsafe_allow_html=True)
                     fontes_vinculadas_sec = sorted([f for f in df_sec_saldo['fonte_clean'].unique() if f != ''])
                     linhas_fontes_sec = []
-                    tot_rep_s, tot_ren_s, tot_gas_s, tot_sal_s = 0.0, 0.0, 0.0, 0.0
+                    tot_rep_s, tot_ren_s, tot_gasto_s, tot_sal_s = 0.0, 0.0, 0.0, 0.0
                     for f_item in fontes_vinculadas_sec:
                         df_f_item_base = df_sec_ativa[df_sec_ativa['fonte_clean'] == f_item]
                         if ano_sec_ativo == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
                         else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] ==  ano_sec_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_sec_ativo)]
                         r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
-                        tot_rep_s += r_rep; tot_ren_s += r_ren; tot_gas_s += r_gas; tot_sal_s += r_sal
+                        tot_rep_s += r_rep; tot_ren_s += r_ren; tot_gasto_s += r_gas; tot_sal_s += r_sal
                         linhas_fontes_sec.append({'Fonte Orçamentária': f_item.upper(), 'Repasses no Período': r_rep, 'Rendimentos no Período': r_ren, 'Despesas no Período': r_gas, 'Saldo Disponível (Acumulado)': r_sal})
-                    linhas_fontes_sec.append({'Fonte Orçamentária': 'TOTAL CONSOLIDADO DA SECRETARIA 🏛️', 'Repasses no Período': tot_rep_s, 'Rendimentos no Período': tot_ren_s, 'Despesas no Período': tot_gas_s, 'Saldo Disponível (Acumulado)': tot_sal_s})
+                    linhas_fontes_sec.append({'Fonte Orçamentária': 'TOTAL CONSOLIDADO DA SECRETARIA 🏛️', 'Repasses no Período': tot_rep_s, 'Rendimentos no Período': tot_ren_s, 'Despesas no Período': tot_gasto_s, 'Saldo Disponível (Acumulado)': tot_sal_s})
                     df_tab_fontes_sec = pd.DataFrame(linhas_fontes_sec)
                     def _style_linhas_sec(row): return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' if 'TOTAL CONSOLIDADO' in str(row['Fonte Orçamentária']).upper() else '' for _ in row]
                     st.dataframe(df_tab_fontes_sec.style.apply(_style_linhas_sec, axis=1).format({'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Disponível (Acumulado)': fmt}), use_container_width=True, hide_index=True)
@@ -527,11 +527,11 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. 🌐 ABA PANORAMA GERAL REFORMULADA (4 Gráficos Estratégicos Dedicados)
+        # 5. 🌐 ABA PANORAMA GERAL REFORMULADA COM 4 GRÁFICOS DE COLUNAS (BARRAS VERTICAIS)
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#0f172a; border-bottom:3px solid #0f172a;'>📊 CADERNO DE BALANÇOS CONSOLIDADOS (4 QUADROS)</div>", unsafe_allow_html=True)
             
-            # 🛠️ PREPARAÇÃO DOS DADOS CONTÁBEIS PARA OS FILTROS DOS GRÁFICOS
+            # Preparação dos dados para os gráficos
             df_g_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_g_cronologico['saldo_acumulado'] = ((df_g_cronologico['repasse'] + df_g_cronologico['rendimento']) - df_g_cronologico['bruto']).cumsum()
             
@@ -541,13 +541,13 @@ try:
             
             df_g_fonte = df.groupby('fonte_clean').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_fonte['saldo'] = (df_g_fonte['repasse'] + df_g_fonte['rendimento']) - df_g_fonte['bruto']
-            df_g_fonte = df_g_fonte.sort_values('saldo', ascending=True) # Ascending true para o gráfico de barras horizontais rankear de cima para baixo
+            df_g_fonte = df_g_fonte.sort_values('saldo', ascending=False)
             
             df_g_deputado = df.groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_deputado['saldo'] = (df_g_deputado['repasse'] + df_g_deputado['rendimento']) - df_g_deputado['bruto']
             df_g_deputado = df_g_deputado[df_g_deputado['deputado'] != 'Não Informado'].sort_values('saldo', ascending=False)
 
-            # 🚀 QUADRO DE LAYOUT 1: CRONOGRAMA DE SALDO E DIVISÃO POR SECRETARIA
+            # 🚀 Linha 1 de Gráficos (Cronograma + Secretarias)
             c_g1, c_g2 = st.columns(2)
             
             with c_g1:
@@ -562,13 +562,14 @@ try:
                 fig2.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=260, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
                 st.plotly_chart(fig2, use_container_width=True)
                 
-            # 🚀 QUADRO DE LAYOUT 2: RANKING POR FONTE E CRÚZIO POR PARLAMENTAR
+            # 🚀 Linha 2 de Gráficos (Fontes corrigidas para colunas + Deputados)
             c_g3, c_g4 = st.columns(2)
             
             with c_g3:
                 st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>🎯 3. SALDO DISPONÍVEL CONSOLIDADO POR FONTE ORÇAMENTÁRIA:</div>", unsafe_allow_html=True)
-                fig3 = go.Figure(go.Bar(y=df_g_fonte['fonte_clean'].astype(str).str.upper(), x=df_g_fonte['saldo'], orientation='h', marker_color='#0f172a', text=[fmt(v) for v in df_g_fonte['saldo']], textposition='auto'))
-                fig3.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), xaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
+                # 🛠️ CORREÇÃO VISUAL EXECUTADA AQUI: Gráfico convertido para barras verticais (colunas) eliminando falhas de rótulos longos
+                fig3 = go.Figure(go.Bar(x=df_g_fonte['fonte_clean'].astype(str).str.upper(), y=df_g_fonte['saldo'], marker_color='#0f172a', text=[fmt(v) for v in df_g_fonte['saldo']], textposition='auto'))
+                fig3.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'), xaxis=dict(type='category'))
                 st.plotly_chart(fig3, use_container_width=True)
                 
             with c_g4:
