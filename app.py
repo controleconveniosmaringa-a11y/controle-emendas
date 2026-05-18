@@ -72,9 +72,8 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# CONEXÃO VIA API PÚBLICA DO GOOGLE (À prova de falhas no Streamlit)
-SHEET_ID = "1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
+# ➜ LINK DE IMPRESSÃO PÚBLICA EM CSV (Totalmente imune a bloqueios de servidores)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT1lqgE1vYtGvPbyvK9pX6Xf8_R6zBf6o3fX5wK-G_6mB2Tj9gXzX7E8p9yVvVf_N_G2X_3U_H5X9R/pub?output=csv"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
