@@ -95,16 +95,17 @@ try:
                     
                     st.markdown(f"<div class='main-title'>Controle de Emendas — Fonte: {fonte_sel}</div>", unsafe_allow_html=True)
                     
-                    # 📅 1. SELETOR DE ANO CENTRAL UNIFICADO PARA TODA A FONTE ATIVA
+                    # 📅 SELETOR DE EXERCÍCIO FISCAL GLOBAL (MANDATÓRIO E UNIFICADO NO INÍCIO)
                     anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
-                    ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal para Filtrar o Painel:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_global")
+                    ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal para Filtrar o Painel:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
                     
-                    # Definição dos escopos temporais para fluxo e para saldo (acumulativo)
+                    # Regras estruturais de corte de datas com base no seletor unificado do topo
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final
                         df_fonte_saldo = df_final
-                        df_banco_fluxo = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
-                        df_banco_saldo = df_banco_fluxo
+                        df_conta_total_banco = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
+                        df_banco_fluxo = df_conta_total_banco
+                        df_banco_saldo = df_conta_total_banco
                     else:
                         df_fonte_fluxo = df_final[df_final['ano_mov'] == ano_selecionado]
                         df_fonte_saldo = df_final[df_final['ano_mov'].astype(int) <= int(ano_selecionado)]
@@ -113,17 +114,20 @@ try:
                         df_banco_fluxo = df_banco_base[df_banco_base['ano_mov'] == ano_selecionado] if not df_banco_base.empty else pd.DataFrame()
                         df_banco_saldo = df_banco_base[df_banco_base['ano_mov'].astype(int) <= int(ano_selecionado)] if not df_banco_base.empty else pd.DataFrame()
 
-                    # Cálculos das métricas dos blocos superiores (Considerando os saldos acumulados)
+                    # Cálculos reativos automáticos sincronizados pelo topo
                     saldo_exclusivo_fonte = float(df_fonte_saldo['repasse'].sum() + df_fonte_saldo['rendimento'].sum()) - float(df_fonte_saldo['bruto'].sum())
                     saldo_real_banco_total = float(df_banco_saldo['repasse'].sum() + df_banco_saldo['rendimento'].sum()) - float(df_banco_saldo['bruto'].sum()) if not df_banco_saldo.empty else saldo_exclusivo_fonte
 
+                    # Rótulo de ano amigável para exibição nos títulos
+                    lbl_ano = "Histórico Total" if ano_selecionado == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_selecionado}"
+
                     st.markdown(f'''<div class='kpi-row-container'>
                         <div class='kpi-card-head'>
-                            <div class='kpi-label'>🎯 Saldo Acumulado Disponível da Fonte ({ano_selecionado})</div>
+                            <div class='kpi-label'>🎯 Saldo Disponível da Fonte ({lbl_ano})</div>
                             <div class='kpi-value'>{fmt(saldo_exclusivo_fonte)}</div>
                         </div>
                         <div class='kpi-card-head-blue'>
-                            <div class='kpi-label' style='color:#1e40af;'>🏦 Saldo Acumulado na Conta: {conta_vinculada} ({ano_selecionado})</div>
+                            <div class='kpi-label' style='color:#1e40af;'>🏦 Saldo em Conta: {conta_vinculada} ({lbl_ano})</div>
                             <div class='kpi-value' style='color:#2563eb;'>{fmt(saldo_real_banco_total)}</div>
                         </div>
                     </div>''', unsafe_allow_html=True)
@@ -136,79 +140,75 @@ try:
                     
                     secretarias = [s for s in df_final['secretaria'].unique() if s != '']
                     
-                    # 🌍 RESUMO CONSOLIDADO MÃE (Sincronizado por Ano)
+                    # 🌍 RESUMO CONSOLIDADO MÃE (Sincronizado)
                     if len(secretarias) > 1:
-                        st.markdown(f"<div class='section-title'>🌍 RESUMO CONSOLIDADO DA FONTE — ANO FILTRADO: {ano_selecionado}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='section-title'>🌍 RESUMO CONSOLIDADO DA FONTE — ({lbl_ano})</div>", unsafe_allow_html=True)
                         sum_rep_mãe = float(df_fonte_fluxo['repasse'].sum())
                         sum_ren_mãe = float(df_fonte_fluxo['rendimento'].sum())
                         sum_gas_mãe = float(df_fonte_fluxo['bruto'].sum())
                         
                         st.markdown(f'''<table class='extrato-table'>
-                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE ENTRADO NO ANO</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sum_rep_mãe)}</td></tr>
-                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO DO ANO</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(sum_ren_mãe)}</td></tr>
-                            <tr class='extrato-row'><td>(-) DESPESAS LIQUIDADAS NO ANO (TODAS AS SECRETARIAS)</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(sum_gas_mãe)}</td></tr>
-                            <tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label'>(=) SALDO REAL ACUMULADO DISPONÍVEL (COM ANOS ANTERIORES)</td><td class='extrato-cell-val' style='color:{"#059669" if saldo_exclusivo_fonte >= 0 else "#dc2626"}; font-size:14px;'>{fmt(saldo_exclusivo_fonte)}</td></tr>
+                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE ENTRADO NO PERÍODO</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sum_rep_mãe)}</td></tr>
+                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO DO PERÍODO</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(sum_ren_mãe)}</td></tr>
+                            <tr class='extrato-row'><td>(-) DESPESAS LIQUIDADAS NO PERÍODO (TODAS AS SECRETARIAS)</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(sum_gas_mãe)}</td></tr>
+                            <tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label'>(=) SALDO REAL ACUMULADO DISPONÍVEL NA EMENDA</td><td class='extrato-cell-val' style='color:{"#059669" if saldo_exclusivo_fonte >= 0 else "#dc2626"}; font-size:14px;'>{fmt(saldo_exclusivo_fonte)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # 🏢 DIVISÃO DETALHADA POR SECRETARIA (Sincronizada por Ano com acúmulo de saldos passados!)
-                    st.markdown(f"<div class='section-title'>🏢 Divisão de Recursos por Secretaria — Ano Filtrado: {ano_selecionado}</div>", unsafe_allow_html=True)
+                    # 🏢 DIVISÃO POR SECRETARIA (Sincronizada automaticamente pelo filtro do topo)
+                    st.markdown(f"<div class='section-title'>🏢 Divisão de Recursos por Secretaria — ({lbl_ano})</div>", unsafe_allow_html=True)
                     for sec in secretarias:
-                        # Isolamento de Fluxo do Ano para a secretaria
                         df_sec_fluxo = df_fonte_fluxo[df_fonte_fluxo['secretaria'] == sec]
                         sec_rep_ano = float(df_sec_fluxo['repasse'].sum())
                         sec_ren_ano = float(df_sec_fluxo['rendimento'].sum())
                         sec_gas_ano = float(df_sec_fluxo['bruto'].sum())
                         
-                        # Isolamento do histórico acumulado para a secretaria (Soma com os anos passados)
                         df_sec_saldo = df_fonte_saldo[df_fonte_saldo['secretaria'] == sec]
                         sec_saldo_acumulado = float(df_sec_saldo['repasse'].sum() + df_sec_saldo['rendimento'].sum()) - float(df_sec_saldo['bruto'].sum())
                         
                         st.markdown(f"<div class='secretaria-header'>🏛️ {sec.upper()}</div>", unsafe_allow_html=True)
                         st.markdown(f'''<table class='extrato-table'>
-                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE DESTINADO NO ANO PARA {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_rep_ano)}</td></tr>
-                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DA CONTA NO ANO PARA {sec.upper()}</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(sec_ren_ano)}</td></tr>
-                            <tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS LIQUIDADAS NO ANO POR {sec.upper()} (NF BRUTA)</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(sec_gas_ano)}</td></tr>
-                            <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL LIVRE ATUAL — {sec.upper()} (COM SALDO ANTERIOR)</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo_acumulado)}</td></tr>
+                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE DESTINADO NO PERÍODO</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_rep_ano)}</td></tr>
+                            <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DA CONTA NO PERÍODO</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(sec_ren_ano)}</td></tr>
+                            <tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS LIQUIDADAS NO PERÍODO (NF BRUTA)</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(sec_gas_ano)}</td></tr>
+                            <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL LIVRE ATUAL (COM SALDO ANTERIOR)</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo_acumulado)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # ⚖️ CONCILIAÇÃO BANCÁRIA (Sincronizada automaticamente pelo mesmo seletor)
+                    # ⚖️ CONCILIAÇÃO BANCÁRIA (Sincronizada automaticamente pelo filtro do topo)
                     if conta_vinculada != "Não Informada" and not df_banco_saldo.empty:
-                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada} ({lbl_ano})</div>", unsafe_allow_html=True)
                         
                         fontes_compartilhadas = sorted([fc for fc in df_banco_saldo['fonte_clean'].unique() if fc != ''])
                         linhas_banco = []
-                        tot_rep_banco, tot_ren_banco, tot_gas_banco, tot_saldo_banco = 0.0, 0.0, 0.0, 0.0
+                        tot_rep_ano, tot_ren_ano, tot_gasto_ano, tot_saldo_acum = 0.0, 0.0, 0.0, 0.0
                         
                         for f_item in fontes_compartilhadas:
-                            # Fluxo do ano para o banco
-                            df_i_fluxo = df_banco_fluxo[df_banco_fluxo['fonte_clean'] == f_item] if not df_banco_fluxo.empty else pd.DataFrame()
-                            f_rep = float(df_i_fluxo['repasse'].sum()) if not df_i_fluxo.empty else 0.0
-                            f_ren = float(df_i_fluxo['rendimento'].sum()) if not df_i_fluxo.empty else 0.0
-                            f_des = float(df_i_fluxo['bruto'].sum()) if not df_i_fluxo.empty else 0.0
+                            df_item_ano = df_banco_fluxo[df_banco_fluxo['fonte_clean'] == f_item] if not df_banco_fluxo.empty else pd.DataFrame()
+                            f_rep = float(df_item_ano['repasse'].sum()) if not df_item_ano.empty else 0.0
+                            f_ren = float(df_item_ano['rendimento'].sum()) if not df_item_ano.empty else 0.0
+                            f_des = float(df_item_ano['bruto'].sum()) if not df_item_ano.empty else 0.0
                             
-                            # Histórico de saldos para o banco
-                            df_i_saldo = df_banco_saldo[df_banco_saldo['fonte_clean'] == f_item]
-                            f_sal_real = float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum()) - float(df_i_saldo['bruto'].sum())
+                            df_item_acum = df_banco_saldo[df_banco_saldo['fonte_clean'] == f_item]
+                            f_sal_real = float(df_item_acum['repasse'].sum() + df_item_acum['rendimento'].sum()) - float(df_item_acum['bruto'].sum())
                             
-                            tot_rep_banco += f_rep
-                            tot_ren_banco += f_ren
-                            tot_gas_banco += f_des
-                            tot_saldo_banco += f_sal_real
+                            tot_rep_ano += f_rep
+                            tot_ren_ano += f_ren
+                            tot_gasto_ano += f_des
+                            tot_saldo_acum += f_sal_real
                             
                             linhas_banco.append({
                                 'Fonte Orçamentária': f_item.upper() + (" (Ativa)" if f_item == fonte_sel else ""),
-                                'Repasses no Ano': f_rep,
-                                'Rendimentos no Ano': f_ren,
-                                'Despesas no Ano': f_des,
+                                'Repasses no Período': f_rep,
+                                'Rendimentos no Período': f_ren,
+                                'Despesas no Período': f_des,
                                 'Saldo Real em Conta (Acumulado)': f_sal_real
                             })
                         
                         linhas_banco.append({
                             'Fonte Orçamentária': 'TOTAL CONSOLIDADO DA CONTA 🏦',
-                            'Repasses no Ano': tot_rep_banco,
-                            'Rendimentos no Ano': tot_ren_banco,
-                            'Despesas no Ano': tot_gas_banco,
-                            'Saldo Real em Conta (Acumulado)': tot_saldo_banco
+                            'Repasses no Período': tot_rep_ano,
+                            'Rendimentos no Período': tot_ren_ano,
+                            'Despesas no Período': tot_gasto_ano,
+                            'Saldo Real em Conta (Acumulado)': tot_saldo_acum
                         })
                             
                         df_tab_banco = pd.DataFrame(linhas_banco)
@@ -222,12 +222,12 @@ try:
                             return ['' for _ in row]
                             
                         df_estilizado = df_tab_banco.style.apply(_style_linhas, axis=1).format({
-                            'Repasses no Ano': fmt, 'Rendimentos no Ano': fmt, 'Despesas no Ano': fmt, 'Saldo Real em Conta (Acumulado)': fmt
+                            'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real em Conta (Acumulado)': fmt
                         })
                         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
 
-                    # Listagem de lançamentos (Filtrada pelo escopo do ano)
-                    st.markdown("<div class='section-title'>📋 Detalhamento dos Lançamentos do Período</div>", unsafe_allow_html=True)
+                    # 📋 DETALHAMENTO DE LANÇAMENTOS (Sincronizado: Exibe apenas os empenhos do período selecionado)
+                    st.markdown(f"<div class='section-title'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
                         df_render = pd.DataFrame({
@@ -239,7 +239,7 @@ try:
                         })
                         st.dataframe(df_render, use_container_width=True, hide_index=True)
                     else:
-                        st.info("ℹ️ Nenhum empenho ou lançamento registrado especificamente neste ano.")
+                        st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
@@ -281,4 +281,4 @@ try:
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
             
 except Exception as e:
-    st.error(f"Erro no processamento completo: {e}")
+    st.error(f"Erro no processamento unificado: {e}")
