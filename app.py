@@ -8,12 +8,21 @@ import urllib.request
 # 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
 
-# Interface Visual Enxuta via CSS de Alta Performance
+# Interface Visual Enxuta via CSS de Alta Performance (Atualizada para Layout Executivo)
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
-    .main-title { font-size: 34px; font-weight: 800; color: #0f172a; letter-spacing: -1.2px; margin-bottom: 5px; }
+    
+    /* 👔 Novo Cabeçalho Executivo de Alta Performance */
+    .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background-color: #0f172a; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header-left { display: flex; flex-direction: column; }
+    .main-title { font-size: 28px; font-weight: 800; color: #ffffff !important; letter-spacing: -0.8px; margin: 0; padding: 0; line-height: 1.2; }
+    .main-subtitle { font-size: 13px; font-weight: 500; color: #94a3b8 !important; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .header-right { display: flex; align-items: center; background-color: #1e293b; padding: 8px 16px; border-radius: 6px; border: 1px solid #334155; }
+    .status-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #10b981; }
+    .status-text { font-size: 11px; font-weight: 700; color: #f8fafc !important; text-transform: uppercase; letter-spacing: 0.5px; }
+    
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 14px 20px; }
     .kpi-card-head-blue { flex: 1; background-color: #f8fafc; border: 2px solid #2563eb; border-radius: 8px; padding: 14px 20px; border-left: 6px solid #2563eb; }
@@ -108,20 +117,30 @@ try:
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
-        st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
+        # 👔 NOVO CÔNCLAVE VISUAL DA PARTE SUPERIOR (Layout de Alto Padrão)
+        st.markdown('''
+            <div class="header-container">
+                <div class="header-left">
+                    <div class="main-title">Controle de Emendas Orçamentárias</div>
+                    <div class="main-subtitle">Sistema Integrado de Auditoria Financeira de Convênios</div>
+                </div>
+                <div class="header-right">
+                    <div class="status-dot"></div>
+                    <div class="status-text">Base Google Sheets Conectada</div>
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
         
         tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE (Filtro de Ano Dinâmico por Fonte)
+        # 1. 🎯 ABA POR FONTE
         with tab_ativa:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
             
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
-                
-                # 🛠️ CAPTURA DINÂMICA DE ANOS DA FONTE SELECIONADA
                 anos_da_fonte = sorted(list(set([str(a) for a in df_final['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_fonte = ["Exibir Histórico Acumulado Completo"] + anos_da_fonte
                 ano_fonte_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Fonte:", options=opcoes_anos_fonte, key="filtro_ano_exclusivo_fonte")
@@ -218,7 +237,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO (Filtro de Ano Dinâmico por Plano)
+        # 2. 📋 ABA POR PLANO DE AÇÃO
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -245,7 +264,6 @@ try:
                 
                 df_pln_ativo = df[df['plano_clean'].str.upper() == plano_final_analise]
                 
-                # 🛠️ CAPTURA DINÂMICA DE ANOS DO PLANO SELECIONADO
                 anos_do_plano = sorted(list(set([str(a) for a in df_pln_ativo['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_plano = ["Exibir Histórico Acumulado Completo"] + anos_do_plano
                 ano_plano_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Plano:", options=opcoes_anos_plano, key="filtro_ano_exclusivo_plano")
@@ -345,7 +363,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
 
-        # 3. 🏛️ ABA POR SECRETARIA (Filtro de Ano Dinâmico por Secretaria)
+        # 3. 🏛️ ABA POR SECRETARIA
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria / Pasta</div>", unsafe_allow_html=True)
             lista_sec_validas = sorted([str(s).upper() for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']])
@@ -364,7 +382,6 @@ try:
                 
                 df_sec_ativa = df[df['secretaria'].str.upper() == secretaria_final_analise]
                 
-                # 🛠️ CAPTURA DINÂMICA DE ANOS DA SECRETARIA SELECIONADA
                 anos_da_sec = sorted(list(set([str(a) for a in df_sec_ativa['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_sec = ["Exibir Histórico Acumulado Completo"] + anos_da_sec
                 ano_sec_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para esta Secretaria:", options=opcoes_anos_sec, key="filtro_ano_exclusivo_secretaria")
@@ -429,7 +446,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
 
-        # 4. 🔍 ABA POR DEPUTADO (Filtro de Ano Dinâmico por Deputado)
+        # 4. 🔍 ABA POR DEPUTADO
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar: Investigação por Deputado / Autor</div>", unsafe_allow_html=True)
             lista_deps_validos = sorted([str(d).upper() for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'Não Informado']])
@@ -448,7 +465,6 @@ try:
                 
                 df_dep_ativo = df[df['deputado'].str.upper() == deputado_final_analise]
                 
-                # 🛠️ CAPTURA DINÂMICA DE ANOS DO DEPUTADO SELECIONADO
                 anos_do_dep = sorted(list(set([str(a) for a in df_dep_ativo['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_dep = ["Exibir Histórico Acumulado Completo"] + anos_do_dep
                 ano_dep_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Deputado:", options=opcoes_anos_dep, key="filtro_ano_exclusivo_deputado")
@@ -513,7 +529,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. 🌐 ABA PANORAMA GERAL (Esta aba mantém a listagem global completa de anos nativos)
+        # 5. 🌐 ABA PANORAMA GERAL
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
             g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
