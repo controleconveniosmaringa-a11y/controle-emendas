@@ -109,16 +109,14 @@ try:
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
 
-        # 🛠️ TOPO GLOBAL SIMPLIFICADO CONFORME VOCÊ PEDIU
         st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
         ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
         
-        # Criação das abas ordenadas
         tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE (O Filtro da fonte veio para cá agora!)
+        # 1. ABA POR FONTE
         with tab_ativa:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
             
@@ -216,7 +214,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO
+        # 2. 📋 ABA POR PLANO DE AÇÃO (ATUALIZADA COM RASTREABILIDADE DE PARLAMENTAR E SECRETARIA)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -310,6 +308,34 @@ try:
                         df_tab_banco_pln = pd.DataFrame(linhas_banco_pln)
                         def _style_linhas_pln(row): return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' if 'TOTAL CONSOLIDADO' in str(row['Plano de Ação']).upper() else ('background-color: #e0f2fe; font-weight: 700;' if '(ATIVO 🎯)' in str(row['Plano de Ação']).upper() else '') for _ in row]
                         st.dataframe(df_tab_banco_pln.style.apply(_style_linhas_pln, axis=1).format({'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real do Plano (Acumulado)': fmt}), use_container_width=True, hide_index=True)
+
+                    # 🚀 [RECURSO NOVO]: RASTREABILIDADE DE SECRETARIAS E PARLAMENTARES NO PLANO
+                    st.markdown(f"<div class='section-title' style='color:#0f172a; border-bottom:3px solid #0f172a;'>🏛️ RASTREABILIDADE DE VÍNCULOS INSTITUCIONAIS ({lbl_ano_pln})</div>", unsafe_allow_html=True)
+                    col_vinculo_sec, col_vinculo_dep = st.columns(2)
+                    
+                    with col_vinculo_sec:
+                        st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>🏢 DIVISÃO DE DESPESAS POR SECRETARIA EXECUTOR:</div>", unsafe_allow_html=True)
+                        # Agrupa os gastos do plano ativo por secretaria
+                        df_sec_split = df_despesas_fluxo.groupby('secretaria').agg({'bruto': 'sum'}).reset_index()
+                        if not df_sec_split.empty and df_sec_split['bruto'].sum() > 0:
+                            df_sec_split['bruto_fmt'] = df_sec_split['bruto'].apply(fmt)
+                            df_sec_split.columns = ['Secretaria Pasta', 'Valor Gasto', 'Gasto Liquidado']
+                            st.dataframe(df_sec_split[['Secretaria Pasta', 'Gasto Liquidado']], use_container_width=True, hide_index=True)
+                        else:
+                            st.info("ℹ️ Nenhuma secretaria registrou liquidação neste plano no período.")
+                            
+                    with col_vinculo_dep:
+                        st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>👤 VÍNCULO DE AUTORIA PARLAMENTAR (DEPUTADO):</div>", unsafe_allow_html=True)
+                        # Mapeia as receitas e despesas vinculadas aos deputados neste plano
+                        df_dep_split = df_despesas_fluxo.groupby('deputado').agg({'repasse': 'sum', 'bruto': 'sum'}).reset_index()
+                        if not df_dep_split.empty:
+                            # Herança do repasse para o deputado ativo dono da fonte
+                            if deputado_final_analise := dep_vinculo_pln:
+                                df_dep_split['repasse'] = float(df_receitas_fluxo['repasse'].sum())
+                            df_dep_split['Repasses (Fonte)'] = df_dep_split['repasse'].apply(fmt)
+                            df_dep_split['Despesas (Plano)'] = df_dep_split['bruto'].apply(fmt)
+                            df_dep_split.columns = ['Parlamentar Autor', 'rep', 'bru', 'Repasses Destinados', 'Despesas Liquidadas']
+                            st.dataframe(df_dep_split[['Parlamentar Autor', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True)
                     
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
@@ -489,6 +515,7 @@ try:
             col_l2.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Saídas Liquidadas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#dc2626;">{fmt(g_gas)}</div></div>''', unsafe_allow_html=True)
             
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
+            df_cron规律 = df_cronologico['repasse'] # Placeholder de segurança estrutural
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
             fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
