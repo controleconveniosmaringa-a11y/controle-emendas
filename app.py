@@ -146,7 +146,7 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # ⚖️ CORREÇÃO E ESTILIZAÇÃO PREMIUM DA ABERTURA DE SALDOS (CONCILIAÇÃO)
+                    # ⚖️ CONCILIAÇÃO BANCÁRIA COM ATIVAÇÃO DE LINHA DE TOTALIZAÇÃO COMPLETA
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
@@ -157,6 +157,8 @@ try:
                         fontes_compartilhadas = sorted([fc for fc in df_banco_proc['fonte_clean'].unique() if fc != ''])
                         
                         linhas_banco = []
+                        tot_rep, tot_ren, tot_gasto = 0.0, 0.0, 0.0
+                        
                         for f_item in fontes_compartilhadas:
                             df_item = df_banco_proc[df_banco_proc['fonte_clean'] == f_item]
                             f_rep = float(df_item['repasse'].sum())
@@ -164,24 +166,42 @@ try:
                             f_des = float(df_item['bruto'].sum())
                             f_sal = (f_rep + f_ren) - f_des
                             
+                            # Acumuladores globais para o fechamento da conta
+                            tot_rep += f_rep
+                            tot_ren += f_ren
+                            tot_gasto += f_des
+                            
                             linhas_banco.append({
-                                'Fonte Orçamentária': f_item.upper(),
-                                'Repasses (Recitas)': f_rep,
-                                'Rendimentos (+_': f_ren,
+                                'Fonte Orçamentária': f_item.upper() + (" (Ativa)" if f_item == fonte_sel else ""),
+                                'Repasses (Receitas)': f_rep,
+                                'Rendimentos (+)': f_ren,
                                 'Despesas (NF Bruta)': f_des,
                                 'Saldo Real Disponível': f_sal
                             })
+                        
+                        # Injeção matemática da Linha Final de Totais Consolidados do Banco
+                        linhas_banco.append({
+                            'Fonte Orçamentária': 'TOTAL CONSOLIDADO DA CONTA 🏦',
+                            'Repasses (Receitas)': tot_rep,
+                            'Rendimentos (+)': tot_ren,
+                            'Despesas (NF Bruta)': tot_gasto,
+                            'Saldo Real Disponível': (tot_rep + tot_ren) - tot_gasto
+                        })
                             
                         df_tab_banco = pd.DataFrame(linhas_banco)
                         
-                        # SISTEMA DE ESTILIZAÇÃO VETORIZADA - LAYOUT FINANÇAS INTERATIVO (0 LENTIDÃO)
+                        # SISTEMA DE DESIGN VETORIZADO INTELIGENTE
                         def _style_linhas(row):
-                            # Pinta de azul suave a linha inteira da fonte selecionada ativamente
-                            is_ativa = str(row['Fonte Orçamentária']).strip().lower() == str(fonte_sel).strip().lower()
-                            return ['background-color: #e0f2fe; font-weight: 700;' if is_ativa else '' for _ in row]
+                            txt_fonte = str(row['Fonte Orçamentária']).strip().upper()
+                            # Destaca a linha de Totais em cinza escuro/azul ou a Fonte Ativa em azul claro
+                            if 'TOTAL CONSOLIDADO' in txt_fonte:
+                                return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' for _ in row]
+                            elif '(ATIVA)' in txt_fonte:
+                                return ['background-color: #e0f2fe; font-weight: 700;' if '(ATIVA)' in txt_fonte else '' for _ in row]
+                            return ['' for _ in row]
                             
                         df_estilizado = df_tab_banco.style.apply(_style_linhas, axis=1).format({
-                            'Repasses (Recitas)': fmt, 'Rendimentos (+_': fmt, 'Despesas (NF Bruta)': fmt, 'Saldo Real Disponível': fmt
+                            'Repasses (Receitas)': fmt, 'Rendimentos (+)': fmt, 'Despesas (NF Bruta)': fmt, 'Saldo Real Disponível': fmt
                         })
                         
                         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
