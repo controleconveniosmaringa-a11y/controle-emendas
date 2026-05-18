@@ -72,12 +72,13 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# ➜ LINK DE IMPRESSÃO PÚBLICA EM CSV (Totalmente imune a bloqueios de servidores)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT1lqgE1vYtGvPbyvK9pX6Xf8_R6zBf6o3fX5wK-G_6mB2Tj9gXzX7E8p9yVvVf_N_G2X_3U_H5X9R/pub?output=csv"
+# LINK DIRETO DA CONEXÃO DA PLANILHA MÃE
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/export?format=csv&gid=826107717"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    df_raw = pd.read_csv(SHEET_URL)
+    # Uso de storage_options para forçar os servidores do Streamlit a burlarem bloqueios de 404
+    df_raw = pd.read_csv(SHEET_URL, storage_options={{"User-Agent": "Mozilla/5.0"}})
     df = pd.DataFrame()
     
     colunas_mapeadas_limpas = {}
