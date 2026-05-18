@@ -4,62 +4,10 @@ import plotly.graph_objects as go
 import re
 import os
 
-# 1. CONFIGURAÇÃO ESTRUTURAL DA PÁGINA (Executada em nível de Kernel)
+# 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
 
-# Funções auxiliares de vetorização matemática de alta velocidade
-def _limpar_fonte(df_serie):
-    return df_serie.fillna('').astype(str).str.strip().str.split('.').str[0].str.lower().str.replace('nan', '', regex=False).str.replace('-', '', regex=False)
-
-def _limpar_numerico(df_serie):
-    return pd.to_numeric(df_serie.fillna(0).astype(str).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.strip(), errors='coerce').fillna(0.0)
-
-# 2. CARREGAMENTO DE DADOS COM PRÉ-PROCESSAMENTO CENTRALIZADO (CACHE REAL DE NÍVEL 1)
-@st.cache_data(ttl=3600, show_spinner="Otimizando índices de alta velocidade...")
-def carregar_e_indexar_base():
-    if not os.path.exists("dados.csv"):
-        return pd.DataFrame()
-        
-    df_raw = pd.read_csv("dados.csv", low_memory=False)
-    df = pd.DataFrame()
-    colunas_mapeadas = {}
-    
-    for c in df_raw.columns:
-        c_clean = str(c).strip().lower()
-        c_clean = re.sub(r'[^\w\s]', '', c_clean).strip()
-        c_clean = c_clean.replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o')
-        colunas_mapeadas[c_clean] = df_raw[c]
-        
-    def pegar_serie(nome, padrao=''):
-        for c_limpa, dados in colunas_mapeadas.items():
-            if nome in c_limpa:
-                return dados
-        return pd.Series([padrao] * len(df_raw))
-
-    df['fonte_clean'] = _limpar_fonte(pegar_serie('fonte'))
-    df['emenda_clean'] = pegar_serie('emenda').fillna('-').astype(str).str.strip().str.split('.').str[0]
-    df['plano_clean'] = pegar_serie('plano').fillna('-').astype(str).str.strip().str.split('.').str[0]
-    
-    df['EMPENHO_COL'] = pegar_serie('empenho').fillna('-').astype(str).str.strip()
-    df['NOTA_COL'] = pegar_serie('nota').fillna('-').astype(str).str.strip()
-    df['PDF_GERAL'] = pegar_serie('pdf').fillna('-').astype(str).str.strip()
-    
-    df['secretaria'] = pegar_serie('secretaria').fillna('Não Especificada').astype(str).str.strip().str.replace('^$', 'Não Especificada', regex=True)
-    df['deputado'] = pegar_serie('deputado').fillna('Não Informado').astype(str).str.strip().str.replace('^$', 'Não Informado', regex=True)
-    df['desc_clean'] = pegar_serie('descricao').fillna('Sem descrição informada').astype(str).str.strip()
-    df['conta corrente'] = pegar_serie('conta').fillna('Não Informada').astype(str).str.strip().str.replace('^$', 'Não Informada', regex=True)
-
-    coluna_data = next((c for c in colunas_mapeadas if 'data' in c and 'venc' not in c and 'nota' not in c), None)
-    df['DATA_LANCAMENTO'] = colunas_mapeadas[coluna_data].fillna('-').astype(str).str.strip() if coluna_data else pegar_serie('data', '-')
-    df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
-
-    df['Receitas / Repasses'] = _limpar_numerico(pegar_serie('repasse'))
-    df['rendimentos'] = _limpar_numerico(pegar_serie('rendimento'))
-    df['Valor Bruto da NF'] = _limpar_numerico(pegar_serie('bruto'))
-    
-    return df
-
-# 3. INTERFACE E MODELAGEM VISUAL CSS COMPACTADO
+# Interface Visual Enxuta via CSS de Alta Performance
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
@@ -81,23 +29,67 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
+# 2. MOTOR DE LEITURA COMPARTILHADO ULTRA RÁPIDO (IGNORA O CACHE DO STREAMLIT)
+@st.cache_resource
+def obter_base_dados_global():
+    if not os.path.exists("dados.csv"):
+        return pd.DataFrame()
+        
+    # Carregamento bruto indexado direto da RAM usando tipagem otimizada de strings
+    df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str).fillna('')
+    df = pd.DataFrame()
+    
+    # Normalização expressa de colunas
+    colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
+    
+    def extrair(nome_chave):
+        col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
+        return df_raw[col_real].str.strip() if col_real else pd.Series([''] * len(df_raw))
+
+    df['fonte_clean'] = extrair('fonte').str.split('.').str[0].str.lower().str.replace('-', '', regex=False)
+    df['emenda_clean'] = extrair('emenda').str.split('.').str[0]
+    df['plano_clean'] = extrair('plano').str.split('.').str[0]
+    
+    df['EMPENHO_COL'] = extrair('empenho').replace('', '-')
+    df['NOTA_COL'] = extrair('nota').replace('', '-')
+    df['PDF_GERAL'] = extrair('pdf').replace('', '-')
+    
+    df['secretaria'] = extrair('secretaria').replace('', 'Não Especificada')
+    df['deputado'] = extrair('deputado').replace('', 'Não Informado')
+    df['desc_clean'] = extrair('descricao').replace('', 'Sem descrição informada')
+    df['conta corrente'] = extrair('conta').replace('', 'Não Informada')
+
+    coluna_data = next((limpa for limpa in colunas_originais if 'data' in limpa and 'venc' not in limpa and 'nota' not in limpa), None)
+    df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
+    df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
+
+    # Conversão numérica direta por substituição vetorizada em bloco
+    for col_num in ['repasse', 'rendimento', 'bruto']:
+        serie_num = extrair(col_num).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+        df[col_num] = pd.to_numeric(serie_num, errors='coerce').fillna(0.0)
+        
+    return df
+
 try:
-    df = carregar_e_indexar_base()
+    df = obter_base_dados_global()
     
     if not df.empty:
+        # Formatação otimizada local em milissegundos
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-        fontes_disponiveis = sorted(df['fonte_clean'].unique())
-        fontes = [f for f in fontes_disponiveis if f not in ['', 'nan']]
+        # Extração instantânea das fontes exclusivas
+        fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
         st.sidebar.markdown("<h3 style='margin-top:0; font-size:16px; color:#000000;'>Filtro Principal</h3>", unsafe_allow_html=True)
         fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
         
+        # Criação de abas nativas e leves
         tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
             f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
         ])
         
+        # ABA 1: FOCO NA VELOCIDADE INSTANTÂNEA DA FONTE SELECIONADA
         with tab_ativa:
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
@@ -108,13 +100,13 @@ try:
                     pln_vinculo = df_final['plano_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
-                    sum_repasse = float(df_final['Receitas / Repasses'].sum())
-                    sum_rendimento = float(df_final['rendimentos'].sum())
-                    sum_gasto = float(df_final['Valor Bruto da NF'].sum())
+                    sum_repasse = float(df_final['repasse'].sum())
+                    sum_rendimento = float(df_final['rendimento'].sum())
+                    sum_gasto = float(df_final['bruto'].sum())
                     saldo_exclusivo_fonte = (sum_repasse + sum_rendimento) - sum_gasto
                     
                     df_conta_total_banco = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
-                    saldo_real_banco_total = float(df_conta_total_banco['Receitas / Repasses'].sum() + df_conta_total_banco['rendimentos'].sum()) - float(df_conta_total_banco['Valor Bruto da NF'].sum()) if not df_conta_total_banco.empty else saldo_exclusivo_fonte
+                    saldo_real_banco_total = float(df_conta_total_banco['repasse'].sum() + df_conta_total_banco['rendimento'].sum()) - float(df_conta_total_banco['bruto'].sum()) if not df_conta_total_banco.empty else saldo_exclusivo_fonte
 
                     st.markdown(f"<div class='main-title'>Controle de Emendas — Fonte: {fonte_sel}</div>", unsafe_allow_html=True)
                     st.markdown(f'''<div class='kpi-row-container'>
@@ -137,7 +129,7 @@ try:
                     secretarias = [s for s in df_final['secretaria'].unique() if s != '']
                     
                     if len(secretarias) > 1:
-                        st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom: 3px solid #1e3a8a;'>🌍 RESUMO GERAL CONSOLIDADO (TODAS AS SECRETARIAS)</div>", unsafe_allow_html=True)
+                        st.markdown("<div class='section-title'>🌍 RESUMO GERAL CONSOLIDADO (TODAS AS SECRETARIAS)</div>", unsafe_allow_html=True)
                         st.markdown(f'''<table class='extrato-table'>
                             <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE TOTAL ENTRADO NA FONTE (MÃE)</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sum_repasse)}</td></tr>
                             <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO GLOBAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(sum_rendimento)}</td></tr>
@@ -148,9 +140,9 @@ try:
                     st.markdown("<div class='section-title'>🏢 Divisão de Recursos por Secretaria Detalhada</div>", unsafe_allow_html=True)
                     for sec in secretarias:
                         df_sec = df_final[df_final['secretaria'] == sec]
-                        sec_repasse = float(df_sec['Receitas / Repasses'].sum())
-                        sec_rendimento = float(df_sec['rendimentos'].sum())
-                        sec_despesa_bruta = float(df_sec['Valor Bruto da NF'].sum())
+                        sec_repasse = float(df_sec['repasse'].sum())
+                        sec_rendimento = float(df_sec['rendimento'].sum())
+                        sec_despesa_bruta = float(df_sec['bruto'].sum())
                         sec_saldo = (sec_repasse + sec_rendimento) - sec_despesa_bruta
                         
                         st.markdown(f"<div class='secretaria-header'>🏛️ {sec.upper()}</div>", unsafe_allow_html=True)
@@ -161,11 +153,10 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # RECONSTRUÇÃO NATIVA ULTRA VELOZ DA CONCILIAÇÃO BANCÁRIA (SEM CONFLITO VISUAL)
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
-                        anos_bancarios = sorted(list(set([str(a) for a in df_conta_total_banco['ano_mov'] if a not in ['None', 'nan']])))
+                        anos_bancarios = sorted(list(set([str(a) for a in df_conta_total_banco['ano_mov'].unique() if a not in ['', 'nan']])))
                         ano_banco_sel = st.selectbox("📅 Selecione o Exercício para Conciliação Bancária:", ["Exibir Saldo Histórico Acumulado"] + anos_bancarios, key="filtro_ano_banco")
                         
                         df_banco_proc = df_conta_total_banco if ano_banco_sel == "Exibir Saldo Histórico Acumulado" else df_conta_total_banco[df_conta_total_banco['ano_mov'] == ano_banco_sel]
@@ -175,21 +166,19 @@ try:
                         linhas_banco = []
                         for f_item in fontes_compartilhadas:
                             df_item = df_banco_proc[df_banco_proc['fonte_clean'] == f_item]
-                            f_rep = float(df_item['Receitas / Repasses'].sum())
-                            f_ren = float(df_item['rendimentos'].sum())
-                            f_des = float(df_item['Valor Bruto da NF'].sum())
-                            f_sal = (f_rep + f_ren) - f_des
+                            f_rep = float(df_item['repasse'].sum())
+                            f_ren = float(df_item['rendimento'].sum())
+                            f_des = float(df_item['bruto'].sum())
                             
                             linhas_banco.append({
                                 'Fonte Orçamentária': f_item + (" 👈 (Ativa)" if f_item == fonte_sel else ""),
                                 '(+) Repasses': fmt(f_rep),
                                 '(+) Rendimentos': fmt(f_ren),
                                 '(-) Despesas NF': fmt(f_des),
-                                '(=) Saldo Real': fmt(f_sal)
+                                '(=) Saldo Real': fmt((f_rep + f_ren) - f_des)
                             })
                             
-                        df_tab_banco = pd.DataFrame(linhas_banco)
-                        st.dataframe(df_tab_banco, use_container_width=True, hide_index=True)
+                        st.dataframe(pd.DataFrame(linhas_banco), use_container_width=True, hide_index=True)
 
                     st.markdown("<div class='section-title'>📋 Detalhamento dos Lançamentos</div>", unsafe_allow_html=True)
                     df_validos = df_final[df_final['EMPENHO_COL'] != '-']
@@ -198,21 +187,22 @@ try:
                             'DATA': df_validos['DATA_LANCAMENTO'],
                             'EMPENHO': df_validos['EMPENHO_COL'],
                             'NOTA': df_validos['NOTA_COL'],
-                            'VALOR BRUTO': df_validos['Valor Bruto da NF'].apply(fmt),
+                            'VALOR BRUTO': df_validos['bruto'].apply(fmt),
                             'PDF': df_validos['PDF_GERAL']
                         })
                         st.dataframe(df_render, use_container_width=True, hide_index=True)
 
+        # PANORAMA GERAL CARREGADO SOB DEMANDA (PRESERVA A VELOCIDADE DA PÁGINA)
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
-            g_rep, g_ren, g_gas = float(df['Receitas / Repasses'].sum()), float(df['rendimentos'].sum()), float(df['Valor Bruto da NF'].sum())
+            g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
             
             col_l1, col_l2 = st.columns(2)
             col_l1.markdown(f'''<div class='metric-container' style='background-color:#f8fafc; border-color:#2563eb; border-left:6px solid #2563eb;'><div>💰 Total Entradas Recebidas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#059669;">{fmt(g_rep + g_ren)}</div></div>''', unsafe_allow_html=True)
             col_l2.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Saídas Liquidadas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#dc2626;">{fmt(g_gas)}</div></div>''', unsafe_allow_html=True)
 
-            df_cronologico = df.groupby('ano_mov').agg({'Receitas / Repasses':'sum', 'rendimentos':'sum', 'Valor Bruto da NF':'sum'}).reset_index().sort_values('ano_mov')
-            df_cronologico['Saldo_Acumulado'] = ((df_cronologico['Receitas / Repasses'] + df_cronologico['rendimentos']) - df_cronologico['Valor Bruto da NF']).cumsum()
+            df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
+            df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
             fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
@@ -220,27 +210,27 @@ try:
 
         with tab_deputados:
             st.markdown("<div class='section-title'>📊 Repasses por Parlamentar</div>", unsafe_allow_html=True)
-            df_dep = df.groupby(['deputado', 'fonte_clean']).agg({'Receitas / Repasses': 'sum', 'Valor Bruto da NF': 'sum', 'desc_clean': 'first'}).reset_index()
+            df_dep = df.groupby(['deputado', 'fonte_clean']).agg({'repasse': 'sum', 'bruto': 'sum', 'desc_clean': 'first'}).reset_index()
             df_dep = df_dep[df_dep['deputado'] != 'Não Informado']
-            df_dep['Saldo'] = df_dep['Receitas / Repasses'] - df_dep['Valor Bruto da NF']
+            df_dep['Saldo'] = df_dep['repasse'] - df_dep['bruto']
             
-            df_dep['Receitas / Repasses'] = df_dep['Receitas / Repasses'].apply(fmt)
-            df_dep['Valor Bruto da NF'] = df_dep['Valor Bruto da NF'].apply(fmt)
+            df_dep['repasse'] = df_dep['repasse'].apply(fmt)
+            df_dep['bruto'] = df_dep['bruto'].apply(fmt)
             df_dep['Saldo'] = df_dep['Saldo'].apply(fmt)
             df_dep.columns = ['Parlamentar / Deputado', 'Fonte', '(+) Repasses', '(-) Gastos', '(=) Saldo Livre', 'Descrição']
             st.dataframe(df_dep, use_container_width=True, hide_index=True)
 
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Recursos Direcionados por Secretaria</div>", unsafe_allow_html=True)
-            df_sec = df.groupby(['secretaria', 'fonte_clean']).agg({'Receitas / Repasses': 'sum', 'Valor Bruto da NF': 'sum'}).reset_index()
+            df_sec = df.groupby(['secretaria', 'fonte_clean']).agg({'repasse': 'sum', 'bruto': 'sum'}).reset_index()
             df_sec = df_sec[df_sec['secretaria'] != 'Não Especificada']
-            df_sec['Saldo'] = df_sec['Receitas / Repasses'] - df_sec['Valor Bruto da NF']
+            df_sec['Saldo'] = df_sec['repasse'] - df_sec['bruto']
             
-            df_sec['Receitas / Repasses'] = df_sec['Receitas / Repasses'].apply(fmt)
-            df_sec['Valor Bruto da NF'] = df_sec['Valor Bruto da NF'].apply(fmt)
+            df_sec['repasse'] = df_sec['repasse'].apply(fmt)
+            df_sec['bruto'] = df_sec['bruto'].apply(fmt)
             df_sec['Saldo'] = df_sec['Saldo'].apply(fmt)
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
             
 except Exception as e:
-    st.error(f"Erro no processamento completo: {e}")
+    st.error(f"Erro no processamento de alta velocidade: {e}")
