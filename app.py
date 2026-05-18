@@ -72,14 +72,20 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# LINK LIMPO FORMATADO EM CSV
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/export?format=csv"
+# CONEXÃO INDESTRUTÍVEL VIA PROTOCOLO DE PREVIEW PÚBLICO
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/preview"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    df_raw = pd.read_csv(SHEET_URL)
-    df = pd.DataFrame()
+    # Coleta via tabelas HTML estruturadas para ignorar os bloqueios de firewall do 404
+    html_tables = pd.read_html(SHEET_URL, header=0, encoding='utf-8')
+    df_raw = html_tables[0]
     
+    # Limpeza de colunas fantasmas geradas pelo preview do Google
+    df_raw = df_raw.dropna(how='all', axis=1)
+    df_raw.columns = [str(c).split('.')[0] if 'Unnamed' in str(c) else str(c) for c in df_raw.columns]
+    
+    df = pd.DataFrame()
     colunas_mapeadas_limpas = {}
     for c in df_raw.columns:
         c_clean = str(c).strip().lower()
