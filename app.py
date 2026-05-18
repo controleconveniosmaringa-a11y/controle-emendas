@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 import os
+import urllib.request
 
 # 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
@@ -29,12 +30,18 @@ st.markdown('''<style>
 </style>''', unsafe_allow_html=True)
 
 def obter_base_dados_global():
-    if not os.path.exists("dados.csv"):
-        return pd.DataFrame()
-        
-    df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-    df = pd.DataFrame()
+    # 🛠️ CAPTURA DIRETAMENTE A BASE ATUALIZADA DO GOOGLE SHEETS VIA API PÚBLICA DO GITHUB
+    url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     
+    try:
+        df_raw = pd.read_csv(url_dados_efetivos, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+    except Exception:
+        if os.path.exists("dados.csv"):
+            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else:
+            return pd.DataFrame()
+            
+    df = pd.DataFrame()
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
     def extrair_lista_limpa(nome_chave):
@@ -51,7 +58,14 @@ def obter_base_dados_global():
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
     df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
-    df['URL_REAL_LINK'] = [x if x != '' else '-' for x in extrair_lista_limpa('urllink')]
+    
+    url_items = [''] * len(df_raw)
+    for chave_tentativa in ['urllink', 'url', 'link', 'comprovante']:
+        col_achada = next((orig for limpa, orig in colunas_originais.items() if chave_tentativa in limpa), None)
+        if col_achada is not None:
+            url_items = [str(item).strip() if (str(item).strip() != '' and str(item).strip().lower() != 'nan') else '' for item in df_raw[col_achada]]
+            break
+    df['URL_REAL_LINK'] = [x if x != '' else '-' for x in url_items]
     
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in extrair_lista_limpa('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in extrair_lista_limpa('deputado')]
@@ -67,7 +81,6 @@ def obter_base_dados_global():
         anos.append(match.group(1) if match else '2025')
     df['ano_mov'] = anos
 
-    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO
     for col_num in ['repasse', 'rendimento', 'bruto']:
         valores_limpos = []
         for v in extrair_lista_limpa(col_num):
@@ -75,17 +88,14 @@ def obter_base_dados_global():
             if not txt or txt == '-':
                 valores_limpos.append(0.0)
                 continue
-            
             if ',' in txt and '.' in txt:
                 txt = txt.replace('.', '').replace(',', '.')
             elif ',' in txt:
                 txt = txt.replace(',', '.')
-                
             try:
                 valores_limpos.append(float(txt))
             except ValueError:
                 valores_limpos.append(0.0)
-                
         df[col_num] = valores_limpos
         
     return df
@@ -293,7 +303,6 @@ try:
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
-            # 🛠️ LINHA CORRIGIDA SEM CARACTERES CORROMPIDOS (Sintaxe 100% Limpa)
             fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
