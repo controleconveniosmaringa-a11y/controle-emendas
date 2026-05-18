@@ -30,7 +30,6 @@ st.markdown('''<style>
 </style>''', unsafe_allow_html=True)
 
 def obter_base_dados_global():
-    # 🛠️ CAPTURA DIRETAMENTE A BASE ATUALIZADA DO GOOGLE SHEETS VIA API PÚBLICA DO GITHUB
     url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     
     try:
@@ -118,8 +117,9 @@ try:
         with c_filtro2:
             ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
         
-        tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
-            f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
+        # 🛠️ ADICIONADA A QUARTA TAB: "📋 Por Plano de Ação"
+        tab_ativa, tab_geral, tab_deputados, tab_secretarias, tab_planos = st.tabs([
+            f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria", "📋 Por Plano de Ação"
         ])
         
         with tab_ativa:
@@ -330,6 +330,41 @@ try:
             df_sec['Saldo'] = df_sec['Saldo'].apply(fmt)
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
+
+        # 🚀 LÓGICA DA NOVA ABA: EXIBIÇÃO CONSOLIDADA POR PLANO DE AÇÃO
+        with tab_planos:
+            st.markdown("<div class='section-title'>📋 Movimentações Financeiras por Plano de Ação</div>", unsafe_allow_html=True)
+            
+            # Filtra linhas sem plano definido
+            df_pln_base = df[(df['plano_clean'] != '') & (df['plano_clean'] != 'nan')]
+            
+            if not df_pln_base.empty:
+                # Agrupa por plano e fonte trazendo o somatório completo pedido
+                df_plno_grouped = df_pln_base.groupby(['plano_clean', 'fonte_clean']).agg({
+                    'repasse': 'sum',
+                    'rendimento': 'sum',
+                    'bruto': 'sum'
+                }).reset_index()
+                
+                # Calcula o saldo disponível matemático (Receita + Rendimento - Despesa)
+                df_plno_grouped['saldo_disponivel'] = (df_plno_grouped['repasse'] + df_plno_grouped['rendimento']) - df_plno_grouped['bruto']
+                
+                # Ordena pelo código do plano para organização visual
+                df_plno_grouped = df_plno_grouped.sort_values('plano_clean')
+                
+                # Aplica a formatação de moeda brasileira nas colunas calculadas
+                df_plno_render = pd.DataFrame({
+                    'Plano de Ação': df_plno_grouped['plano_clean'].astype(str).str.upper(),
+                    'Fonte Orçamentária': df_plno_grouped['fonte_clean'].astype(str).str.upper(),
+                    '(+) Receita (Repasse)': df_plno_grouped['repasse'].apply(fmt),
+                    '(+) Rendimentos': df_plno_grouped['rendimento'].apply(fmt),
+                    '(-) Despesas': df_plno_grouped['bruto'].apply(fmt),
+                    '(=) Saldo Disponível': df_plno_grouped['saldo_disponivel'].apply(fmt)
+                })
+                
+                st.dataframe(df_plno_render, use_container_width=True, hide_index=True)
+            else:
+                st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
             
 except Exception as e:
     st.error(f"Erro no processamento unificado: {e}")
