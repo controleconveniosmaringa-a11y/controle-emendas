@@ -227,7 +227,7 @@ try:
             col_l2.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Saídas Liquidadas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#dc2626;">{fmt(g_gas)}</div></div>''', unsafe_allow_html=True)
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
-            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
+            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cron规律 = df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
 
@@ -249,36 +249,44 @@ try:
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
 
-        # 🛠️ ABA PLANO DE AÇÃO ATUALIZADA COM ENTRADA DUPLA (DIGITAÇÃO OU SELEÇÃO)
+        # 🛠️ ABA PLANO DE AÇÃO ATUALIZADA COM COMPARAÇÃO DE NÚMEROS PUROS (IGNORA TRAÇOS, PONTOS E ESPAÇOS)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
             
             if lista_planos_validos:
-                # Criação do layout de duas colunas para os filtros combinados
                 col_busca_txt, col_busca_sel = st.columns(2)
                 
                 with col_busca_txt:
-                    plano_digitado = st.text_input("⌨️ Escreva o número do Plano de Ação:", value="", placeholder="Ex: 1264", key="input_texto_plano_acao").strip().upper()
+                    # Recebe a digitação do usuário
+                    plano_digitado_raw = st.text_input("⌨️ Escreva o número do Plano de Ação (Apenas números, sem traços):", value="", placeholder="Ex: 1264", key="input_texto_plano_acao").strip()
+                    # 🛠️ Remove qualquer traço, ponto ou espaço digitado para ter o número puro
+                    plano_digitado_numerico = re.sub(r'\D', '', plano_digitado_raw)
+                
+                # Procura na lista qual plano corresponde aos números puros digitados
+                plano_encontrado_por_digito = None
+                if plano_digitado_numerico:
+                    for pln_real in lista_planos_validos:
+                        if re.sub(r'\D', '', pln_real) == plano_digitado_numerico:
+                            plano_encontrado_por_digito = pln_real
+                            break
                 
                 with col_busca_sel:
-                    # Se o usuário digitou algo válido, a lista se ajusta automaticamente para ele
                     plano_padrao_idx = 0
-                    if plano_digitado in lista_planos_validos:
-                        plano_padrao_idx = lista_planos_validos.index(plano_digitado)
+                    if plano_encontrado_por_digito in lista_planos_validos:
+                        plano_padrao_idx = lista_planos_validos.index(plano_encontrado_por_digito)
                     
                     plano_selecionado_listbox = st.selectbox("🖱️ Ou escolha clicando aqui na lista:", options=lista_planos_validos, index=plano_padrao_idx, key="selecao_plano_lista_hibrida")
                 
-                # 🛠️ REGRA DE OURO DA DUPLA ESCOLHA: O digitado tem prioridade absoluta se existir na base, senão usa a lista
-                if plano_digitado and plano_digitado in lista_planos_validos:
-                    plano_final_analise = plano_digitado
+                # Define o plano final para a query
+                if plano_encontrado_por_digito:
+                    plano_final_analise = plano_encontrado_por_digito
                 else:
-                    if plano_digitado and plano_digitado not in lista_planos_validos:
-                        st.warning(f"⚠️ O plano '{plano_digitado}' não foi localizado na base. Exibindo o plano selecionado na lista abaixo.")
+                    if plano_digitado_raw and not plano_encontrado_por_digito:
+                        st.warning(f"⚠️ O plano contendo apenas os números '{plano_digitado_numerico}' não foi localizado. Usando a lista suspensa abaixo.")
                     plano_final_analise = plano_selecionado_listbox
                 
-                # Executa o filtro contábil com base no plano final escolhido
                 df_pln_ativo = df[df['plano_clean'].str.upper() == plano_final_analise]
                 
                 if not df_pln_ativo.empty:
