@@ -74,23 +74,17 @@ st.markdown('''<style>
     .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #000000; margin-top: 25px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 3px solid #000000; }
     .meta-tag { background-color: #f1f5f9; color: #000000; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; border: 1px solid #cbd5e1; margin-right: 6px; display: inline-block; }
     .secretaria-header { font-size: 16px; font-weight: 800; color: #000000; margin-top: 15px; padding-left: 6px; border-left: 5px solid #000000; }
-    .metric-container { background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; justify-content: center; min-height: 100px; }
     .extrato-table { width: 100%; border-collapse: collapse; margin-top: 8px; background-color: #ffffff; border: 2px solid #000000; border-radius: 6px; overflow: hidden; }
     .extrato-row { border-bottom: 1px solid #cbd5e1; }
     .extrato-row-final { background-color: #f8fafc; font-weight: 800; border-top: 2px solid #000000; }
     .extrato-cell-label { padding: 10px 15px; font-size: 12px; font-weight: 700; color: #0f172a; text-align: left; }
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
-    .grid-header { background-color: #2563eb; color: #ffffff; padding: 10px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #1e40af; }
-    .grid-row-active { background-color: #f8fafc; padding: 10px; font-weight: 700; border-bottom: 1px solid #cbd5e1; font-size: 12px; }
-    .grid-row-normal { padding: 10px; border-bottom: 1px solid #cbd5e1; font-size: 12px; }
-    .grid-total { background-color: #eff6ff; padding: 12px; font-weight: 800; font-size: 12px; color: #1e3a8a; border-top: 2px solid #2563eb; }
 </style>''', unsafe_allow_html=True)
 
 try:
     df = carregar_e_indexar_base()
     
     if not df.empty:
-        # Formatação nativa cacheável extremamente veloz
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
@@ -100,7 +94,6 @@ try:
         st.sidebar.markdown("<h3 style='margin-top:0; font-size:16px; color:#000000;'>Filtro Principal</h3>", unsafe_allow_html=True)
         fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
         
-        # Abas estáveis de carregamento isolado
         tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
             f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
         ])
@@ -168,7 +161,7 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # CONCILIAÇÃO BANCÁRIA COM RENDERIZAÇÃO ESTÁTICA EM BLOCO (MÚLTIPLOS USUÁRIOS)
+                    # RECONSTRUÇÃO NATIVA ULTRA VELOZ DA CONCILIAÇÃO BANCÁRIA (SEM CONFLITO VISUAL)
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
@@ -176,24 +169,10 @@ try:
                         ano_banco_sel = st.selectbox("📅 Selecione o Exercício para Conciliação Bancária:", ["Exibir Saldo Histórico Acumulado"] + anos_bancarios, key="filtro_ano_banco")
                         
                         df_banco_proc = df_conta_total_banco if ano_banco_sel == "Exibir Saldo Histórico Acumulado" else df_conta_total_banco[df_conta_total_banco['ano_mov'] == ano_banco_sel]
-                        rotulo_tabela = "SALDO HISTÓRICO ACUMULADO GERAL" if ano_banco_sel == "Exibir Saldo Histórico Acumulado" else f"EXERCÍCIO FISCAL DE {ano_banco_sel}"
                         
                         fontes_compartilhadas = sorted([fc for fc in df_banco_proc['fonte_clean'].unique() if fc != ''])
                         
-                        # Construção HTML estática em string única para poupar barramento do servidor
-                        html_buffer = f"""
-                        <div style='display: grid; gap: 2px; background-color: #cbd5e1; padding: 1px; border-radius: 6px; overflow: hidden; border: 2px solid #000000;'>
-                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: #2563eb; color: white; padding: 10px; font-weight: 800; font-size: 12px;'>
-                                <div>ORIGEM DO RECURSO ({rotulo_tabela})</div>
-                                <div style='text-align: right;'>(+) REPASSES</div>
-                                <div style='text-align: right;'>(+) RENDIMENTOS</div>
-                                <div style='text-align: right;'>(-) DESPESAS</div>
-                                <div style='text-align: right;'>(=) SALDO BANCO</div>
-                            </div>
-                        """
-                        
-                        b_rec, b_ren, b_des, b_sal_tot = 0.0, 0.0, 0.0, 0.0
-                        
+                        linhas_banco = []
                         for f_item in fontes_compartilhadas:
                             df_item = df_banco_proc[df_banco_proc['fonte_clean'] == f_item]
                             f_rep = float(df_item['Receitas / Repasses'].sum())
@@ -201,37 +180,16 @@ try:
                             f_des = float(df_item['Valor Bruto da NF'].sum())
                             f_sal = (f_rep + f_ren) - f_des
                             
-                            b_rec += f_rep
-                            b_ren += f_ren
-                            b_des += f_des
-                            b_sal_tot += f_sal
+                            linhas_banco.append({
+                                'Fonte Orçamentária': f_item + (" 👈 (Ativa)" if f_item == fonte_sel else ""),
+                                '(+) Repasses': fmt(f_rep),
+                                '(+) Rendimentos': fmt(f_ren),
+                                '(-) Despesas NF': fmt(f_des),
+                                '(=) Saldo Real': fmt(f_sal)
+                            })
                             
-                            bg_row = "#f8fafc" if f_item == fonte_sel else "#ffffff"
-                            font_w = "800" if f_item == fonte_sel else "500"
-                            marcador = " 👈 (Ativa)" if f_item == fonte_sel else ""
-                            cor_saldo = "#059669" if f_sal >= 0 else "#dc2626"
-                            
-                            html_buffer += f"""
-                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: {bg_row}; padding: 10px; font-size: 12px; font-weight: {font_w}; border-bottom: 1px solid #cbd5e1;'>
-                                <div>📍 Fonte Orçamentária: <b>{f_item}</b>{marcador}</div>
-                                <div style='text-align: right; color: #059669;'>{fmt(f_rep)}</div>
-                                <div style='text-align: right; color: #2563eb;'>{fmt(f_ren)}</div>
-                                <div style='text-align: right; color: #dc2626;'>{fmt(f_des)}</div>
-                                <div style='text-align: right; font-weight: 800; color: {cor_saldo};'>{fmt(f_sal)}</div>
-                            </div>
-                            """
-                            
-                        html_buffer += f"""
-                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: #eff6ff; padding: 12px; font-weight: 800; font-size: 12px; color: #1e3a8a; border-top: 2px solid #2563eb;'>
-                                <div>💰 VALOR DISPONÍVEL TOTAL NA CONTA</div>
-                                <div style='text-align: right; color: #475569;'>{fmt(b_rec)}</div>
-                                <div style='text-align: right; color: #475569;'>{fmt(b_ren)}</div>
-                                <div style='text-align: right; color: #dc2626;'>{fmt(b_des)}</div>
-                                <div style='text-align: right; font-size: 13px; color: #1e3a8a; background-color: #dbeafe; padding: 2px 6px; border-radius: 4px; border: 1px solid #2563eb;'><b>{fmt(b_sal_tot)}</b></div>
-                            </div>
-                        </div>
-                        """
-                        st.markdown(html_buffer, unsafe_allow_html=True)
+                        df_tab_banco = pd.DataFrame(linhas_banco)
+                        st.dataframe(df_tab_banco, use_container_width=True, hide_index=True)
 
                     st.markdown("<div class='section-title'>📋 Detalhamento dos Lançamentos</div>", unsafe_allow_html=True)
                     df_validos = df_final[df_final['EMPENHO_COL'] != '-']
