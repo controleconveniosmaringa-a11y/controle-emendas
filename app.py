@@ -11,7 +11,7 @@ st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="w
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
-    [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; } /* Oculta a barra lateral para ganhar espaço */
+    [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     .main-title { font-size: 34px; font-weight: 800; color: #0f172a; letter-spacing: -1.2px; margin-bottom: 5px; }
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 14px 20px; }
@@ -28,7 +28,6 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
-# 2. MOTOR DE LEITURA COMPARTILHADO ULTRA RÁPIDO (RAM DIRECTA)
 @st.cache_resource
 def obter_base_dados_global():
     if not os.path.exists("dados.csv"):
@@ -50,6 +49,7 @@ def obter_base_dados_global():
     df['EMPENHO_COL'] = extrair('empenho').replace('', '-')
     df['NOTA_COL'] = extrair('nota').replace('', '-')
     df['PDF_GERAL'] = extrair('pdf').replace('', '-')
+    df['URL_REAL_LINK'] = extrair('urllink').replace('', '-') 
     
     df['secretaria'] = extrair('secretaria').replace('', 'Não Especificada')
     df['deputado'] = extrair('deputado').replace('', 'Não Informado')
@@ -76,10 +76,8 @@ try:
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
 
-        # 📄 TÍTULO PRINCIPAL DO PAINEL
         st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
         
-        # 🎯 FILTROS POSICIONADOS LADO A LADO LOGO APÓS O TÍTULO CENTRAL
         c_filtro1, c_filtro2 = st.columns(2)
         with c_filtro1:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária:", options=fontes, index=0)
@@ -100,7 +98,6 @@ try:
                     pln_vinculo = df_final['plano_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
-                    # Aplicação do corte temporal unificado do topo central
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final
                         df_fonte_saldo = df_final
@@ -230,7 +227,7 @@ try:
                             'Nº Empenho': df_validos['EMPENHO_COL'],
                             'Nota Fiscal': df_validos['NOTA_COL'],
                             'Valor Bruto NF': df_validos['bruto'], 
-                            'Comprovante/PDF 📄': df_validos['PDF_GERAL']
+                            'Comprovante/PDF 📄': df_validos['URL_REAL_LINK']
                         })
                         
                         df_render_estilizado = df_render.style.format({
@@ -246,7 +243,7 @@ try:
                                 "Nº Empenho": st.column_config.TextColumn(alignment="center"),
                                 "Nota Fiscal": st.column_config.TextColumn(alignment="center"),
                                 "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"),
-                                "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗") if df_render['Comprovante/PDF 📄'].str.contains('http').any() else st.column_config.TextColumn(alignment="left")
+                                "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")
                             }
                         )
                     else:
