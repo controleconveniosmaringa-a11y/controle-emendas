@@ -89,7 +89,8 @@ st.markdown(f'''<style>
 </style>''', unsafe_allow_html=True)
 
 try:
-    df = carregar_dados_locales()
+    # CORREÇÃO CRÍTICA DO NOME DA FUNÇÃO DE CHAMADA
+    df = carregar_dados_locais()
     
     if not df.empty:
         def fmt(valor):
@@ -109,7 +110,6 @@ try:
         st.sidebar.markdown("---")
         st.sidebar.markdown("<h3 style='margin-size:0; font-size:16px; color:#000000;'>Mapeamento Geral</h3>", unsafe_allow_html=True)
         
-        # Uso de state para evitar re-renderização fantasma pesada de gráficos e poupar memória
         if st.sidebar.button("🌐 Consultar Panorama Geral Municipal", use_container_width=True):
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Panorama Consolidado Histórico — Geral por Fontes Orçamentárias</div>", unsafe_allow_html=True)
             tot_global_repasse = float(df['Receitas / Repasses'].sum())
