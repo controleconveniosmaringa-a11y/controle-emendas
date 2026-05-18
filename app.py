@@ -72,14 +72,12 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# PONTE DIRETA DA PLANILHA VIA EXPORTAÇÃO CORPORATIVA
-SHEET_ID = "1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&id={SHEET_ID}"
+# LINK LIMPO FORMATADO EM CSV
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/export?format=csv"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    # Uso do mecanismo integrado 'python' do pandas para ignorar barreira 404
-    df_raw = pd.read_csv(SHEET_URL, engine='python')
+    df_raw = pd.read_csv(SHEET_URL)
     df = pd.DataFrame()
     
     colunas_mapeadas_limpas = {}
@@ -182,7 +180,7 @@ try:
         with g1:
             st.markdown(f'''<div class='metric-container' style='background-color:#f8fafc; border-color:#2563eb; border-left:6px solid #2563eb;'><div>💰 Total de Receitas Municipais (Global)</div><div style="font-size:17px; font-weight:700; color:#059669;">Repasses: {fmt(tot_global_repasse)}</div><div style="font-size:17px; font-weight:700; color:#2563eb;">Rendimentos: {fmt(tot_global_rendimento)}</div></div>''', unsafe_allow_html=True)
         with g2:
-            st.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left:6px solid #dc2626;'><div>💸 Total Já Liquidado Municipal (Gasto Bruto)</div><div style="font-size:24px; font-weight:800; color:#dc2626;">{fmt(tot_global_gasto)}</div></div>''', unsafe_allow_html=True)
+            st.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Já Liquidado Municipal (Gasto Bruto)</div><div style="font-size:24px; font-weight:800; color:#dc2626;">{fmt(tot_global_gasto)}</div></div>''', unsafe_allow_html=True)
 
         df_cronologico = df.groupby('ano_mov').agg({'Receitas / Repasses':'sum', 'rendimentos':'sum', 'Valor Bruto da NF':'sum'}).reset_index()
         df_cronologico['Saldo_Isolado_Ano'] = (df_cronologico['Receitas / Repasses'] + df_cronologico['rendimentos']) - df_cronologico['Valor Bruto da NF']
@@ -291,7 +289,7 @@ try:
             y=df_sec_consolidado_grafico['Saldo Disponível'],
             name='Saldo Disponível',
             marker=dict(color='#059669', line=dict(color='#047857', width=1.5)), 
-            text=[f"{fmt(v)}" for v in df_sec_consolidado_grafico['Saldo Disponível']],
+            text=[f"{fmt(v)}" for v in df_sec_consolidado_grafico['secretaria']],
             textposition='outside',
             textfont=dict(family='Inter', size=11, color='#000000')
         ))
