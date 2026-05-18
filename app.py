@@ -37,7 +37,6 @@ def obter_base_dados_global():
     
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
-    # 🛠️ NOVA ABORDAGEM: Extração purificada em listas nativas do Python para banir o erro do NumPy
     def extrair_lista_limpa(nome_chave):
         col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
         if col_real is not None:
@@ -68,7 +67,7 @@ def obter_base_dados_global():
         anos.append(match.group(1) if match else '2025')
     df['ano_mov'] = anos
 
-    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO (Sem multiplicação por 100)
+    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO
     for col_num in ['repasse', 'rendimento', 'bruto']:
         valores_limpos = []
         for v in extrair_lista_limpa(col_num):
@@ -294,7 +293,8 @@ try:
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
-            fig = go.Figure(go.Scatter(x=df_cron规律 = df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
+            # 🛠️ LINHA CORRIGIDA SEM CARACTERES CORROMPIDOS (Sintaxe 100% Limpa)
+            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
 
