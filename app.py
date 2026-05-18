@@ -11,8 +11,7 @@ st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="w
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
-    [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { background-color: #ffffff !important; border-right: 2px solid #cbd5e1 !important; }
-    [data-testid="stSidebar"] div[data-testid="stSelectbox"] { background-color: #f1f5f9 !important; padding: 2px; border-radius: 6px; }
+    [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; } /* Oculta a barra lateral para ganhar espaço */
     .main-title { font-size: 34px; font-weight: 800; color: #0f172a; letter-spacing: -1.2px; margin-bottom: 5px; }
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 14px 20px; }
@@ -75,9 +74,17 @@ try:
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
+        anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
+
+        # 📄 TÍTULO PRINCIPAL DO PAINEL
+        st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
         
-        st.sidebar.markdown("<h3 style='margin-top:0; font-size:16px; color:#000000;'>Filtro Principal</h3>", unsafe_allow_html=True)
-        fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
+        # 🎯 NOVO LAYOUT DO TOPO CENTRAL: FILTROS POSICIONADOS LADO A LADO LOGO APÓS O TÍTULO
+        c_filtro1, c_filtro2 = st.columns(2)
+        with c_filtro1:
+            fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária:", options=fontes, index=0)
+        with c_filtro2:
+            ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
         
         tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
             f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
@@ -93,11 +100,7 @@ try:
                     pln_vinculo = df_final['plano_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
-                    st.markdown(f"<div class='main-title'>Controle de Emendas — Fonte: {fonte_sel}</div>", unsafe_allow_html=True)
-                    
-                    anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
-                    ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal para Filtrar o Painel:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
-                    
+                    # Aplicação do corte temporal unificado do topo central
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final
                         df_fonte_saldo = df_final
@@ -168,14 +171,14 @@ try:
                         </table>''', unsafe_allow_html=True)
 
                     if conta_vinculada != "Não Informada" and not df_banco_saldo.empty:
-                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada} ({lbl_ano})</div>", unsafe_allow_html=True)
                         
                         fontes_compartilhadas = sorted([fc for fc in df_banco_saldo['fonte_clean'].unique() if fc != ''])
                         linhas_banco = []
                         tot_rep_ano, tot_ren_ano, tot_gasto_ano, tot_saldo_acum = 0.0, 0.0, 0.0, 0.0
                         
                         for f_item in fontes_compartilhadas:
-                            df_item_ano = df_banco_fluxo[df_banco_fluxo['fonte_clean'] == f_item] if not df_banco_fluxo.empty else pd.DataFrame()
+                            df_item_ano = df_banco_flux[df_banco_flux['fonte_clean'] == f_item] if not df_banco_flux.empty else pd.DataFrame()
                             f_rep = float(df_item_ano['repasse'].sum()) if not df_item_ano.empty else 0.0
                             f_ren = float(df_item_ano['rendimento'].sum()) if not df_item_ano.empty else 0.0
                             f_des = float(df_item_ano['bruto'].sum()) if not df_item_ano.empty else 0.0
@@ -219,7 +222,6 @@ try:
                         })
                         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
 
-                    # 📋 DESIGN PREMIUM INTERATIVO APLICADO NO DETALHAMENTO DE LANÇAMENTOS 
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
@@ -227,19 +229,14 @@ try:
                             'Data Lançamento': df_validos['DATA_LANCAMENTO'],
                             'Nº Empenho': df_validos['EMPENHO_COL'],
                             'Nota Fiscal': df_validos['NOTA_COL'],
-                            'Valor Bruto NF': df_validos['bruto'], # Enviado como float para aplicar estilo monetário nativo
+                            'Valor Bruto NF': df_validos['bruto'], 
                             'Comprovante/PDF 📄': df_validos['PDF_GERAL']
                         })
                         
-                        # Customização avançada da planilha (Estilo Tabela Bancária Executiva)
                         df_render_estilizado = df_render.style.format({
-                            'Valor Bruto NF': fmt  # Formata a coluna de moeda perfeitamente
-                        }).set_properties(**{
-                            'font-weight': '500',
-                            'font-size': '12px'
-                        })
+                            'Valor Bruto NF': fmt  
+                        }).set_properties(**{'font-weight': '500', 'font-size': '12px'})
                         
-                        # Renderiza com largura total e configurações avançadas de coluna do Streamlit
                         st.dataframe(
                             df_render_estilizado, 
                             use_container_width=True, 
