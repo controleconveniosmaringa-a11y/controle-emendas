@@ -59,7 +59,7 @@ def carregar_e_indexar_base():
     
     return df
 
-# 3. INTERFACE E MODELAGEM VISUAL CSS
+# 3. INTERFACE E MODELAGEM VISUAL CSS COMPACTADO
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
@@ -90,6 +90,7 @@ try:
     df = carregar_e_indexar_base()
     
     if not df.empty:
+        # Formatação nativa cacheável extremamente veloz
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
@@ -99,11 +100,11 @@ try:
         st.sidebar.markdown("<h3 style='margin-top:0; font-size:16px; color:#000000;'>Filtro Principal</h3>", unsafe_allow_html=True)
         fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
         
+        # Abas estáveis de carregamento isolado
         tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
             f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
         ])
         
-        # ABA 1: OPERAÇÃO COMPLETA COM CONCILIAÇÃO BANCÁRIA REATIVADA
         with tab_ativa:
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
@@ -142,7 +143,6 @@ try:
                     
                     secretarias = [s for s in df_final['secretaria'].unique() if s != '']
                     
-                    # RETORNO DO EXTRATO CONSOLIDADO MÃE (MÚLTIPLAS SECRETARIAS)
                     if len(secretarias) > 1:
                         st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom: 3px solid #1e3a8a;'>🌍 RESUMO GERAL CONSOLIDADO (TODAS AS SECRETARIAS)</div>", unsafe_allow_html=True)
                         st.markdown(f'''<table class='extrato-table'>
@@ -168,7 +168,7 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # RETORNO COMPLETO DA CONCILIAÇÃO BANCÁRIA COMPARTILHADA POR EXERCÍCIO
+                    # CONCILIAÇÃO BANCÁRIA COM RENDERIZAÇÃO ESTÁTICA EM BLOCO (MÚLTIPLOS USUÁRIOS)
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
@@ -180,12 +180,17 @@ try:
                         
                         fontes_compartilhadas = sorted([fc for fc in df_banco_proc['fonte_clean'].unique() if fc != ''])
                         
-                        c_head1, c_head2, c_head3, c_head4, c_head5 = st.columns([2.5, 1.5, 1.5, 1.5, 2])
-                        c_head1.markdown(f"<div class='grid-header' style='text-align:left;'>ORIGEM DO RECURSO ({rotulo_tabela})</div>", unsafe_allow_html=True)
-                        c_head2.markdown("<div class='grid-header' style='background-color:#059669; border-color:#047857;'>(+) REPASSES</div>", unsafe_allow_html=True)
-                        c_head3.markdown("<div class='grid-header' style='background-color:#2563eb; border-color:#1d4ed8;'>(+) RENDIMENTOS</div>", unsafe_allow_html=True)
-                        c_head4.markdown("<div class='grid-header' style='background-color:#dc2626; border-color:#b91c1c;'>(-) DESPESAS</div>", unsafe_allow_html=True)
-                        c_head5.markdown("<div class='grid-header' style='background-color:#1e293b; border-color:#0f172a;'>(=) SALDO BANCO</div>", unsafe_allow_html=True)
+                        # Construção HTML estática em string única para poupar barramento do servidor
+                        html_buffer = f"""
+                        <div style='display: grid; gap: 2px; background-color: #cbd5e1; padding: 1px; border-radius: 6px; overflow: hidden; border: 2px solid #000000;'>
+                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: #2563eb; color: white; padding: 10px; font-weight: 800; font-size: 12px;'>
+                                <div>ORIGEM DO RECURSO ({rotulo_tabela})</div>
+                                <div style='text-align: right;'>(+) REPASSES</div>
+                                <div style='text-align: right;'>(+) RENDIMENTOS</div>
+                                <div style='text-align: right;'>(-) DESPESAS</div>
+                                <div style='text-align: right;'>(=) SALDO BANCO</div>
+                            </div>
+                        """
                         
                         b_rec, b_ren, b_des, b_sal_tot = 0.0, 0.0, 0.0, 0.0
                         
@@ -201,24 +206,33 @@ try:
                             b_des += f_des
                             b_sal_tot += f_sal
                             
-                            classe = "grid-row-active" if f_item == fonte_sel else "grid-row-normal"
+                            bg_row = "#f8fafc" if f_item == fonte_sel else "#ffffff"
+                            font_w = "800" if f_item == fonte_sel else "500"
                             marcador = " 👈 (Ativa)" if f_item == fonte_sel else ""
+                            cor_saldo = "#059669" if f_sal >= 0 else "#dc2626"
                             
-                            c_row1, c_row2, c_row3, c_row4, c_row5 = st.columns([2.5, 1.5, 1.5, 1.5, 2])
-                            c_row1.markdown(f"<div class='{classe}'>📍 Fonte Orçamentária: <b>{f_item}</b>{marcador}</div>", unsafe_allow_html=True)
-                            c_row2.markdown(f"<div class='{classe}' style='text-align:right; color:#059669;'>{fmt(f_rep)}</div>", unsafe_allow_html=True)
-                            c_row3.markdown(f"<div class='{classe}' style='text-align:right; color:#2563eb;'>{fmt(f_ren)}</div>", unsafe_allow_html=True)
-                            c_row4.markdown(f"<div class='{classe}' style='text-align:right; color:#dc2626;'>{fmt(f_des)}</div>", unsafe_allow_html=True)
-                            c_row5.markdown(f"<div class='{classe}' style='text-align:right; font-weight:800; color:{"#059669" if f_sal >= 0 else "#dc2626"};'>{fmt(f_sal)}</div>", unsafe_allow_html=True)
+                            html_buffer += f"""
+                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: {bg_row}; padding: 10px; font-size: 12px; font-weight: {font_w}; border-bottom: 1px solid #cbd5e1;'>
+                                <div>📍 Fonte Orçamentária: <b>{f_item}</b>{marcador}</div>
+                                <div style='text-align: right; color: #059669;'>{fmt(f_rep)}</div>
+                                <div style='text-align: right; color: #2563eb;'>{fmt(f_ren)}</div>
+                                <div style='text-align: right; color: #dc2626;'>{fmt(f_des)}</div>
+                                <div style='text-align: right; font-weight: 800; color: {cor_saldo};'>{fmt(f_sal)}</div>
+                            </div>
+                            """
                             
-                        c_tot1, c_tot2, c_tot3, c_tot4, c_tot5 = st.columns([2.5, 1.5, 1.5, 1.5, 2])
-                        c_tot1.markdown(f"<div class='grid-total'>💰 VALOR DISPONÍVEL TOTAL NA CONTA (SALDO DO BANCO)</div>", unsafe_allow_html=True)
-                        c_tot2.markdown(f"<div class='grid-total' style='text-align:right; color:#475569;'>{fmt(b_rec)}</div>", unsafe_allow_html=True)
-                        c_tot3.markdown(f"<div class='grid-total' style='text-align:right; color:#475569;'>{fmt(b_ren)}</div>", unsafe_allow_html=True)
-                        c_tot4.markdown(f"<div class='grid-total' style='text-align:right; color:#dc2626;'>{fmt(b_des)}</div>", unsafe_allow_html=True)
-                        c_tot5.markdown(f"<div class='grid-total' style='text-align:right; font-size:14px; color:#1e3a8a; background-color:#dbeafe; border:2px solid #2563eb;'><b>{fmt(b_sal_tot)}</b></div>", unsafe_allow_html=True)
+                        html_buffer += f"""
+                            <div style='display: grid; grid-template-columns: 2.5fr 1.5fr 1.5fr 1.5fr 2fr; background-color: #eff6ff; padding: 12px; font-weight: 800; font-size: 12px; color: #1e3a8a; border-top: 2px solid #2563eb;'>
+                                <div>💰 VALOR DISPONÍVEL TOTAL NA CONTA</div>
+                                <div style='text-align: right; color: #475569;'>{fmt(b_rec)}</div>
+                                <div style='text-align: right; color: #475569;'>{fmt(b_ren)}</div>
+                                <div style='text-align: right; color: #dc2626;'>{fmt(b_des)}</div>
+                                <div style='text-align: right; font-size: 13px; color: #1e3a8a; background-color: #dbeafe; padding: 2px 6px; border-radius: 4px; border: 1px solid #2563eb;'><b>{fmt(b_sal_tot)}</b></div>
+                            </div>
+                        </div>
+                        """
+                        st.markdown(html_buffer, unsafe_allow_html=True)
 
-                    # Tabela detalhada de lançamentos
                     st.markdown("<div class='section-title'>📋 Detalhamento dos Lançamentos</div>", unsafe_allow_html=True)
                     df_validos = df_final[df_final['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
@@ -231,7 +245,6 @@ try:
                         })
                         st.dataframe(df_render, use_container_width=True, hide_index=True)
 
-        # ABA 2: PANORAMA GLOBAL MUNICIPAL HISTÓRICO
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
             g_rep, g_ren, g_gas = float(df['Receitas / Repasses'].sum()), float(df['rendimentos'].sum()), float(df['Valor Bruto da NF'].sum())
@@ -247,7 +260,6 @@ try:
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
 
-        # ABA 3: RANKING DE DEPUTADOS PARLAMENTARES
         with tab_deputados:
             st.markdown("<div class='section-title'>📊 Repasses por Parlamentar</div>", unsafe_allow_html=True)
             df_dep = df.groupby(['deputado', 'fonte_clean']).agg({'Receitas / Repasses': 'sum', 'Valor Bruto da NF': 'sum', 'desc_clean': 'first'}).reset_index()
@@ -260,7 +272,6 @@ try:
             df_dep.columns = ['Parlamentar / Deputado', 'Fonte', '(+) Repasses', '(-) Gastos', '(=) Saldo Livre', 'Descrição']
             st.dataframe(df_dep, use_container_width=True, hide_index=True)
 
-        # ABA 4: MAPA DE DIRECIONAMENTO POR SECRETARIAS
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Recursos Direcionados por Secretaria</div>", unsafe_allow_html=True)
             df_sec = df.groupby(['secretaria', 'fonte_clean']).agg({'Receitas / Repasses': 'sum', 'Valor Bruto da NF': 'sum'}).reset_index()
