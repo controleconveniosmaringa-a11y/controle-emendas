@@ -60,9 +60,32 @@ def obter_base_dados_global():
     df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
     df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
 
+    # 🛠️ TRATAMENTO FINANCEIRO DE ALTA PRECISÃO: Evita a multiplicação por 100 dos valores
     for col_num in ['repasse', 'rendimento', 'bruto']:
-        serie_num = extrair(col_num).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-        df[col_num] = pd.to_numeric(serie_num, errors='coerce').fillna(0.0)
+        valores_limpos = []
+        for v in extrair(col_num):
+            txt = str(v).replace('R$', '').strip()
+            if not txt or txt == '-':
+                valores_limpos.append(0.0)
+                continue
+            
+            # Se o valor usa o padrão brasileiro (ex: 300.000,00)
+            if ',' in txt and '.' in txt:
+                txt = txt.replace('.', '').replace(',', '.')
+            # Se o valor veio apenas com a vírgula dos centavos (ex: 1500,50)
+            elif ',' in txt:
+                txt = txt.replace(',', '.')
+            # Se o valor veio com pontos mas sem vírgula, e os dois últimos dígitos parecem centavos
+            elif '.' in txt and len(txt.split('.')[-1]) == 2 and len(txt.replace('.', '')) > 4:
+                # Caso raro onde o separador de milhar virou ponto e não há centavos explícitos
+                pass
+                
+            try:
+                valores_limpos.append(float(txt))
+            except ValueError:
+                valores_limpos.append(0.0)
+                
+        df[col_num] = pd.to_numeric(valores_limpos, errors='coerce').fillna(0.0)
         
     return df
 
@@ -222,12 +245,21 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
+                        
+                        lista_links_limpos = []
+                        for lk in df_validos['URL_REAL_LINK']:
+                            str_lk = str(lk).strip()
+                            if str_lk.startswith("http"):
+                                lista_links_limpos.append(str_lk)
+                            else:
+                                lista_links_limpos.append(None)
+                        
                         df_render = pd.DataFrame({
                             'Data Lançamento': df_validos['DATA_LANCAMENTO'],
                             'Nº Empenho': df_validos['EMPENHO_COL'],
                             'Nota Fiscal': df_validos['NOTA_COL'],
                             'Valor Bruto NF': df_validos['bruto'], 
-                            'Comprovante/PDF 📄': df_validos['URL_REAL_LINK']
+                            'Comprovante/PDF 📄': lista_links_limpos
                         })
                         
                         df_render_estilizado = df_render.style.format({
