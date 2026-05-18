@@ -80,7 +80,6 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    # Forçando cabeçalho via urllib nativo para arrancar o arquivo do servidor do Google
     req = urllib.request.Request(
         SHEET_URL, 
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -195,7 +194,7 @@ try:
 
         df_cronologico = df.groupby('ano_mov').agg({'Receitas / Repasses':'sum', 'rendimentos':'sum', 'Valor Bruto da NF':'sum'}).reset_index()
         df_cronologico['Saldo_Isolado_Ano'] = (df_cronologico['Receitas / Repasses'] + df_cronologico['rendimentos']) - df_cronologico['Valor Bruto da NF']
-        df_cronologico = df_cronologico.sort_values('ano_mov')
+        df_cron运行 = df_cronologico.sort_values('ano_mov')
         df_cronologico['Saldo_Acumulado_Real'] = df_cronologico['Saldo_Isolado_Ano'].cumsum()
         
         fig_linha_tempo = go.Figure()
@@ -325,9 +324,9 @@ try:
         st.dataframe(df_tabela_sec, use_container_width=True, hide_index=True)
         st.markdown("---")
 
-if fonte_sel == "" or df.empty:
+    if fonte_sel == "" or df.empty:
         st.warning("⚠️ Aguardando sincronização com a planilha mãe...")
-else:
+    else:
         df_final = df[df['fonte_clean'] == fonte_sel]
         
         if df_final.empty:
