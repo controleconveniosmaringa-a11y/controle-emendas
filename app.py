@@ -148,7 +148,7 @@ try:
                     eme_vinculo = df_final['emenda_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
-                    if 	ano_fonte_ativo == "Exibir Histórico Acumulado Completo":
+                    if ano_fonte_ativo == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final; df_fonte_saldo = df_final
                         df_conta_total_banco = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
                         df_banco_fluxo = df_conta_total_banco; df_banco_saldo = df_conta_total_banco
@@ -273,9 +273,9 @@ try:
                     
                     if  ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_despesas_fluxo = df_pln_ativo; df_despesas_saldo = df_pln_ativo; df_receitas_fluxo = df_fonte_maee_completa; df_receitas_saldo = df_fonte_maee_completa
                     else:
-                        df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] ==  ano_plano_ativo]; df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
+                        df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] ==  ano_plano_ativo]; df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int( ano_plano_ativo)]
                         df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] ==  ano_plano_ativo]
-                        df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['fonte_clean'] == fonte_maee]; df_receitas_saldo = df_receitas_saldo[df_receitas_saldo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
+                        df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['fonte_clean'] == fonte_maee]; df_receitas_saldo = df_receitas_saldo[df_receitas_saldo['ano_mov'].astype(int) <= int( ano_plano_ativo)]
                     
                     repasse_pln = float(df_receitas_saldo['repasse'].sum()); rendimento_pln = float(df_receitas_saldo['rendimento'].sum()); despesa_pln = float(df_despesas_saldo['bruto'].sum())
                     saldo_final_pln = (repasse_pln + rendimento_pln) - despesa_pln
@@ -352,7 +352,7 @@ try:
                             df_dep_split['Despesas Liquidadas'] = df_dep_split['bruto'].apply(fmt)
                             st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
                     
-                    st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Períono — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
                         lista_links_pln = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_pln_validos['URL_REAL_LINK']]
@@ -471,7 +471,7 @@ try:
                     lbl_ano_dep = "Histórico Total" if ano_dep_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_dep_ativo}"
                     if ano_dep_ativo == "Exibir Histórico Acumulado Completo": df_dep_fluxo = df_dep_ativo; df_dep_saldo = df_dep_ativo
                     else:
-                        df_dep_fluxo = df_dep_ativo[df_dep_ativo['ano_mov'] == ano_dep_ativo]
+                        df_dep_fluxo = df_dep_ativo[df_dep_ativo['ano_mov'] ==  ano_dep_ativo]
                         df_dep_saldo = df_dep_ativo[df_dep_ativo['ano_mov'].astype(int) <= int(ano_dep_ativo)]
                     
                     repasse_dep = float(df_dep_saldo['repasse'].sum()); rendimento_dep = float(df_dep_saldo['rendimento'].sum()); despesa_dep = float(df_dep_saldo['bruto'].sum())
@@ -507,7 +507,7 @@ try:
                     t_rep_d, t_ren_d, t_gas_d, t_sal_d = 0.0, 0.0, 0.0, 0.0
                     for f_item in fontes_do_dep:
                         df_f_item_base = df_dep_ativo[df_dep_ativo['fonte_clean'] == f_item]
-                        if ano_dep_ativo == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
+                        if  ano_dep_ativo == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
                         else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] ==  ano_dep_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_dep_ativo)]
                         r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
@@ -527,20 +527,55 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. 🌐 ABA PANORAMA GERAL
+        # 5. 🌐 ABA PANORAMA GERAL REFORMULADA (4 Gráficos Estratégicos Dedicados)
         with tab_geral:
-            st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
-            g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
-            col_l1, col_l2 = st.columns(2)
-            col_l1.markdown(f'''<div class='metric-container' style='background-color:#f8fafc; border-color:#2563eb; border-left:6px solid #2563eb;'><div>💰 Total Entradas Recebidas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#059669;">{fmt(g_rep + g_ren)}</div></div>''', unsafe_allow_html=True)
-            col_l2.markdown(f'''<div class='metric-container' style='border-color:#dc2626; border-left: 6px solid #dc2626;'><div>💸 Total Saídas Liquidadas (Histórico)</div><div style="font-size:22px; font-weight:800; color:#dc2626;">{fmt(g_gas)}</div></div>''', unsafe_allow_html=True)
+            st.markdown("<div class='section-title' style='color:#0f172a; border-bottom:3px solid #0f172a;'>📊 CADERNO DE BALANÇOS CONSOLIDADOS (4 QUADROS)</div>", unsafe_allow_html=True)
             
-            df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
-            df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
+            # 🛠️ PREPARAÇÃO DOS DADOS CONTÁBEIS PARA OS FILTROS DOS GRÁFICOS
+            df_g_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
+            df_g_cronologico['saldo_acumulado'] = ((df_g_cronologico['repasse'] + df_g_cronologico['rendimento']) - df_g_cronologico['bruto']).cumsum()
             
-            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
-            fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
-            st.plotly_chart(fig, use_container_width=True)
+            df_g_secretaria = df.groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+            df_g_secretaria['saldo'] = (df_g_secretaria['repasse'] + df_g_secretaria['rendimento']) - df_g_secretaria['bruto']
+            df_g_secretaria = df_g_secretaria[df_g_secretaria['secretaria'] != 'Não Especificada'].sort_values('saldo', ascending=False)
+            
+            df_g_fonte = df.groupby('fonte_clean').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+            df_g_fonte['saldo'] = (df_g_fonte['repasse'] + df_g_fonte['rendimento']) - df_g_fonte['bruto']
+            df_g_fonte = df_g_fonte.sort_values('saldo', ascending=True) # Ascending true para o gráfico de barras horizontais rankear de cima para baixo
+            
+            df_g_deputado = df.groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+            df_g_deputado['saldo'] = (df_g_deputado['repasse'] + df_g_deputado['rendimento']) - df_g_deputado['bruto']
+            df_g_deputado = df_g_deputado[df_g_deputado['deputado'] != 'Não Informado'].sort_values('saldo', ascending=False)
+
+            # 🚀 QUADRO DE LAYOUT 1: CRONOGRAMA DE SALDO E DIVISÃO POR SECRETARIA
+            c_g1, c_g2 = st.columns(2)
+            
+            with c_g1:
+                st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>📈 1. EVOLUÇÃO CRONOLÓGICA DO SALDO DISPONÍVEL ACUMULADO:</div>", unsafe_allow_html=True)
+                fig1 = go.Figure(go.Scatter(x=df_g_cronologico['ano_mov'], y=df_g_cronologico['saldo_acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_g_cronologico['saldo_acumulado']], textposition="top center"))
+                fig1.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=260, margin=dict(l=10,r=10,t=30,b=10), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
+                st.plotly_chart(fig1, use_container_width=True)
+                
+            with c_g2:
+                st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>🏛️ 2. TOTAL DE SALDO REAL DISPONÍVEL EM CADA SECRETARIA:</div>", unsafe_allow_html=True)
+                fig2 = go.Figure(go.Bar(x=df_g_secretaria['secretaria'].astype(str).str.upper(), y=df_g_secretaria['saldo'], marker_color='#2563eb', text=[fmt(v) for v in df_g_secretaria['saldo']], textposition='auto'))
+                fig2.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=260, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
+                st.plotly_chart(fig2, use_container_width=True)
+                
+            # 🚀 QUADRO DE LAYOUT 2: RANKING POR FONTE E CRÚZIO POR PARLAMENTAR
+            c_g3, c_g4 = st.columns(2)
+            
+            with c_g3:
+                st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>🎯 3. SALDO DISPONÍVEL CONSOLIDADO POR FONTE ORÇAMENTÁRIA:</div>", unsafe_allow_html=True)
+                fig3 = go.Figure(go.Bar(y=df_g_fonte['fonte_clean'].astype(str).str.upper(), x=df_g_fonte['saldo'], orientation='h', marker_color='#0f172a', text=[fmt(v) for v in df_g_fonte['saldo']], textposition='auto'))
+                fig3.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), xaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
+                st.plotly_chart(fig3, use_container_width=True)
+                
+            with c_g4:
+                st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>👤 4. SALDO TOTAL LIVRE DE EMENDAS POR DEPUTADO AUTOR:</div>", unsafe_allow_html=True)
+                fig4 = go.Figure(go.Bar(x=df_g_deputado['deputado'].astype(str).str.upper(), y=df_g_deputado['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_deputado['saldo']], textposition='auto'))
+                fig4.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
+                st.plotly_chart(fig4, use_container_width=True)
             
 except Exception as e:
     st.error(f"Erro no processamento unificado: {e}")
