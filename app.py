@@ -28,48 +28,52 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
-# 🛠️ REMOÇÃO DO @st.cache_resource PARA LIMPAR ERROS TRAVADOS NA MEMÓRIA
 def obter_base_dados_global():
     if not os.path.exists("dados.csv"):
         return pd.DataFrame()
         
-    # Carrega substituindo valores nulos por texto vazio automaticamente
     df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     df = pd.DataFrame()
     
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
-    def extrair(nome_chave):
+    # 🛠️ NOVA ABORDAGEM: Extração purificada em listas nativas do Python para banir o erro do NumPy
+    def extrair_lista_limpa(nome_chave):
         col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
         if col_real is not None:
-            return pd.Series(df_raw[col_real]).fillna('').astype(str).str.strip()
-        return pd.Series([''] * len(df_raw))
+            return [str(item).strip() if (str(item).strip() != '' and str(item).strip().lower() != 'nan') else '' for item in df_raw[col_real]]
+        return [''] * len(df_raw)
 
-    df['fonte_clean'] = extrair('fonte').str.split('.').str[0].str.lower().str.replace('-', '', regex=False)
-    df['emenda_clean'] = extrair('emenda').str.split('.').str[0]
-    df['plano_clean'] = extrair('plano').str.split('.').str[0]
+    fontes_brutas = extrair_lista_limpa('fonte')
+    df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '') for f in fontes_brutas]
+    df['emenda_clean'] = [str(e).split('.')[0] for e in extrair_lista_limpa('emenda')]
+    df['plano_clean'] = [str(p).split('.')[0] for p in extrair_lista_limpa('plano')]
     
-    # Processa item por item como string pura da biblioteca nativa, impedindo arrays do NumPy
-    df['EMPENHO_COL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('empenho')]
-    df['NOTA_COL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('nota')]
-    df['PDF_GERAL'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('pdf')]
-    df['URL_REAL_LINK'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else '-' for x in extrair('urllink')]
+    df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
+    df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
+    df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
+    df['URL_REAL_LINK'] = [x if x != '' else '-' for x in extrair_lista_limpa('urllink')]
     
-    df['secretaria'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Especificada' for x in extrair('secretaria')]
-    df['deputado'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Informado' for x in extrair('deputado')]
-    df['desc_clean'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Sem descrição informada' for x in extrair('descricao')]
-    df['conta corrente'] = [str(x).strip() if str(x).strip() not in ['', 'nan'] else 'Não Informada' for x in extrair('conta')]
+    df['secretaria'] = [x if x != '' else 'Não Especificada' for x in extrair_lista_limpa('secretaria')]
+    df['deputado'] = [x if x != '' else 'Não Informado' for x in extrair_lista_limpa('deputado')]
+    df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in extrair_lista_limpa('descricao')]
+    df['conta corrente'] = [x if x != '' else 'Não Informada' for x in extrair_lista_limpa('conta')]
 
-    coluna_data = next((limpa for limpa in colunas_originais if 'data' in limpa and 'venc' not in limpa and 'nota' not in limpa), None)
-    df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
-    df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
+    datas_brutas = extrair_lista_limpa('data')
+    df['DATA_LANCAMENTO'] = datas_brutas
+    
+    anos = []
+    for d in datas_brutas:
+        match = re.search(r'(20\d{2})', str(d))
+        anos.append(match.group(1) if match else '2025')
+    df['ano_mov'] = anos
 
-    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO
+    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO (Sem multiplicação por 100)
     for col_num in ['repasse', 'rendimento', 'bruto']:
         valores_limpos = []
-        for v in extrair(col_num):
+        for v in extrair_lista_limpa(col_num):
             txt = str(v).replace('R$', '').strip()
-            if not txt or txt in ['-', 'nan']:
+            if not txt or txt == '-':
                 valores_limpos.append(0.0)
                 continue
             
@@ -83,7 +87,7 @@ def obter_base_dados_global():
             except ValueError:
                 valores_limpos.append(0.0)
                 
-        df[col_num] = pd.to_numeric(valores_limpos, errors='coerce').fillna(0.0)
+        df[col_num] = valores_limpos
         
     return df
 
@@ -290,7 +294,7 @@ try:
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
-            fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
+            fig = go.Figure(go.Scatter(x=df_cron规律 = df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
 
