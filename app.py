@@ -146,54 +146,67 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # ⚖️ CONCILIAÇÃO BANCÁRIA COM ATIVAÇÃO DE LINHA DE TOTALIZAÇÃO COMPLETA
+                    # ⚖️ CONCILIAÇÃO BANCÁRIA COM SUCESSÃO CRONOLÓGICA DE SALDOS (CONSIDERA ANOS ANTERIORES)
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
                         anos_bancarios = sorted(list(set([str(a) for a in df_conta_total_banco['ano_mov'].unique() if a not in ['', 'nan']])))
                         ano_banco_sel = st.selectbox("📅 Selecione o Exercício para Conciliação Bancária:", ["Exibir Saldo Histórico Acumulado"] + anos_bancarios, key="filtro_ano_banco")
                         
-                        df_banco_proc = df_conta_total_banco if ano_banco_sel == "Exibir Saldo Histórico Acumulado" else df_conta_total_banco[df_conta_total_banco['ano_mov'] == ano_banco_sel]
-                        fontes_compartilhadas = sorted([fc for fc in df_banco_proc['fonte_clean'].unique() if fc != ''])
+                        # Definição das pontes temporais contábeis
+                        if ano_banco_sel == "Exibir Saldo Histórico Acumulado":
+                            df_banco_fluxo_ano = df_conta_total_banco
+                            df_banco_saldo_acum = df_conta_total_banco
+                            rotulo_tabela = "SALDO HISTÓRICO ACUMULADO GERAL"
+                        else:
+                            # Fluxo mostra apenas as entradas/saídas daquele ano específico
+                            df_banco_fluxo_ano = df_conta_total_banco[df_conta_total_banco['ano_mov'] == ano_banco_sel]
+                            # Saldo Acumulado captura o ano atual E todos os anteriores para carregar o saldo transitório
+                            df_banco_saldo_acum = df_conta_total_banco[df_conta_total_banco['ano_mov'].astype(int) <= int(ano_banco_sel)]
+                            rotulo_tabela = f"EXERCÍCIO FISCAL DE {ano_banco_sel}"
+                            
+                        fontes_compartilhadas = sorted([fc for fc in df_conta_total_banco['fonte_clean'].unique() if fc != ''])
                         
                         linhas_banco = []
-                        tot_rep, tot_ren, tot_gasto = 0.0, 0.0, 0.0
+                        tot_rep_ano, tot_ren_ano, tot_gasto_ano, tot_saldo_acum = 0.0, 0.0, 0.0, 0.0
                         
                         for f_item in fontes_compartilhadas:
-                            df_item = df_banco_proc[df_banco_proc['fonte_clean'] == f_item]
-                            f_rep = float(df_item['repasse'].sum())
-                            f_ren = float(df_item['rendimento'].sum())
-                            f_des = float(df_item['bruto'].sum())
-                            f_sal = (f_rep + f_ren) - f_des
+                            # 1. Movimentações restritas ao ano selecionado
+                            df_item_ano = df_banco_fluxo_ano[df_banco_fluxo_ano['fonte_clean'] == f_item]
+                            f_rep = float(df_item_ano['repasse'].sum())
+                            f_ren = float(df_item_ano['rendimento'].sum())
+                            f_des = float(df_item_ano['bruto'].sum())
                             
-                            # Acumuladores globais para o fechamento da conta
-                            tot_rep += f_rep
-                            tot_ren += f_ren
-                            tot_gasto += f_des
+                            # 2. Saldo Real considerando o acúmulo histórico (Carrega o saldo do ano anterior)
+                            df_item_acum = df_banco_saldo_acum[df_banco_saldo_acum['fonte_clean'] == f_item]
+                            f_sal_real = float(df_item_acum['repasse'].sum() + df_item_acum['rendimento'].sum()) - float(df_item_acum['bruto'].sum())
+                            
+                            tot_rep_ano += f_rep
+                            tot_ren_ano += f_ren
+                            tot_gasto_ano += f_des
+                            tot_saldo_acum += f_sal_real
                             
                             linhas_banco.append({
                                 'Fonte Orçamentária': f_item.upper() + (" (Ativa)" if f_item == fonte_sel else ""),
-                                'Repasses (Receitas)': f_rep,
-                                'Rendimentos (+)': f_ren,
-                                'Despesas (NF Bruta)': f_des,
-                                'Saldo Real Disponível': f_sal
+                                f'Repasses ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': f_rep,
+                                f'Rendimentos ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': f_ren,
+                                f'Despesas ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': f_des,
+                                'Saldo Real em Conta (Acumulado)': f_sal_real
                             })
                         
-                        # Injeção matemática da Linha Final de Totais Consolidados do Banco
+                        # Linha Final consolidada com somatório inteligente
                         linhas_banco.append({
                             'Fonte Orçamentária': 'TOTAL CONSOLIDADO DA CONTA 🏦',
-                            'Repasses (Receitas)': tot_rep,
-                            'Rendimentos (+)': tot_ren,
-                            'Despesas (NF Bruta)': tot_gasto,
-                            'Saldo Real Disponível': (tot_rep + tot_ren) - tot_gasto
+                            f'Repasses ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': tot_rep_ano,
+                            f'Rendimentos ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': tot_ren_ano,
+                            f'Despesas ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': tot_gasto_ano,
+                            'Saldo Real em Conta (Acumulado)': tot_saldo_acum
                         })
                             
                         df_tab_banco = pd.DataFrame(linhas_banco)
                         
-                        # SISTEMA DE DESIGN VETORIZADO INTELIGENTE
                         def _style_linhas(row):
                             txt_fonte = str(row['Fonte Orçamentária']).strip().upper()
-                            # Destaca a linha de Totais em cinza escuro/azul ou a Fonte Ativa em azul claro
                             if 'TOTAL CONSOLIDADO' in txt_fonte:
                                 return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' for _ in row]
                             elif '(ATIVA)' in txt_fonte:
@@ -201,7 +214,10 @@ try:
                             return ['' for _ in row]
                             
                         df_estilizado = df_tab_banco.style.apply(_style_linhas, axis=1).format({
-                            'Repasses (Receitas)': fmt, 'Rendimentos (+)': fmt, 'Despesas (NF Bruta)': fmt, 'Saldo Real Disponível': fmt
+                            f'Repasses ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': fmt,
+                            f'Rendimentos ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': fmt,
+                            f'Despesas ({ano_banco_sel if ano_banco_sel.isdigit() else "Geral"})': fmt,
+                            'Saldo Real em Conta (Acumulado)': fmt
                         })
                         
                         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
