@@ -95,11 +95,9 @@ try:
                     
                     st.markdown(f"<div class='main-title'>Controle de Emendas — Fonte: {fonte_sel}</div>", unsafe_allow_html=True)
                     
-                    # 📅 SELETOR DE EXERCÍCIO FISCAL GLOBAL (MANDATÓRIO E UNIFICADO NO INÍCIO)
                     anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
                     ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal para Filtrar o Painel:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
                     
-                    # Regras estruturais de corte de datas com base no seletor unificado do topo
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final
                         df_fonte_saldo = df_final
@@ -114,11 +112,9 @@ try:
                         df_banco_fluxo = df_banco_base[df_banco_base['ano_mov'] == ano_selecionado] if not df_banco_base.empty else pd.DataFrame()
                         df_banco_saldo = df_banco_base[df_banco_base['ano_mov'].astype(int) <= int(ano_selecionado)] if not df_banco_base.empty else pd.DataFrame()
 
-                    # Cálculos reativos automáticos sincronizados pelo topo
                     saldo_exclusivo_fonte = float(df_fonte_saldo['repasse'].sum() + df_fonte_saldo['rendimento'].sum()) - float(df_fonte_saldo['bruto'].sum())
                     saldo_real_banco_total = float(df_banco_saldo['repasse'].sum() + df_banco_saldo['rendimento'].sum()) - float(df_banco_saldo['bruto'].sum()) if not df_banco_saldo.empty else saldo_exclusivo_fonte
 
-                    # Rótulo de ano amigável para exibição nos títulos
                     lbl_ano = "Histórico Total" if ano_selecionado == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_selecionado}"
 
                     st.markdown(f'''<div class='kpi-row-container'>
@@ -140,7 +136,6 @@ try:
                     
                     secretarias = [s for s in df_final['secretaria'].unique() if s != '']
                     
-                    # 🌍 RESUMO CONSOLIDADO MÃE (Sincronizado)
                     if len(secretarias) > 1:
                         st.markdown(f"<div class='section-title'>🌍 RESUMO CONSOLIDADO DA FONTE — ({lbl_ano})</div>", unsafe_allow_html=True)
                         sum_rep_mãe = float(df_fonte_fluxo['repasse'].sum())
@@ -154,7 +149,6 @@ try:
                             <tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label'>(=) SALDO REAL ACUMULADO DISPONÍVEL NA EMENDA</td><td class='extrato-cell-val' style='color:{"#059669" if saldo_exclusivo_fonte >= 0 else "#dc2626"}; font-size:14px;'>{fmt(saldo_exclusivo_fonte)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # 🏢 DIVISÃO POR SECRETARIA (Sincronizada automaticamente pelo filtro do topo)
                     st.markdown(f"<div class='section-title'>🏢 Divisão de Recursos por Secretaria — ({lbl_ano})</div>", unsafe_allow_html=True)
                     for sec in secretarias:
                         df_sec_fluxo = df_fonte_fluxo[df_fonte_fluxo['secretaria'] == sec]
@@ -173,9 +167,8 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL LIVRE ATUAL (COM SALDO ANTERIOR)</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo_acumulado)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
-                    # ⚖️ CONCILIAÇÃO BANCÁRIA (Sincronizada automaticamente pelo filtro do topo)
                     if conta_vinculada != "Não Informada" and not df_banco_saldo.empty:
-                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada} ({lbl_ano})</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
                         fontes_compartilhadas = sorted([fc for fc in df_banco_saldo['fonte_clean'].unique() if fc != ''])
                         linhas_banco = []
@@ -226,18 +219,39 @@ try:
                         })
                         st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
 
-                    # 📋 DETALHAMENTO DE LANÇAMENTOS (Sincronizado: Exibe apenas os empenhos do período selecionado)
-                    st.markdown(f"<div class='section-title'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
+                    # 📋 DESIGN PREMIUM INTERATIVO APLICADO NO DETALHAMENTO DE LANÇAMENTOS 
+                    st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
                         df_render = pd.DataFrame({
-                            'DATA': df_validos['DATA_LANCAMENTO'],
-                            'EMPENHO': df_validos['EMPENHO_COL'],
-                            'NOTA': df_validos['NOTA_COL'],
-                            'VALOR BRUTO': df_validos['bruto'].apply(fmt),
-                            'PDF': df_validos['PDF_GERAL']
+                            'Data Lançamento': df_validos['DATA_LANCAMENTO'],
+                            'Nº Empenho': df_validos['EMPENHO_COL'],
+                            'Nota Fiscal': df_validos['NOTA_COL'],
+                            'Valor Bruto NF': df_validos['bruto'], # Enviado como float para aplicar estilo monetário nativo
+                            'Comprovante/PDF 📄': df_validos['PDF_GERAL']
                         })
-                        st.dataframe(df_render, use_container_width=True, hide_index=True)
+                        
+                        # Customização avançada da planilha (Estilo Tabela Bancária Executiva)
+                        df_render_estilizado = df_render.style.format({
+                            'Valor Bruto NF': fmt  # Formata a coluna de moeda perfeitamente
+                        }).set_properties(**{
+                            'font-weight': '500',
+                            'font-size': '12px'
+                        })
+                        
+                        # Renderiza com largura total e configurações avançadas de coluna do Streamlit
+                        st.dataframe(
+                            df_render_estilizado, 
+                            use_container_width=True, 
+                            hide_index=True,
+                            column_config={
+                                "Data Lançamento": st.column_config.TextColumn(alignment="center"),
+                                "Nº Empenho": st.column_config.TextColumn(alignment="center"),
+                                "Nota Fiscal": st.column_config.TextColumn(alignment="center"),
+                                "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"),
+                                "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗") if df_render['Comprovante/PDF 📄'].str.contains('http').any() else st.column_config.TextColumn(alignment="left")
+                            }
+                        )
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
