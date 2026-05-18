@@ -77,8 +77,8 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7j
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    # Uso de storage_options para forçar os servidores do Streamlit a burlarem bloqueios de 404
-    df_raw = pd.read_csv(SHEET_URL, storage_options={{"User-Agent": "Mozilla/5.0"}})
+    # CORREÇÃO DA SINTAXE DO DICIONÁRIO (User-Agent limpo com chaves simples)
+    df_raw = pd.read_csv(SHEET_URL, storage_options={"User-Agent": "Mozilla/5.0"})
     df = pd.DataFrame()
     
     colunas_mapeadas_limpas = {}
