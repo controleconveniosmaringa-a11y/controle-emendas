@@ -109,21 +109,19 @@ try:
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         anos_disponiveis = sorted(list(set([str(a) for a in df['ano_mov'].unique() if a not in ['', 'nan']])))
 
+        # 🛠️ TOPO GLOBAL SIMPLIFICADO CONFORME VOCÊ PEDIU
         st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
+        ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
         
-        c_filtro1, c_filtro2 = st.columns(2)
-        with c_filtro1:
-            fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária:", options=fontes, index=0)
-        with c_filtro2:
-            ano_selecionado = st.selectbox("📅 Selecione o Exercício Fiscal:", ["Exibir Histórico Acumulado Completo"] + anos_disponiveis, key="filtro_ano_central_global")
-        
-        # 🛠️ REORDENAÇÃO DAS ABAS EXECUTADA AQUI CONFORME SOLICITADO
+        # Criação das abas ordenadas
         tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
-            f"🎯 Fonte Ativa: {fonte_sel}", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
+            "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. ABA FONTE ATIVA
+        # 1. 🎯 ABA POR FONTE (O Filtro da fonte veio para cá agora!)
         with tab_ativa:
+            fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
+            
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
                 if not df_final.empty:
@@ -146,7 +144,7 @@ try:
                     saldo_real_banco_total = float(df_banco_saldo['repasse'].sum() + df_banco_saldo['rendimento'].sum()) - float(df_banco_saldo['bruto'].sum()) if not df_banco_saldo.empty else saldo_exclusivo_fonte
                     lbl_ano = "Histórico Total" if ano_selecionado == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_selecionado}"
 
-                    st.markdown(f'''<div class='kpi-row-container'>
+                    st.markdown(f'''<div class='kpi-row-container' style='margin-top: 10px;'>
                         <div class='kpi-card-head'>
                             <div class='kpi-label'>🎯 Saldo Disponível da Fonte ({lbl_ano})</div>
                             <div class='kpi-value'>{fmt(saldo_exclusivo_fonte)}</div>
@@ -218,7 +216,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. ABA POR PLANO DE AÇÃO
+        # 2. 📋 ABA POR PLANO DE AÇÃO
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -322,7 +320,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
 
-        # 3. ABA POR SECRETARIA
+        # 3. 🏛️ ABA POR SECRETARIA
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria / Pasta</div>", unsafe_allow_html=True)
             lista_sec_validas = sorted([str(s).upper() for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']])
@@ -382,9 +380,9 @@ try:
                     tot_rep_s, tot_ren_s, tot_gas_s, tot_sal_s = 0.0, 0.0, 0.0, 0.0
                     for f_item in fontes_vinculadas_sec:
                         df_f_item_base = df_sec_ativa[df_sec_ativa['fonte_clean'] == f_item]
-                        if ano_selecionado == "Exibir Histórico Acumulado Completo": df_f_fluxo = df_f_item_base; df_f_saldo = df_f_item_base
-                        else: df_f_fluxo = df_f_item_base[df_f_item_base['ano_mov'] == ano_selecionado]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_selecionado)]
-                        r_rep = float(df_f_fluxo['repasse'].sum()); r_ren = float(df_f_fluxo['rendimento'].sum()); r_gas = float(df_f_fluxo['bruto'].sum())
+                        if ano_selecionado == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
+                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] == ano_selecionado]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_selecionado)]
+                        r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
                         tot_rep_s += r_rep; tot_ren_s += r_ren; tot_gas_s += r_gas; tot_sal_s += r_sal
                         linhas_fontes_sec.append({'Fonte Orçamentária': f_item.upper(), 'Repasses no Período': r_rep, 'Rendimentos no Período': r_ren, 'Despesas no Período': r_gas, 'Saldo Disponível (Acumulado)': r_sal})
@@ -400,9 +398,9 @@ try:
                         df_render_sec = pd.DataFrame({'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_sec_validos['EMPENHO_COL'], 'Nota Fiscal': df_sec_validos['NOTA_COL'], 'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_sec_validos['bruto'], 'Comprovante/PDF 📄': lista_links_sec})
                         st.dataframe(df_render_sec.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
-            else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrada na base de dados atual.")
+            else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
 
-        # 4. ABA POR DEPUTADO
+        # 4. 🔍 ABA POR DEPUTADO
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar: Investigação por Deputado / Autor</div>", unsafe_allow_html=True)
             lista_deps_validos = sorted([str(d).upper() for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'Não Informado']])
@@ -462,9 +460,9 @@ try:
                     t_rep_d, t_ren_d, t_gas_d, t_sal_d = 0.0, 0.0, 0.0, 0.0
                     for f_item in fontes_do_dep:
                         df_f_item_base = df_dep_ativo[df_dep_ativo['fonte_clean'] == f_item]
-                        if ano_selecionado == "Exibir Histórico Acumulado Completo": df_f_fluxo = df_f_item_base; df_f_saldo = df_f_item_base
-                        else: df_f_fluxo = df_f_item_base[df_f_item_base['ano_mov'] == ano_selecionado]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_selecionado)]
-                        r_rep = float(df_f_fluxo['repasse'].sum()); r_ren = float(df_f_fluxo['rendimento'].sum()); r_gas = float(df_f_fluxo['bruto'].sum())
+                        if ano_selecionado == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
+                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] == ano_selecionado]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_selecionado)]
+                        r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
                         t_rep_d += r_rep; t_ren_d += r_ren; t_gas_d += r_gas; t_sal_d += r_sal
                         linhas_fontes_dep.append({'Fonte Orçamentária / Emenda': f_item.upper(), 'Nº Emenda': df_f_item_base['emenda_clean'].iloc[0], 'Repasses no Período': r_rep, 'Rendimentos no Período': r_ren, 'Despesas no Período': r_gas, 'Saldo Disponível (Acumulado)': r_sal})
@@ -482,7 +480,7 @@ try:
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. ABA PANORAMA GERAL (FICOU POR ÚLTIMO)
+        # 5. 🌐 ABA PANORAMA GERAL
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
             g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
