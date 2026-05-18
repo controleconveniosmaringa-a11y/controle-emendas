@@ -72,8 +72,9 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# Link universal corrigido para leitura pública de CSV
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/export?format=csv"
+# CONEXÃO VIA API PÚBLICA DO GOOGLE (À prova de falhas no Streamlit)
+SHEET_ID = "1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
@@ -166,7 +167,6 @@ try:
         fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
-    # BARRA LATERAL: CENTRAL DE MAPEAMENTO GENERALIZADO
     st.sidebar.markdown("---")
     st.sidebar.markdown("<h3 style='margin-size:0; font-size:16px; color:#000000;'>Mapeamento Geral</h3>", unsafe_allow_html=True)
     
@@ -412,7 +412,6 @@ try:
                     </table>''', unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
 
-            # CONCILIAÇÃO BANCÁRIA DA CONTA CORRENTE
             if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                 st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                 
