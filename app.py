@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import re
+import urllib.request
+import io
 
 # Configuração estrutural da página corporativa
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
@@ -72,20 +74,23 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# CONEXÃO INDESTRUTÍVEL VIA PROTOCOLO DE PREVIEW PÚBLICO
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/preview"
+# PONTE VIA GOOGLE VISUALIZATION API COM PARÂMETRO QUE DETONA O CACHE 404
+SHEET_ID = "1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&addon=none"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    # Coleta via tabelas HTML estruturadas para ignorar os bloqueios de firewall do 404
-    html_tables = pd.read_html(SHEET_URL, header=0, encoding='utf-8')
-    df_raw = html_tables[0]
-    
-    # Limpeza de colunas fantasmas geradas pelo preview do Google
-    df_raw = df_raw.dropna(how='all', axis=1)
-    df_raw.columns = [str(c).split('.')[0] if 'Unnamed' in str(c) else str(c) for c in df_raw.columns]
-    
+    # Forçando cabeçalho via urllib nativo para arrancar o arquivo do servidor do Google
+    req = urllib.request.Request(
+        SHEET_URL, 
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    )
+    with urllib.request.urlopen(req) as response:
+        csv_data = response.read()
+        
+    df_raw = pd.read_csv(io.BytesIO(csv_data))
     df = pd.DataFrame()
+    
     colunas_mapeadas_limpas = {}
     for c in df_raw.columns:
         c_clean = str(c).strip().lower()
@@ -320,9 +325,9 @@ try:
         st.dataframe(df_tabela_sec, use_container_width=True, hide_index=True)
         st.markdown("---")
 
-    if fonte_sel == "" or df.empty:
+if fonte_sel == "" or df.empty:
         st.warning("⚠️ Aguardando sincronização com a planilha mãe...")
-    else:
+else:
         df_final = df[df['fonte_clean'] == fonte_sel]
         
         if df_final.empty:
