@@ -33,29 +33,33 @@ def obter_base_dados_global():
     if not os.path.exists("dados.csv"):
         return pd.DataFrame()
         
-    df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str).fillna('')
+    # 🛠️ CORREÇÃO IMPEDIDORA DE ERRO: O próprio leitor barra valores nulos nativamente sem acionar o erro do NumPy
+    df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     df = pd.DataFrame()
     
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
     def extrair(nome_chave):
         col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
-        return df_raw[col_real].str.strip() if col_real else pd.Series([''] * len(df_raw))
+        if col_real:
+            # Converte explicitamente para Series do Pandas limpando espaços
+            return pd.Series(df_raw[col_real]).astype(str).str.strip()
+        else:
+            return pd.Series([''] * len(df_raw))
 
     df['fonte_clean'] = extrair('fonte').str.split('.').str[0].str.lower().str.replace('-', '', regex=False)
     df['emenda_clean'] = extrair('emenda').str.split('.').str[0]
     df['plano_clean'] = extrair('plano').str.split('.').str[0]
     
-    # 🛠️ CORREÇÃO EXCLUSIVA AQUI: Eliminado o uso de .replace() que gerava o erro do NumPy array
-    df['EMPENHO_COL'] = extrair('empenho').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
-    df['NOTA_COL'] = extrair('nota').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
-    df['PDF_GERAL'] = extrair('pdf').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
-    df['URL_REAL_LINK'] = extrair('urllink').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
+    df['EMPENHO_COL'] = extrair('empenho').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['NOTA_COL'] = extrair('nota').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['PDF_GERAL'] = extrair('pdf').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['URL_REAL_LINK'] = extrair('urllink').apply(lambda x: '-' if str(x).strip() in ['', 'nan'] else str(x).strip())
     
-    df['secretaria'] = extrair('secretaria').apply(lambda x: 'Não Especificada' if str(x).strip() == '' else str(x).strip())
-    df['deputado'] = extrair('deputado').apply(lambda x: 'Não Informado' if str(x).strip() == '' else str(x).strip())
-    df['desc_clean'] = extrair('descricao').apply(lambda x: 'Sem descrição informada' if str(x).strip() == '' else str(x).strip())
-    df['conta corrente'] = extrair('conta').apply(lambda x: 'Não Informada' if str(x).strip() == '' else str(x).strip())
+    df['secretaria'] = extrair('secretaria').apply(lambda x: 'Não Especificada' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['deputado'] = extrair('deputado').apply(lambda x: 'Não Informado' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['desc_clean'] = extrair('descricao').apply(lambda x: 'Sem descrição informada' if str(x).strip() in ['', 'nan'] else str(x).strip())
+    df['conta corrente'] = extrair('conta').apply(lambda x: 'Não Informada' if str(x).strip() in ['', 'nan'] else str(x).strip())
 
     coluna_data = next((limpa for limpa in colunas_originais if 'data' in limpa and 'venc' not in limpa and 'nota' not in limpa), None)
     df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
@@ -66,7 +70,7 @@ def obter_base_dados_global():
         valores_limpos = []
         for v in extrair(col_num):
             txt = str(v).replace('R$', '').strip()
-            if not txt or txt == '-':
+            if not txt or txt in ['-', 'nan']:
                 valores_limpos.append(0.0)
                 continue
             
