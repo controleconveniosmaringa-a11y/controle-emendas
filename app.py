@@ -249,22 +249,40 @@ try:
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
 
-        # 🛠️ ABA PLANO DE AÇÃO CORRIGIDA CONTRA RECEITAS ZERADAS
+        # 🛠️ ABA PLANO DE AÇÃO ATUALIZADA COM ENTRADA DUPLA (DIGITAÇÃO OU SELEÇÃO)
         with tab_planos:
-            st.markdown("<div class='section-title'>🔍 Painel de Investigação por Plano de Ação</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
             
             if lista_planos_validos:
-                plano_selecionado_aba = st.selectbox("📋 Selecione o Plano de Ação que deseja analisar:", options=lista_planos_validos, key="selecao_plano_acao_aba_exclusivo")
+                # Criação do layout de duas colunas para os filtros combinados
+                col_busca_txt, col_busca_sel = st.columns(2)
                 
-                df_pln_ativo = df[df['plano_clean'].str.upper() == plano_selecionado_aba]
+                with col_busca_txt:
+                    plano_digitado = st.text_input("⌨️ Escreva o número do Plano de Ação:", value="", placeholder="Ex: 1264", key="input_texto_plano_acao").strip().upper()
+                
+                with col_busca_sel:
+                    # Se o usuário digitou algo válido, a lista se ajusta automaticamente para ele
+                    plano_padrao_idx = 0
+                    if plano_digitado in lista_planos_validos:
+                        plano_padrao_idx = lista_planos_validos.index(plano_digitado)
+                    
+                    plano_selecionado_listbox = st.selectbox("🖱️ Ou escolha clicando aqui na lista:", options=lista_planos_validos, index=plano_padrao_idx, key="selecao_plano_lista_hibrida")
+                
+                # 🛠️ REGRA DE OURO DA DUPLA ESCOLHA: O digitado tem prioridade absoluta se existir na base, senão usa a lista
+                if plano_digitado and plano_digitado in lista_planos_validos:
+                    plano_final_analise = plano_digitado
+                else:
+                    if plano_digitado and plano_digitado not in lista_planos_validos:
+                        st.warning(f"⚠️ O plano '{plano_digitado}' não foi localizado na base. Exibindo o plano selecionado na lista abaixo.")
+                    plano_final_analise = plano_selecionado_listbox
+                
+                # Executa o filtro contábil com base no plano final escolhido
+                df_pln_ativo = df[df['plano_clean'].str.upper() == plano_final_analise]
                 
                 if not df_pln_ativo.empty:
-                    # Identifica de qual FONTE original esse plano puxa os recursos
                     fonte_maee = df_pln_ativo['fonte_clean'].iloc[0].lower().strip()
-                    
-                    # Filtra a base completa daquela FONTE específica para capturar as receitas globais corretas
                     df_fonte_maee_completa = df[df['fonte_clean'] == fonte_maee]
                     
                     dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]
@@ -273,34 +291,33 @@ try:
                     
                     lbl_ano_pln = "Histórico Total" if ano_selecionado == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_selecionado}"
                     
-                    # Configuração de escopo temporal (Fluxo anual vs Histórico)
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
-                        # Despesas pertencem ao plano ativo
                         df_despesas_fluxo = df_pln_ativo
                         df_despesas_saldo = df_pln_ativo
-                        # Receitas pertencem à Fonte Mãe desse plano
                         df_receitas_fluxo = df_fonte_maee_completa
                         df_receitas_saldo = df_fonte_maee_completa
                     else:
                         df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] == ano_selecionado]
                         df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_selecionado)]
-                        
                         df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] == ano_selecionado]
                         df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'].astype(int) <= int(ano_selecionado)]
                     
-                    # 🚀 LÓGICA DE HERANÇA CONTÁBIL: Receita e Rendimento vêm da Fonte Mãe, Despesa vem do Plano
                     repasse_pln = float(df_receitas_saldo['repasse'].sum())
                     rendimento_pln = float(df_receitas_saldo['rendimento'].sum())
                     despesa_pln = float(df_despesas_saldo['bruto'].sum())
                     saldo_final_pln = (repasse_pln + rendimento_pln) - despesa_pln
                     
-                    st.markdown(f'''<div class='kpi-row-container'>
+                    st.markdown(f'''<div class='kpi-row-container' style='margin-top: 15px;'>
+                        <div class='kpi-card-head' style='border-color: #2563eb; border-left: 6px solid #2563eb; background-color: #f8fafc;'>
+                            <div class='kpi-label'>📋 Plano Ativo em Análise</div>
+                            <div class='kpi-value' style='color: #0f172a;'>{plano_final_analise}</div>
+                        </div>
                         <div class='kpi-card-head' style='border-color: #059669; border-left: 6px solid #059669;'>
-                            <div class='kpi-label'>📋 Saldo Disponível no Plano ({lbl_ano_pln})</div>
+                            <div class='kpi-label'>💰 Saldo Disponível no Plano ({lbl_ano_pln})</div>
                             <div class='kpi-value'>{fmt(saldo_final_pln)}</div>
                         </div>
                         <div class='kpi-card-head-blue'>
-                            <div class='kpi-label' style='color:#1e40af;'>🏦 Conta Corrente Vinculada</div>
+                            <div class='kpi-label' style='color:#1e40af;'>🏦 Conta Vinculada</div>
                             <div class='kpi-value' style='color:#2563eb; font-size: 20px;'>{conta_vinculo_pln}</div>
                         </div>
                     </div>''', unsafe_allow_html=True)
@@ -311,7 +328,6 @@ try:
                         <div class='meta-tag'>📄 Nº Emenda: {eme_vinculo_pln}</div>
                     </div>''', unsafe_allow_html=True)
                     
-                    # Tabela de Extrato com os valores capturados corretamente da Fonte Mãe
                     st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     st.markdown(f'''<table class='extrato-table'>
                         <tr class='extrato-row'><td class='extrato-cell-label'>(+) COMPOSIÇÃO DE RECEITA (REPASSE INTEGRAL DA FONTE)</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(df_receitas_fluxo['repasse'].sum()))}</td></tr>
