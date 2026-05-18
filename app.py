@@ -72,13 +72,14 @@ st.markdown(f'''
     .grid-total {{ background-color: #eff6ff; padding: 16px; font-weight: 800; font-size: 14px; color: #1e3a8a; border-top: 2px solid #2563eb; }}
     </style>''', unsafe_allow_html=True)
 
-# LINK DIRETO DA CONEXÃO DA PLANILHA MÃE
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0/export?format=csv&gid=826107717"
+# PONTE DIRETA DA PLANILHA VIA EXPORTAÇÃO CORPORATIVA
+SHEET_ID = "1Q3KDPsjhWh-981mECYrIFMBMD7jcPAFPFPJIYELQYR0"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&id={SHEET_ID}"
 
 @st.cache_data(ttl=1)
 def carregar_dados():
-    # CORREÇÃO DA SINTAXE DO DICIONÁRIO (User-Agent limpo com chaves simples)
-    df_raw = pd.read_csv(SHEET_URL, storage_options={"User-Agent": "Mozilla/5.0"})
+    # Uso do mecanismo integrado 'python' do pandas para ignorar barreira 404
+    df_raw = pd.read_csv(SHEET_URL, engine='python')
     df = pd.DataFrame()
     
     colunas_mapeadas_limpas = {}
