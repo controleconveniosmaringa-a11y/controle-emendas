@@ -46,21 +46,22 @@ def obter_base_dados_global():
     df['emenda_clean'] = extrair('emenda').str.split('.').str[0]
     df['plano_clean'] = extrair('plano').str.split('.').str[0]
     
-    df['EMPENHO_COL'] = extrair('empenho').replace('', '-')
-    df['NOTA_COL'] = extrair('nota').replace('', '-')
-    df['PDF_GERAL'] = extrair('pdf').replace('', '-')
-    df['URL_REAL_LINK'] = extrair('urllink').replace('', '-') 
+    # 🛠️ CORREÇÃO EXCLUSIVA AQUI: Eliminado o uso de .replace() que gerava o erro do NumPy array
+    df['EMPENHO_COL'] = extrair('empenho').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
+    df['NOTA_COL'] = extrair('nota').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
+    df['PDF_GERAL'] = extrair('pdf').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
+    df['URL_REAL_LINK'] = extrair('urllink').apply(lambda x: '-' if str(x).strip() == '' else str(x).strip())
     
-    df['secretaria'] = extrair('secretaria').replace('', 'Não Especificada')
-    df['deputado'] = extrair('deputado').replace('', 'Não Informado')
-    df['desc_clean'] = extrair('descricao').replace('', 'Sem descrição informada')
-    df['conta corrente'] = extrair('conta').replace('', 'Não Informada')
+    df['secretaria'] = extrair('secretaria').apply(lambda x: 'Não Especificada' if str(x).strip() == '' else str(x).strip())
+    df['deputado'] = extrair('deputado').apply(lambda x: 'Não Informado' if str(x).strip() == '' else str(x).strip())
+    df['desc_clean'] = extrair('descricao').apply(lambda x: 'Sem descrição informada' if str(x).strip() == '' else str(x).strip())
+    df['conta corrente'] = extrair('conta').apply(lambda x: 'Não Informada' if str(x).strip() == '' else str(x).strip())
 
     coluna_data = next((limpa for limpa in colunas_originais if 'data' in limpa and 'venc' not in limpa and 'nota' not in limpa), None)
     df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
     df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
 
-    # 🛠️ TRATAMENTO FINANCEIRO DE ALTA PRECISÃO: Evita a multiplicação por 100 dos valores
+    # TRATAMENTO FINANCEIRO DE ALTA PRECISÃO
     for col_num in ['repasse', 'rendimento', 'bruto']:
         valores_limpos = []
         for v in extrair(col_num):
@@ -69,16 +70,10 @@ def obter_base_dados_global():
                 valores_limpos.append(0.0)
                 continue
             
-            # Se o valor usa o padrão brasileiro (ex: 300.000,00)
             if ',' in txt and '.' in txt:
                 txt = txt.replace('.', '').replace(',', '.')
-            # Se o valor veio apenas com a vírgula dos centavos (ex: 1500,50)
             elif ',' in txt:
                 txt = txt.replace(',', '.')
-            # Se o valor veio com pontos mas sem vírgula, e os dois últimos dígitos parecem centavos
-            elif '.' in txt and len(txt.split('.')[-1]) == 2 and len(txt.replace('.', '')) > 4:
-                # Caso raro onde o separador de milhar virou ponto e não há centavos explícitos
-                pass
                 
             try:
                 valores_limpos.append(float(txt))
