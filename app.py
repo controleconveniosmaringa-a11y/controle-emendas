@@ -8,17 +8,16 @@ import urllib.request
 # 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
 
-# Interface Visual Enxuta via CSS de Alta Performance (Atualizada para Layout Executivo)
+# Interface Visual Enxuta via CSS de Alta Performance
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     
-    /* 👔 Novo Cabeçalho Executivo de Alta Performance */
+    /* 👔 Cabeçalho Executivo de Alta Performance */
     .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background-color: #0f172a; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .header-left { display: flex; flex-direction: column; }
+    .header-left { display: flex; align-items: center; }
     .main-title { font-size: 28px; font-weight: 800; color: #ffffff !important; letter-spacing: -0.8px; margin: 0; padding: 0; line-height: 1.2; }
-    .main-subtitle { font-size: 13px; font-weight: 500; color: #94a3b8 !important; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     .header-right { display: flex; align-items: center; background-color: #1e293b; padding: 8px 16px; border-radius: 6px; border: 1px solid #334155; }
     .status-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #10b981; }
     .status-text { font-size: 11px; font-weight: 700; color: #f8fafc !important; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -61,7 +60,7 @@ def obter_base_dados_global():
     fontes_brutas = extrair_lista_limpa('fonte')
     df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '') for f in fontes_brutas]
     df['emenda_clean'] = [str(e).split('.')[0] for e in extrair_lista_limpa('emenda')]
-    df['plano_clean'] = [str(p).split('.')[0] for p in extrair_lista_limpa('plano')]
+    df['plano_clean'] = [str(p).split('.')[0].lower().strip() for p in extrair_lista_limpa('plano')]
     
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
@@ -117,12 +116,11 @@ try:
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
-        # 👔 NOVO CÔNCLAVE VISUAL DA PARTE SUPERIOR (Layout de Alto Padrão)
+        # 👔 Cabeçalho Executivo Limpo e Profissional
         st.markdown('''
             <div class="header-container">
                 <div class="header-left">
                     <div class="main-title">Controle de Emendas Orçamentárias</div>
-                    <div class="main-subtitle">Sistema Integrado de Auditoria Financeira de Convênios</div>
                 </div>
                 <div class="header-right">
                     <div class="status-dot"></div>
@@ -150,20 +148,20 @@ try:
                     eme_vinculo = df_final['emenda_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
-                    if ano_fonte_ativo == "Exibir Histórico Acumulado Completo":
+                    if 	ano_fonte_ativo == "Exibir Histórico Acumulado Completo":
                         df_fonte_fluxo = df_final; df_fonte_saldo = df_final
                         df_conta_total_banco = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
                         df_banco_fluxo = df_conta_total_banco; df_banco_saldo = df_conta_total_banco
                     else:
-                        df_fonte_fluxo = df_final[df_final['ano_mov'] == ano_fonte_ativo]
+                        df_fonte_fluxo = df_final[df_final['ano_mov'] ==  ano_fonte_ativo]
                         df_fonte_saldo = df_final[df_final['ano_mov'].astype(int) <= int(ano_fonte_ativo)]
                         df_banco_base = df[df['conta corrente'] == conta_vinculada] if conta_vinculada != "Não Informada" else pd.DataFrame()
-                        df_banco_fluxo = df_banco_base[df_banco_base['ano_mov'] == ano_fonte_ativo] if not df_banco_base.empty else pd.DataFrame()
+                        df_banco_fluxo = df_banco_base[df_banco_base['ano_mov'] ==  ano_fonte_ativo] if not df_banco_base.empty else pd.DataFrame()
                         df_banco_saldo = df_banco_base[df_banco_base['ano_mov'].astype(int) <= int(ano_fonte_ativo)] if not df_banco_base.empty else pd.DataFrame()
 
                     saldo_exclusivo_fonte = float(df_fonte_saldo['repasse'].sum() + df_fonte_saldo['rendimento'].sum()) - float(df_fonte_saldo['bruto'].sum())
                     saldo_real_banco_total = float(df_banco_saldo['repasse'].sum() + df_banco_saldo['rendimento'].sum()) - float(df_banco_saldo['bruto'].sum()) if not df_banco_saldo.empty else saldo_exclusivo_fonte
-                    lbl_ano = "Histórico Total" if ano_fonte_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_fonte_ativo}"
+                    lbl_ano = "Histórico Total" if  ano_fonte_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_fonte_ativo}"
 
                     st.markdown(f'''<div class='kpi-row-container' style='margin-top: 10px;'>
                         <div class='kpi-card-head'>
@@ -271,12 +269,12 @@ try:
                 if not df_pln_ativo.empty:
                     fonte_maee = df_pln_ativo['fonte_clean'].iloc[0].lower().strip(); df_fonte_maee_completa = df[df['fonte_clean'] == fonte_maee]
                     dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]; eme_vinculo_pln = df_pln_ativo['emenda_clean'].unique()[0]; conta_vinculo_pln = df_pln_ativo['conta corrente'].iloc[0]
-                    lbl_ano_pln = "Histórico Total" if ano_plano_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_plano_ativo}"
+                    lbl_ano_pln = "Histórico Total" if  ano_plano_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_plano_ativo}"
                     
-                    if ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_despesas_fluxo = df_pln_ativo; df_despesas_saldo = df_pln_ativo; df_receitas_fluxo = df_fonte_maee_completa; df_receitas_saldo = df_fonte_maee_completa
+                    if  ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_despesas_fluxo = df_pln_ativo; df_despesas_saldo = df_pln_ativo; df_receitas_fluxo = df_fonte_maee_completa; df_receitas_saldo = df_fonte_maee_completa
                     else:
-                        df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] == ano_plano_ativo]; df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
-                        df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] == ano_plano_ativo]
+                        df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] ==  ano_plano_ativo]; df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
+                        df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] ==  ano_plano_ativo]
                         df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['fonte_clean'] == fonte_maee]; df_receitas_saldo = df_receitas_saldo[df_receitas_saldo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
                     
                     repasse_pln = float(df_receitas_saldo['repasse'].sum()); rendimento_pln = float(df_receitas_saldo['rendimento'].sum()); despesa_pln = float(df_despesas_saldo['bruto'].sum())
@@ -319,10 +317,10 @@ try:
                         t_rep, t_ren, t_gasto, t_saldo = 0.0, 0.0, 0.0, 0.0
                         for p_item in planos_compartilhados:
                             df_p_ativo = df_banco_geral_pln[df_banco_geral_pln['plano_clean'].str.upper() == p_item]
-                            if ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_p_fluxo = df_p_ativo; df_p_saldo = df_p_ativo; f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item; df_f_fluxo = df_f_maee_item
+                            if  ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_p_fluxo = df_p_ativo; df_p_saldo = df_p_ativo; f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item; df_f_fluxo = df_f_maee_item
                             else:
-                                df_p_fluxo = df_p_ativo[df_p_ativo['ano_mov'] == ano_plano_ativo]; df_p_saldo = df_p_ativo[df_p_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
-                                f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item[df_f_maee_item['ano_mov'].astype(int) <= int(ano_plano_ativo)]; df_f_fluxo = df_f_maee_item[df_f_maee_item['ano_mov'] == ano_plano_ativo]
+                                df_p_fluxo = df_p_ativo[df_p_ativo['ano_mov'] ==  ano_plano_ativo]; df_p_saldo = df_p_ativo[df_p_ativo['ano_mov'].astype(int) <= int( ano_plano_ativo)]
+                                f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item[df_f_maee_item['ano_mov'].astype(int) <= int( ano_plano_ativo)]; df_f_fluxo = df_f_maee_item[df_f_maee_item['ano_mov'] ==  ano_plano_ativo]
                             p_rep = float(df_f_fluxo['repasse'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['repasse'].sum())
                             p_ren = float(df_f_fluxo['rendimento'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['rendimento'].sum())
                             p_des = float(df_p_fluxo['bruto'].sum())
@@ -427,7 +425,7 @@ try:
                     for f_item in fontes_vinculadas_sec:
                         df_f_item_base = df_sec_ativa[df_sec_ativa['fonte_clean'] == f_item]
                         if ano_sec_ativo == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
-                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] == ano_sec_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_sec_ativo)]
+                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] ==  ano_sec_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_sec_ativo)]
                         r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
                         tot_rep_s += r_rep; tot_ren_s += r_ren; tot_gas_s += r_gas; tot_sal_s += r_sal
@@ -510,7 +508,7 @@ try:
                     for f_item in fontes_do_dep:
                         df_f_item_base = df_dep_ativo[df_dep_ativo['fonte_clean'] == f_item]
                         if ano_dep_ativo == "Exibir Histórico Acumulado Completo": df_f_flux = df_f_item_base; df_f_saldo = df_f_item_base
-                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] == ano_dep_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_dep_ativo)]
+                        else: df_f_flux = df_f_item_base[df_f_item_base['ano_mov'] ==  ano_dep_ativo]; df_f_saldo = df_f_item_base[df_f_item_base['ano_mov'].astype(int) <= int(ano_dep_ativo)]
                         r_rep = float(df_f_flux['repasse'].sum()); r_ren = float(df_f_flux['rendimento'].sum()); r_gas = float(df_f_flux['bruto'].sum())
                         r_sal = float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - float(df_f_saldo['bruto'].sum())
                         t_rep_d += r_rep; t_ren_d += r_ren; t_gas_d += r_gas; t_sal_d += r_sal
