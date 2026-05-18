@@ -79,7 +79,7 @@ try:
         # 📄 TÍTULO PRINCIPAL DO PAINEL
         st.markdown("<div class='main-title'>Controle de Emendas</div>", unsafe_allow_html=True)
         
-        # 🎯 NOVO LAYOUT DO TOPO CENTRAL: FILTROS POSICIONADOS LADO A LADO LOGO APÓS O TÍTULO
+        # 🎯 FILTROS POSICIONADOS LADO A LADO LOGO APÓS O TÍTULO CENTRAL
         c_filtro1, c_filtro2 = st.columns(2)
         with c_filtro1:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária:", options=fontes, index=0)
@@ -178,7 +178,7 @@ try:
                         tot_rep_ano, tot_ren_ano, tot_gasto_ano, tot_saldo_acum = 0.0, 0.0, 0.0, 0.0
                         
                         for f_item in fontes_compartilhadas:
-                            df_item_ano = df_banco_flux[df_banco_flux['fonte_clean'] == f_item] if not df_banco_flux.empty else pd.DataFrame()
+                            df_item_ano = df_banco_fluxo[df_banco_fluxo['fonte_clean'] == f_item] if not df_banco_fluxo.empty else pd.DataFrame()
                             f_rep = float(df_item_ano['repasse'].sum()) if not df_item_ano.empty else 0.0
                             f_ren = float(df_item_ano['rendimento'].sum()) if not df_item_ano.empty else 0.0
                             f_des = float(df_item_ano['bruto'].sum()) if not df_item_ano.empty else 0.0
