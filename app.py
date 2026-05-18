@@ -29,17 +29,15 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
-# 2. MOTOR DE LEITURA COMPARTILHADO ULTRA RÁPIDO (IGNORA O CACHE DO STREAMLIT)
+# 2. MOTOR DE LEITURA COMPARTILHADO ULTRA RÁPIDO (RAM DIRECTA)
 @st.cache_resource
 def obter_base_dados_global():
     if not os.path.exists("dados.csv"):
         return pd.DataFrame()
         
-    # Carregamento bruto indexado direto da RAM usando tipagem otimizada de strings
     df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str).fillna('')
     df = pd.DataFrame()
     
-    # Normalização expressa de colunas
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
     def extrair(nome_chave):
@@ -63,7 +61,6 @@ def obter_base_dados_global():
     df['DATA_LANCAMENTO'] = df_raw[colunas_originais[coluna_data]].str.strip() if coluna_data else extrair('data')
     df['ano_mov'] = df['DATA_LANCAMENTO'].str.extract(r'(20\d{2})').fillna('2025')
 
-    # Conversão numérica direta por substituição vetorizada em bloco
     for col_num in ['repasse', 'rendimento', 'bruto']:
         serie_num = extrair(col_num).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
         df[col_num] = pd.to_numeric(serie_num, errors='coerce').fillna(0.0)
@@ -74,22 +71,18 @@ try:
     df = obter_base_dados_global()
     
     if not df.empty:
-        # Formatação otimizada local em milissegundos
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-        # Extração instantânea das fontes exclusivas
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
         st.sidebar.markdown("<h3 style='margin-top:0; font-size:16px; color:#000000;'>Filtro Principal</h3>", unsafe_allow_html=True)
         fonte_sel = st.sidebar.selectbox("Selecione a Fonte Orçamentária:", options=fontes, index=0)
         
-        # Criação de abas nativas e leves
         tab_ativa, tab_geral, tab_deputados, tab_secretarias = st.tabs([
             f"🎯 Fonte Ativa: {fonte_sel}", "🌐 Panorama Geral", "🔍 Por Deputado", "🏛️ Por Secretaria"
         ])
         
-        # ABA 1: FOCO NA VELOCIDADE INSTANTÂNEA DA FONTE SELECIONADA
         with tab_ativa:
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
@@ -153,6 +146,7 @@ try:
                             <tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO ATUAL LIVRE — {sec.upper()}</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sec_saldo)}</td></tr>
                         </table>''', unsafe_allow_html=True)
 
+                    # ⚖️ CORREÇÃO E ESTILIZAÇÃO PREMIUM DA ABERTURA DE SALDOS (CONCILIAÇÃO)
                     if conta_vinculada != "Não Informada" and not df_conta_total_banco.empty:
                         st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS — CONTA CORRENTE: {conta_vinculada}</div>", unsafe_allow_html=True)
                         
@@ -160,7 +154,6 @@ try:
                         ano_banco_sel = st.selectbox("📅 Selecione o Exercício para Conciliação Bancária:", ["Exibir Saldo Histórico Acumulado"] + anos_bancarios, key="filtro_ano_banco")
                         
                         df_banco_proc = df_conta_total_banco if ano_banco_sel == "Exibir Saldo Histórico Acumulado" else df_conta_total_banco[df_conta_total_banco['ano_mov'] == ano_banco_sel]
-                        
                         fontes_compartilhadas = sorted([fc for fc in df_banco_proc['fonte_clean'].unique() if fc != ''])
                         
                         linhas_banco = []
@@ -169,16 +162,29 @@ try:
                             f_rep = float(df_item['repasse'].sum())
                             f_ren = float(df_item['rendimento'].sum())
                             f_des = float(df_item['bruto'].sum())
+                            f_sal = (f_rep + f_ren) - f_des
                             
                             linhas_banco.append({
-                                'Fonte Orçamentária': f_item + (" 👈 (Ativa)" if f_item == fonte_sel else ""),
-                                '(+) Repasses': fmt(f_rep),
-                                '(+) Rendimentos': fmt(f_ren),
-                                '(-) Despesas NF': fmt(f_des),
-                                '(=) Saldo Real': fmt((f_rep + f_ren) - f_des)
+                                'Fonte Orçamentária': f_item.upper(),
+                                'Repasses (Recitas)': f_rep,
+                                'Rendimentos (+_': f_ren,
+                                'Despesas (NF Bruta)': f_des,
+                                'Saldo Real Disponível': f_sal
                             })
                             
-                        st.dataframe(pd.DataFrame(linhas_banco), use_container_width=True, hide_index=True)
+                        df_tab_banco = pd.DataFrame(linhas_banco)
+                        
+                        # SISTEMA DE ESTILIZAÇÃO VETORIZADA - LAYOUT FINANÇAS INTERATIVO (0 LENTIDÃO)
+                        def _style_linhas(row):
+                            # Pinta de azul suave a linha inteira da fonte selecionada ativamente
+                            is_ativa = str(row['Fonte Orçamentária']).strip().lower() == str(fonte_sel).strip().lower()
+                            return ['background-color: #e0f2fe; font-weight: 700;' if is_ativa else '' for _ in row]
+                            
+                        df_estilizado = df_tab_banco.style.apply(_style_linhas, axis=1).format({
+                            'Repasses (Recitas)': fmt, 'Rendimentos (+_': fmt, 'Despesas (NF Bruta)': fmt, 'Saldo Real Disponível': fmt
+                        })
+                        
+                        st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
 
                     st.markdown("<div class='section-title'>📋 Detalhamento dos Lançamentos</div>", unsafe_allow_html=True)
                     df_validos = df_final[df_final['EMPENHO_COL'] != '-']
@@ -192,7 +198,6 @@ try:
                         })
                         st.dataframe(df_render, use_container_width=True, hide_index=True)
 
-        # PANORAMA GERAL CARREGADO SOB DEMANDA (PRESERVA A VELOCIDADE DA PÁGINA)
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#1e3a8a; border-bottom:3px solid #1e3a8a;'>🌐 Balanço Consolidado de Recursos</div>", unsafe_allow_html=True)
             g_rep, g_ren, g_gas = float(df['repasse'].sum()), float(df['rendimento'].sum()), float(df['bruto'].sum())
@@ -233,4 +238,4 @@ try:
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
             
 except Exception as e:
-    st.error(f"Erro no processamento de alta velocidade: {e}")
+    st.error(f"Erro no processamento completo: {e}")
