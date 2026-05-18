@@ -127,7 +127,6 @@ try:
                 if not df_final.empty:
                     dep_vinculo = df_final['deputado'].unique()[0]
                     eme_vinculo = df_final['emenda_clean'].unique()[0]
-                    pln_vinculo = df_final['plano_clean'].unique()[0]
                     conta_vinculada = df_final['conta corrente'].iloc[0]
                     
                     if ano_selecionado == "Exibir Histórico Acumulado Completo":
@@ -161,7 +160,7 @@ try:
                     st.markdown(f'''<div style='margin-bottom:10px;'>
                         <div class='meta-tag'>👤 Deputado: {dep_vinculo}</div>
                         <div class='meta-tag'>📄 Número Emenda: {eme_vinculo}</div>
-                        <div class='meta-tag'>🎯 Plano de Ação: {pln_vinculo}</div>
+                        <div class='meta-tag'>🎯 Plano de Ação: {df_final['plano_clean'].unique()[0]}</div>
                     </div>''', unsafe_allow_html=True)
                     
                     secretarias = [s for s in df_final['secretaria'].unique() if s != '']
@@ -228,7 +227,6 @@ try:
             df_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_cronologico['Saldo_Acumulado'] = ((df_cronologico['repasse'] + df_cronologico['rendimento']) - df_cronologico['bruto']).cumsum()
             
-            # 🛠️ CORREÇÃO DE SINTAXE EXECUTADA AQUI: Caractere fantasma expurgado definitivamente
             fig = go.Figure(go.Scatter(x=df_cronologico['ano_mov'], y=df_cronologico['Saldo_Acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_cronologico['Saldo_Acumulado']], textposition="top center"))
             fig.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=240, margin=dict(l=5,r=5,t=30,b=5), xaxis=dict(type='category'), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
             st.plotly_chart(fig, use_container_width=True)
@@ -251,6 +249,7 @@ try:
             df_sec.columns = ['Secretaria / Pasta', 'Fonte Orçamentária', '(+) Repasses', '(-) Gastos', '(=) Saldo Real']
             st.dataframe(df_sec, use_container_width=True, hide_index=True)
 
+        # 🛠️ ABA PLANO DE AÇÃO ATUALIZADA COM COMPARTILHAMENTO DE CONTAS E PLANOS MÚLTIPLOS
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             
@@ -323,7 +322,7 @@ try:
                             <div class='kpi-value'>{fmt(saldo_final_pln)}</div>
                         </div>
                         <div class='kpi-card-head-blue'>
-                            <div class='kpi-label' style='color:#1e40af;'>🏦 Conta Vinculada</div>
+                            <div class='kpi-label' style='color:#1e40af;'>🏦 Conta Corrente Vinculada</div>
                             <div class='kpi-value' style='color:#2563eb; font-size: 20px;'>{conta_vinculo_pln}</div>
                         </div>
                     </div>''', unsafe_allow_html=True)
@@ -341,6 +340,85 @@ try:
                         <tr class='extrato-row'><td>(-) DESPESAS LIQUIDADAS EXCLUSIVAS DESTE PLANO DE AÇÃO</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(df_despesas_fluxo['bruto'].sum()))}</td></tr>
                         <tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL LÍQUIDO DO PLANO DE AÇÃO</td><td class='extrato-cell-val' style='color:{"#059669" if saldo_final_pln >= 0 else "#dc2626"}; font-size:14px;'>{fmt(saldo_final_pln)}</td></tr>
                     </table>''', unsafe_allow_html=True)
+                    
+                    # 🚀 [RECURSO NOVO]: EXIBIÇÃO DE PLANOS MULTIPLOS NA MESMA CONTA CORRENTE
+                    if conta_vinculo_pln != "Não Informada":
+                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS DA CONTA BANCÁRIA POR PLANO DE AÇÃO ({lbl_ano_pln})</div>", unsafe_allow_html=True)
+                        
+                        # Filtra a base completa do banco associado àquela conta
+                        df_banco_geral_pln = df[df['conta corrente'] == conta_vinculo_pln]
+                        
+                        # Captura todos os Planos de Ação que usam essa conta
+                        planos_compartilhados = sorted([str(p).upper() for p in df_banco_geral_pln['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
+                        
+                        linhas_banco_pln = []
+                        t_rep, t_ren, t_gasto, t_saldo = 0.0, 0.0, 0.0, 0.0
+                        
+                        for p_item in planos_compartilhados:
+                            # Filtros temporais baseados no escopo selecionado
+                            df_p_ativo = df_banco_geral_pln[df_banco_geral_pln['plano_clean'].str.upper() == p_item]
+                            
+                            if ano_selecionado == "Exibir Histórico Acumulado Completo":
+                                df_p_fluxo = df_p_ativo
+                                df_p_saldo = df_p_ativo
+                            else:
+                                df_p_fluxo = df_p_ativo[df_p_ativo['ano_mov'] == ano_selecionado]
+                                df_p_saldo = df_p_ativo[df_p_ativo['ano_mov'].astype(int) <= int(ano_selecionado)]
+                            
+                            # Para bater com a herança contábil, se o plano for o ativo ou herdar receita de uma fonte mãe daquela conta
+                            f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip()
+                            df_f_maee_item = df[df['fonte_clean'] == f_maee_item]
+                            
+                            if ano_selecionado == "Exibir Histórico Acumulado Completo":
+                                df_f_saldo = df_f_maee_item
+                                df_f_fluxo = df_f_maee_item
+                            else:
+                                df_f_saldo = df_f_maee_item[df_f_maee_item['ano_mov'].astype(int) <= int(ano_selecionado)]
+                                df_f_fluxo = df_f_maee_item[df_f_maee_item['ano_mov'] == ano_selecionado]
+                                
+                            p_rep = float(df_f_fluxo['repasse'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['repasse'].sum())
+                            p_ren = float(df_f_fluxo['rendimento'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['rendimento'].sum())
+                            p_des = float(df_p_fluxo['bruto'].sum())
+                            
+                            p_saldo_acum = (float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - p_des) if p_item == plano_final_analise else (float(df_p_saldo['repasse'].sum() + df_p_saldo['rendimento'].sum()) - p_des)
+                            
+                            t_rep += p_rep
+                            t_ren += p_ren
+                            t_gasto += p_des
+                            t_saldo += p_saldo_acum
+                            
+                            linhas_banco_pln.append({
+                                'Plano de Ação': p_item + (" (Ativo 🎯)" if p_item == plano_final_analise else ""),
+                                'Fonte Vinculada': f_maee_item.upper(),
+                                'Repasses no Período': p_rep,
+                                'Rendimentos no Período': p_ren,
+                                'Despesas no Período': p_des,
+                                'Saldo Real do Plano (Acumulado)': p_saldo_acum
+                            })
+                            
+                        linhas_banco_pln.append({
+                            'Plano de Ação': 'TOTAL CONSOLIDADO DA CONTA CORRENTE 🏦',
+                            'Fonte Vinculada': '-',
+                            'Repasses no Período': t_rep,
+                            'Rendimentos no Período': t_ren,
+                            'Despesas no Período': t_gasto,
+                            'Saldo Real do Plano (Acumulado)': t_saldo
+                        })
+                        
+                        df_tab_banco_pln = pd.DataFrame(linhas_banco_pln)
+                        
+                        def _style_linhas_pln(row):
+                            txt_pln = str(row['Plano de Ação']).strip().upper()
+                            if 'TOTAL CONSOLIDADO' in txt_pln:
+                                return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' for _ in row]
+                            elif '(ATIVO 🎯)' in txt_pln:
+                                return ['background-color: #e0f2fe; font-weight: 700;' for _ in row]
+                            return ['' for _ in row]
+                            
+                        df_estilizado_pln = df_tab_banco_pln.style.apply(_style_linhas_pln, axis=1).format({
+                            'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real do Plano (Acumulado)': fmt
+                        })
+                        st.dataframe(df_estilizado_pln, use_container_width=True, hide_index=True)
                     
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
