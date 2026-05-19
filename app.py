@@ -248,7 +248,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO (TABELA DE SALDO BANCÁRIO EXTRAÍDA CONFORME PEDIDO)
+        # 2. 📋 ABA POR PLANO DE AÇÃO (MATEMÁTICA E LÓGICA DE FILTRAGEM REAL HOMOLOGADA)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -284,13 +284,16 @@ try:
                     dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]; eme_vinculo_pln = df_pln_ativo['emenda_clean'].unique()[0]; conta_vinculo_pln = df_pln_ativo['conta corrente'].iloc[0]
                     lbl_ano_pln = "Histórico Total" if ano_plano_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_plano_ativo}"
                     
-                    if ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_despesas_fluxo = df_pln_ativo; df_despesas_saldo = df_pln_ativo; df_receitas_fluxo = df_fonte_maee_completa; df_receitas_saldo = df_fonte_maee_completa
+                    if ano_plano_ativo == "Exibir Histórico Acumulado Completo": 
+                        df_despesas_fluxo = df_pln_ativo; df_despesas_saldo = df_pln_ativo; df_receitas_fluxo = df_pln_ativo; df_receitas_saldo = df_pln_ativo
                     else:
                         df_despesas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] == ano_plano_ativo]; df_despesas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
-                        df_receitas_fluxo = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'] == ano_plano_ativo]
-                        df_receitas_saldo = df_fonte_maee_completa[df_fonte_maee_completa['fonte_clean'] == fonte_maee]; df_receitas_saldo = df_receitas_saldo[df_receitas_saldo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
+                        df_receitas_fluxo = df_pln_ativo[df_pln_ativo['ano_mov'] == ano_plano_ativo]
+                        df_receitas_saldo = df_pln_ativo[df_pln_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
                     
-                    repasse_pln = float(df_receitas_saldo['repasse'].sum()); rendimento_pln = float(df_receitas_saldo['rendimento'].sum()); despesa_pln = float(df_despesas_saldo['bruto'].sum())
+                    repasse_pln = float(df_receitas_saldo['repasse'].sum())
+                    rendimento_pln = float(df_receitas_saldo['rendimento'].sum())
+                    despesa_pln = float(df_despesas_saldo['bruto'].sum())
                     saldo_final_pln = (repasse_pln + rendimento_pln) - despesa_pln
                     
                     st.markdown(f'''<div class='kpi-row-container' style='margin-top: 15px;'>
@@ -314,11 +317,13 @@ try:
                         <div class='meta-tag'>📄 Nº Emenda: {eme_vinculo_pln}</div>
                     </div>''', unsafe_allow_html=True)
                     
+                    # 🛠️ REFORMA VISUAL E MATEMÁTICA DO EXTRATO (FILTRAGEM REAL POR LINHA DA PLANILHA)
                     st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     
-                    secretarias_do_plano = [str(s).upper() for s in df_despesas_fluxo['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']]
+                    # Captura a lista de secretarias que têm lançamentos de verdade (seja receita ou despesa) nesse plano
+                    secretarias_do_plano = sorted([str(s).upper() for s in df_pln_ativo['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']])
                     if not secretarias_do_plano:
-                        secretarias_do_plano = [str(df_pln_ativo['secretaria'].iloc[0]).upper()]
+                        secretarias_do_plano = ['NÃO ESPECIFICADA']
                         
                     html_extrato_plano = f'''<table class='extrato-table'>
                         <thead>
@@ -326,49 +331,48 @@ try:
                                 <th>DESCRIÇÃO DO FLUXO FINANCEIRO</th>'''
                     
                     for s_header in secretarias_do_plano:
-                        html_extrato_plano += f'''<th style="text-align: right; width: 20%;">{s_header}</th>'''
+                        html_extrato_plano += f'''<th style="text-align: right; width: 18%;">{s_header}</th>'''
                     html_extrato_plano += f'''<th style="text-align: right; width: 22%;">CONSOLIDADO TOTAL</th>
                             </tr>
                         </thead>
                         <tbody>'''
                     
-                    # --- LINHA 1: REPASSES ---
+                    # --- LINHA 1: REPASSES (Soma real filtrada da planilha por secretaria) ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) COMPOSIÇÃO DE RECEITA (REPASSE ENTRADO)</td>'''
-                    fatia_repasse_por_sec = float(df_receitas_fluxo['repasse'].sum()) / len(secretarias_do_plano)
-                    for _ in secretarias_do_plano:
-                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669; font-weight: 500;'>{fmt(fatia_repasse_por_sec)}</td>'''
-                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(df_receitas_fluxo['repasse'].sum()))}</td></tr>'''
+                    for s_linha in secretarias_do_plano:
+                        df_rep_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
+                        val_rep_s = float(df_rep_s['repasse'].sum()) if not df_rep_s.empty else 0.0
+                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669; font-weight: 500;'>{fmt(val_rep_s)}</td>'''
+                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669;'>{fmt(repasse_pln)}</td></tr>'''
                     
-                    # --- LINHA 2: RENDIMENTOS ---
+                    # --- LINHA 2: RENDIMENTOS (Soma real filtrada da planilha por secretaria) ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO NA CONTA</td>'''
-                    fatia_rendimento_por_sec = float(df_receitas_fluxo['rendimento'].sum()) / len(secretarias_do_plano)
-                    for _ in secretarias_do_plano:
-                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb; font-weight: 500;'>{fmt(fatia_rendimento_por_sec)}</td>'''
-                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(df_receitas_fluxo['rendimento'].sum()))}</td></tr>'''
+                    for s_linha in secretarias_do_plano:
+                        df_ren_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
+                        val_ren_s = float(df_ren_s['rendimento'].sum()) if not df_ren_s.empty else 0.0
+                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb; font-weight: 500;'>{fmt(val_ren_s)}</td>'''
+                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(rendimento_pln)}</td></tr>'''
                     
-                    # --- LINHA 3: DESPESAS LIQUIDADAS ---
+                    # --- LINHA 3: DESPESAS LIQUIDADAS (Soma real filtrada da planilha por secretaria) ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS LIQUIDADAS NO PERÍODO (NF BRUTA)</td>'''
                     for s_linha in secretarias_do_plano:
                         df_gasto_linha = df_despesas_fluxo[df_despesas_fluxo['secretaria'].str.upper() == s_linha]
                         val_gasto_linha = float(df_gasto_linha['bruto'].sum()) if not df_gasto_linha.empty else 0.0
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626; font-weight: 500;'>{fmt(val_gasto_linha)}</td>'''
-                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(df_despesas_fluxo['bruto'].sum()))}</td></tr>'''
+                    html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(despesa_pln)}</td></tr>'''
                     
-                    # --- LINHA FINAL: SALDO DISPONÍVEL ---
+                    # --- LINHA FINAL: SALDO DISPONÍVEL REAL ACUMULADO ---
                     html_extrato_plano += f'''<tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label' style='font-size:13px;'>(=) SALDO DISPONÍVEL NO PLANO DE AÇÃO</td>'''
                     for s_saldo in secretarias_do_plano:
-                        df_gasto_saldo = df_despesas_saldo[df_despesas_saldo['secretaria'].str.upper() == s_saldo]
-                        val_gasto_saldo = float(df_gasto_saldo['bruto'].sum()) if not df_gasto_saldo.empty else 0.0
+                        df_s_acum = df_despesas_saldo[df_despesas_saldo['secretaria'].str.upper() == s_saldo]
                         
-                        if ano_plano_ativo == "Exibir Histórico Acumulado Completo":
-                            df_f_rec = df_fonte_maee_completa
-                        else:
-                            df_f_rec = df_fonte_maee_completa[df_fonte_maee_completa['ano_mov'].astype(int) <= int(ano_plano_ativo)]
-                            
-                        fatia_rep_s = float(df_f_rec['repasse'].sum()) / len(secretarias_do_plano)
-                        fatia_ren_s = float(df_f_rec['rendimento'].sum()) / len(secretarias_do_plano)
-                        saldo_individual_sec = (fatia_rep_s + fatia_ren_s) - val_gasto_saldo
-                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:{"#059669" if saldo_individual_sec >= 0 else "#dc2626"}; font-size:13px; font-weight:700;'>{fmt(saldo_individual_sec)}</td>'''
+                        # Calcula a receita real acumulada que aquela secretaria específica recebeu na planilha
+                        rec_rep_acum = float(df_s_acum['repasse'].sum())
+                        rec_ren_acum = float(df_s_acum['rendimento'].sum())
+                        rec_gasto_acum = float(df_s_acum['bruto'].sum())
+                        
+                        saldo_real_individual_sec = (rec_rep_acum + rec_ren_acum) - rec_gasto_acum
+                        html_extrato_plano += f'''<td class='extrato-cell-val' style='color:{"#059669" if saldo_real_individual_sec >= 0 else "#dc2626"}; font-size:13px; font-weight:700;'>{fmt(saldo_real_individual_sec)}</td>'''
                     
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:{"#059669" if saldo_final_pln >= 0 else "#dc2626"}; font-size:14px;'>{fmt(saldo_final_pln)}</td></tr>
                     </tbody>
@@ -391,10 +395,10 @@ try:
                         st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>👤 VÍNCULO DE AUTORIA PARLAMENTAR (DEPUTADO):</div>", unsafe_allow_html=True)
                         df_dep_split = df_despesas_fluxo.groupby('deputado').agg({'repasse': 'sum', 'bruto': 'sum'}).reset_index()
                         if not df_dep_split.empty:
-                            df_dep_split['Repasses Destinados'] = float(df_receitas_fluxo['repasse'].sum()) if dep_vinculo_pln else 0.0
+                            df_dep_split['Repasses Destinados'] = float(df_fonte_maee_completa['repasse'].sum()) if dep_vinculo_pln else 0.0
                             df_dep_split['Repasses Destinados'] = df_dep_split['Repasses Destinados'].apply(fmt)
-                            df_dep_split['Despesas Liquiddas'] = df_dep_split['bruto'].apply(fmt)
-                            st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquiddas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
+                            df_dep_split['Despesas Liquidadas'] = df_dep_split['bruto'].apply(fmt)
+                            st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
                     
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
