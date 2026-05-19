@@ -36,7 +36,6 @@ st.markdown('''<style>
     .extrato-cell-label { padding: 10px 15px; font-size: 12px; font-weight: 700; color: #0f172a; text-align: left; }
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
     
-    /* 📥 Estilização Contratada para o Botão de Download Forçado */
     .btn-download-direto { background-color: #e2e8f0; color: #0f172a !important; text-decoration: none !important; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid #cbd5e1; display: inline-block; transition: all 0.2s ease; text-transform: uppercase; }
     .btn-download-direto:hover { background-color: #cbd5e1; color: #000000 !important; border-color: #94a3b8; }
     .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; }
@@ -134,11 +133,10 @@ try:
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-        # 🛠️ GERADOR DE BOTÕES HTML NATIVOS PARA ABERTURA E DOWNLOAD REAL DE ARQUIVOS
-        def gerar_botoes_documento(link_url, num_empenho, tipo_retorno="abrir"):
+        # 🛠️ TRATAMENTO DE DOWNLOAD CORRIGIDO: Força o nome do arquivo a salvar como o Número da Nota Fiscal
+        def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
             if not link_url or link_url == '':
                 return '-'
-            # Se for link do Google Drive, modifica a estrutura para forçar download direto se for solicitado
             link_final = link_url
             if tipo_retorno == "baixar" and "drive.google.com" in link_url:
                 if "/file/d/" in link_url:
@@ -148,7 +146,13 @@ try:
             if tipo_retorno == "abrir":
                 return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
             elif tipo_retorno == "baixar":
-                nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf" if num_empenho != '-' else "documento.pdf"
+                # ⚙️ REGRA DE NOMENCLATURA: Prioriza o número da Nota Fiscal, se não houver usa o Empenho
+                if num_nota != '-' and num_nota != '':
+                    nome_arquivo_sugerido = f"Nota_Fiscal_{num_nota}.pdf"
+                elif num_empenho != '-' and num_empenho != '':
+                    nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf"
+                else:
+                    nome_arquivo_sugerido = "documento.pdf"
                 return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
             return '-'
 
@@ -267,9 +271,8 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
-                        # 🛠️ MONTAGEM DOS EMBEDDINGS HTML EM STRINGS PARA EVITAR O RECARREGAMENTO VISUAL
-                        lista_html_abrir = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'])]
-                        lista_html_baixar = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'])]
+                        lista_html_abrir = [gerar_botoes_documento(url, emp, nota, "abrir") for url, emp, nota in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'], df_validos['NOTA_COL'])]
+                        lista_html_baixar = [gerar_botoes_documento(url, emp, nota, "baixar") for url, emp, nota in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'], df_validos['NOTA_COL'])]
                         
                         df_render = pd.DataFrame({
                             'Data Lançamento': df_validos['DATA_LANCAMENTO'], 
@@ -279,7 +282,6 @@ try:
                             'Comprovante/PDF 📄': lista_html_abrir,
                             'Download Direto 📥': lista_html_baixar
                         })
-                        # Renderiza via st.write ou st.markdown unificado por causa do HTML interno dos botões
                         st.write(df_render.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
@@ -434,9 +436,8 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
-                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
-                        lista_html_abrir_p = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'])]
-                        lista_html_baixar_p = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'])]
+                        lista_html_abrir_p = [gerar_botoes_documento(url, emp, nota, "abrir") for url, emp, nota in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'], df_pln_validos['NOTA_COL'])]
+                        lista_html_baixar_p = [gerar_botoes_documento(url, emp, nota, "baixar") for url, emp, nota in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'], df_pln_validos['NOTA_COL'])]
                         
                         df_render_pln = pd.DataFrame({
                             'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 
@@ -528,9 +529,8 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Caderno de Lançamentos da Pasta — ({lbl_ano_sec})</div>", unsafe_allow_html=True)
                     df_sec_validos = df_sec_fluxo[df_sec_fluxo['EMPENHO_COL'] != '-']
                     if not df_sec_validos.empty:
-                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
-                        lista_html_abrir_s = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'])]
-                        lista_html_baixar_s = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'])]
+                        lista_html_abrir_s = [gerar_botoes_documento(url, emp, nota, "abrir") for url, emp, nota in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'], df_sec_validos['NOTA_COL'])]
+                        lista_html_baixar_s = [gerar_botoes_documento(url, emp, nota, "baixar") for url, emp, nota in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'], df_sec_validos['NOTA_COL'])]
                         
                         df_render_sec = pd.DataFrame({
                             'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 
@@ -623,9 +623,8 @@ try:
                     st.markdown(f"<div class='section-title'>📋 Caderno de Lançamentos Vinculados ao Deputado — ({lbl_ano_dep})</div>", unsafe_allow_html=True)
                     df_dep_validos = df_dep_fluxo[df_dep_fluxo['EMPENHO_COL'] != '-']
                     if not df_dep_validos.empty:
-                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
-                        lista_html_abrir_d = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'])]
-                        lista_html_baixar_d = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'])]
+                        lista_html_abrir_d = [gerar_botoes_documento(url, emp, nota, "abrir") for url, emp, nota in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'], df_dep_validos['NOTA_COL'])]
+                        lista_html_baixar_d = [gerar_botoes_documento(url, emp, nota, "baixar") for url, emp, nota in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'], df_dep_validos['NOTA_COL'])]
                         
                         df_render_dep = pd.DataFrame({
                             'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 
