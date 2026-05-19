@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 import os
-import urllib.request
 
 # 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
 st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
@@ -37,6 +36,8 @@ st.markdown('''<style>
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
 </style>''', unsafe_allow_html=True)
 
+# 🛠️ CACHE PROTEGIDO CONTRA MULTIPLICAÇÃO DE VALORES EM MEMÓRIA
+@st.cache_data(ttl=3600)
 def obter_base_dados_global():
     url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     
@@ -58,21 +59,34 @@ def obter_base_dados_global():
         return [''] * len(df_raw)
 
     fontes_brutas = extrair_lista_limpa('fonte')
-    df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '') for f in fontes_brutas]
-    df['emenda_clean'] = [str(e).split('.')[0] for e in extrair_lista_limpa('emenda')]
-    df['plano_clean'] = [str(p).split('.')[0].lower().strip() for p in extrair_lista_limpa('plano')]
+    df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in fontes_brutas]
+    df['emenda_clean'] = [str(e).split('.')[0].strip() for e in extrair_lista_limpa('emenda')]
+    df['plano_clean'] = [str(p).split('.')[0].upper().strip() for p in extrair_lista_limpa('plano')]
     
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
     df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
     
+    # 🛠️ CORREÇÃO CIRÚRGICA DO TRATAMENTO DE LINKS DE COMPROVANTES (FIM DO 'NONE')
     url_items = [''] * len(df_raw)
-    for chave_tentativa in ['urllink', 'url', 'link', 'comprovante']:
+    for chave_tentativa in ['urllink', 'url', 'link', 'comprovante', 'pdf']:
         col_achada = next((orig for limpa, orig in colunas_originais.items() if chave_tentativa in limpa), None)
         if col_achada is not None:
-            url_items = [str(item).strip() if (str(item).strip() != '' and str(item).strip().lower() != 'nan') else '' for item in df_raw[col_achada]]
+            url_items = [str(item).strip() for item in df_raw[col_achada]]
             break
-    df['URL_REAL_LINK'] = [x if x != '' else '-' for x in url_items]
+            
+    lista_links_processados = []
+    for lk in url_items:
+        lk_clean = str(lk).strip()
+        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-':
+            lista_links_processados.append('-')
+        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE):
+            lista_links_processados.append(lk_clean)
+        else:
+            lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else '-'
+            lista_links_processados.append(lista_links_processed_fallback)
+            
+    df['URL_REAL_LINK'] = lista_links_processados
     
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in extrair_lista_limpa('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in extrair_lista_limpa('deputado')]
@@ -137,7 +151,7 @@ try:
         with tab_ativa:
             fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
             
-            if font_sel := fonte_sel:
+            if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
                 anos_da_fonte = sorted(list(set([str(a) for a in df_final['ano_mov'].unique() if a not in ['', 'nan']])))
                 opcoes_anos_fonte = ["Exibir Histórico Acumulado Completo"] + anos_da_fonte
@@ -229,8 +243,7 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
-                        lista_links_limpos = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_validos['URL_REAL_LINK']]
-                        df_render = pd.DataFrame({'Data Lançamento': df_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_validos['EMPENHO_COL'], 'Nota Fiscal': df_validos['NOTA_COL'], 'Valor Bruto NF': df_validos['bruto'], 'Comprovante/PDF 📄': lista_links_limpos})
+                        df_render = pd.DataFrame({'Data Lançamento': df_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_validos['EMPENHO_COL'], 'Nota Fiscal': df_validos['NOTA_COL'], 'Valor Bruto NF': df_validos['bruto'], 'Comprovante/PDF 📄': df_validos['URL_REAL_LINK']})
                         st.dataframe(df_render.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
@@ -355,8 +368,7 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
-                        lista_links_pln = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_pln_validos['URL_REAL_LINK']]
-                        df_render_pln = pd.DataFrame({'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_pln_validos['EMPENHO_COL'], 'Nota Fiscal': df_pln_validos['NOTA_COL'], 'Secretaria Executor': df_pln_validos['secretaria'].astype(str).str.upper(), 'Valor Bruto NF': df_pln_validos['bruto'], 'Comprovante/PDF 📄': lista_links_pln})
+                        df_render_pln = pd.DataFrame({'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_pln_validos['EMPENHO_COL'], 'Nota Fiscal': df_pln_validos['NOTA_COL'], 'Secretaria Executor': df_pln_validos['secretaria'].astype(str).str.upper(), 'Valor Bruto NF': df_pln_validos['bruto'], 'Comprovante/PDF 📄': df_pln_validos['URL_REAL_LINK']})
                         st.dataframe(df_render_pln.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
@@ -438,8 +450,7 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Caderno de Lançamentos da Pasta — ({lbl_ano_sec})</div>", unsafe_allow_html=True)
                     df_sec_validos = df_sec_fluxo[df_sec_fluxo['EMPENHO_COL'] != '-']
                     if not df_sec_validos.empty:
-                        lista_links_sec = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_sec_validos['URL_REAL_LINK']]
-                        df_render_sec = pd.DataFrame({'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_sec_validos['EMPENHO_COL'], 'Nota Fiscal': df_sec_validos['NOTA_COL'], 'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_sec_validos['bruto'], 'Comprovante/PDF 📄': lista_links_sec})
+                        df_render_sec = pd.DataFrame({'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_sec_validos['EMPENHO_COL'], 'Nota Fiscal': df_sec_validos['NOTA_COL'], 'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_sec_validos['bruto'], 'Comprovante/PDF 📄': df_sec_validos['URL_REAL_LINK']})
                         st.dataframe(df_render_sec.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
@@ -521,17 +532,15 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Caderno de Lançamentos Vinculados ao Deputado — ({lbl_ano_dep})</div>", unsafe_allow_html=True)
                     df_dep_validos = df_dep_fluxo[df_dep_fluxo['EMPENHO_COL'] != '-']
                     if not df_dep_validos.empty:
-                        lista_links_dep = [str(lk).strip() if str(lk).strip().startswith("http") else None for lk in df_dep_validos['URL_REAL_LINK']]
-                        df_render_dep = pd.DataFrame({'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_dep_validos['EMPENHO_COL'], 'Nota Fiscal': df_dep_validos['NOTA_COL'], 'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_dep_validos['bruto'], 'Comprovante/PDF 📄': lista_links_dep})
+                        df_render_dep = pd.DataFrame({'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_dep_validos['EMPENHO_COL'], 'Nota Fiscal': df_dep_validos['NOTA_COL'], 'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_dep_validos['bruto'], 'Comprovante/PDF 📄': df_dep_validos['URL_REAL_LINK']})
                         st.dataframe(df_render_dep.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
 
-        # 5. 🌐 ABA PANORAMA GERAL REFORMULADA COM 4 GRÁFICOS DE COLUNAS (BARRAS VERTICAIS)
+        # 5. 🌐 ABA PANORAMA GERAL
         with tab_geral:
             st.markdown("<div class='section-title' style='color:#0f172a; border-bottom:3px solid #0f172a;'>📊 CADERNO DE BALANÇOS CONSOLIDADOS (4 QUADROS)</div>", unsafe_allow_html=True)
             
-            # Preparação dos dados para os gráficos
             df_g_cronologico = df.groupby('ano_mov').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index().sort_values('ano_mov')
             df_g_cronologico['saldo_acumulado'] = ((df_g_cronologico['repasse'] + df_g_cronologico['rendimento']) - df_g_cronologico['bruto']).cumsum()
             
@@ -547,9 +556,7 @@ try:
             df_g_deputado['saldo'] = (df_g_deputado['repasse'] + df_g_deputado['rendimento']) - df_g_deputado['bruto']
             df_g_deputado = df_g_deputado[df_g_deputado['deputado'] != 'Não Informado'].sort_values('saldo', ascending=False)
 
-            # 🚀 Linha 1 de Gráficos (Cronograma + Secretarias)
             c_g1, c_g2 = st.columns(2)
-            
             with c_g1:
                 st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>📈 1. EVOLUÇÃO CRONOLÓGICA DO SALDO DISPONÍVEL ACUMULADO:</div>", unsafe_allow_html=True)
                 fig1 = go.Figure(go.Scatter(x=df_g_cronologico['ano_mov'], y=df_g_cronologico['saldo_acumulado'], mode='lines+markers+text', line=dict(color='#059669', width=4), text=[fmt(v) for v in df_g_cronologico['saldo_acumulado']], textposition="top center"))
@@ -562,12 +569,9 @@ try:
                 fig2.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=260, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
                 st.plotly_chart(fig2, use_container_width=True)
                 
-            # 🚀 Linha 2 de Gráficos (Fontes corrigidas para colunas + Deputados)
             c_g3, c_g4 = st.columns(2)
-            
             with c_g3:
                 st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>🎯 3. SALDO DISPONÍVEL CONSOLIDADO POR FONTE ORÇAMENTÁRIA:</div>", unsafe_allow_html=True)
-                # 🛠️ CORREÇÃO VISUAL EXECUTADA AQUI: Gráfico convertido para barras verticais (colunas) eliminando falhas de rótulos longos
                 fig3 = go.Figure(go.Bar(x=df_g_fonte['fonte_clean'].astype(str).str.upper(), y=df_g_fonte['saldo'], marker_color='#0f172a', text=[fmt(v) for v in df_g_fonte['saldo']], textposition='auto'))
                 fig3.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'), xaxis=dict(type='category'))
                 st.plotly_chart(fig3, use_container_width=True)
