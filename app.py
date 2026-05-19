@@ -67,7 +67,6 @@ def obter_base_dados_global():
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
     df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
     
-    # 🛠️ CORREÇÃO CIRÚRGICA DO TRATAMENTO DE LINKS DE COMPROVANTES (FIM DO 'NONE')
     url_items = [''] * len(df_raw)
     for chave_tentativa in ['urllink', 'url', 'link', 'comprovante', 'pdf']:
         col_achada = next((orig for limpa, orig in colunas_originais.items() if chave_tentativa in limpa), None)
@@ -79,11 +78,11 @@ def obter_base_dados_global():
     for lk in url_items:
         lk_clean = str(lk).strip()
         if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-':
-            lista_links_processados.append('-')
+            lista_links_processados.append('')
         elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE):
             lista_links_processados.append(lk_clean)
         else:
-            lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else '-'
+            lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else ''
             lista_links_processados.append(lista_links_processed_fallback)
             
     df['URL_REAL_LINK'] = lista_links_processados
@@ -244,6 +243,7 @@ try:
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
                         df_render = pd.DataFrame({'Data Lançamento': df_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_validos['EMPENHO_COL'], 'Nota Fiscal': df_validos['NOTA_COL'], 'Valor Bruto NF': df_validos['bruto'], 'Comprovante/PDF 📄': df_validos['URL_REAL_LINK']})
+                        # 🛠️ CORREÇÃO DE DIRECIONAMENTO DE LINK EXTERNO EXECUTADA AQUI
                         st.dataframe(df_render.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
@@ -362,13 +362,14 @@ try:
                         if not df_dep_split.empty:
                             df_dep_split['Repasses Destinados'] = float(df_receitas_fluxo['repasse'].sum()) if dep_vinculo_pln else 0.0
                             df_dep_split['Repasses Destinados'] = df_dep_split['Repasses Destinados'].apply(fmt)
-                            df_dep_split['Despesas Liquidadas'] = df_dep_split['bruto'].apply(fmt)
-                            st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
+                            df_dep_split['Despesas Liquiddas'] = df_dep_split['bruto'].apply(fmt)
+                            st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquiddas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
                     
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
                         df_render_pln = pd.DataFrame({'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_pln_validos['EMPENHO_COL'], 'Nota Fiscal': df_pln_validos['NOTA_COL'], 'Secretaria Executor': df_pln_validos['secretaria'].astype(str).str.upper(), 'Valor Bruto NF': df_pln_validos['bruto'], 'Comprovante/PDF 📄': df_pln_validos['URL_REAL_LINK']})
+                        # 🛠️ CORREÇÃO DE DIRECIONAMENTO DE LINK EXTERNO EXECUTADA AQUI
                         st.dataframe(df_render_pln.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
@@ -451,6 +452,7 @@ try:
                     df_sec_validos = df_sec_fluxo[df_sec_fluxo['EMPENHO_COL'] != '-']
                     if not df_sec_validos.empty:
                         df_render_sec = pd.DataFrame({'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_sec_validos['EMPENHO_COL'], 'Nota Fiscal': df_sec_validos['NOTA_COL'], 'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_sec_validos['bruto'], 'Comprovante/PDF 📄': df_sec_validos['URL_REAL_LINK']})
+                        # 🛠️ CORREÇÃO DE DIRECIONAMENTO DE LINK EXTERNO EXECUTADA AQUI
                         st.dataframe(df_render_sec.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
@@ -533,6 +535,7 @@ try:
                     df_dep_validos = df_dep_fluxo[df_dep_fluxo['EMPENHO_COL'] != '-']
                     if not df_dep_validos.empty:
                         df_render_dep = pd.DataFrame({'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_dep_validos['EMPENHO_COL'], 'Nota Fiscal': df_dep_validos['NOTA_COL'], 'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_dep_validos['bruto'], 'Comprovante/PDF 📄': df_dep_validos['URL_REAL_LINK']})
+                        # 🛠️ CORREÇÃO DE DIRECIONAMENTO DE LINK EXTERNO EXECUTADA AQUI
                         st.dataframe(df_render_dep.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base de dados atual.")
