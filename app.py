@@ -35,6 +35,12 @@ st.markdown('''<style>
     .extrato-row-final { background-color: #f8fafc; font-weight: 800; border-top: 2px solid #000000; }
     .extrato-cell-label { padding: 10px 15px; font-size: 12px; font-weight: 700; color: #0f172a; text-align: left; }
     .extrato-cell-val { padding: 10px 15px; font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
+    
+    /* 📥 Estilização Contratada para o Botão de Download Forçado */
+    .btn-download-direto { background-color: #e2e8f0; color: #0f172a !important; text-decoration: none !important; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid #cbd5e1; display: inline-block; transition: all 0.2s ease; text-transform: uppercase; }
+    .btn-download-direto:hover { background-color: #cbd5e1; color: #000000 !important; border-color: #94a3b8; }
+    .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; }
+    .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
 </style>''', unsafe_allow_html=True)
 
 # 🛠️ CACHE PROTEGIDO CONTRA MULTIPLICAÇÃO DE VALORES EM MEMÓRIA
@@ -127,6 +133,24 @@ try:
     if not df.empty:
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+        # 🛠️ GERADOR DE BOTÕES HTML NATIVOS PARA ABERTURA E DOWNLOAD REAL DE ARQUIVOS
+        def gerar_botoes_documento(link_url, num_empenho, tipo_retorno="abrir"):
+            if not link_url or link_url == '':
+                return '-'
+            # Se for link do Google Drive, modifica a estrutura para forçar download direto se for solicitado
+            link_final = link_url
+            if tipo_retorno == "baixar" and "drive.google.com" in link_url:
+                if "/file/d/" in link_url:
+                    id_arquivo = link_url.split("/file/d/")[1].split("/")[0]
+                    link_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
+            
+            if tipo_retorno == "abrir":
+                return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
+            elif tipo_retorno == "baixar":
+                nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf" if num_empenho != '-' else "documento.pdf"
+                return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
+            return '-'
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
@@ -243,9 +267,20 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                     df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
                     if not df_validos.empty:
-                        # 🛠️ NOVA COLUNA 'DOWNLOAD DIRETO' INJETADA NA MATRIZ DE RENDERIZAÇÃO
-                        df_render = pd.DataFrame({'Data Lançamento': df_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_validos['EMPENHO_COL'], 'Nota Fiscal': df_validos['NOTA_COL'], 'Valor Bruto NF': df_validos['bruto'], 'Comprovante/PDF 📄': df_validos['URL_REAL_LINK'], 'Download Direto 📥': df_validos['URL_REAL_LINK']})
-                        st.dataframe(df_render.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗"), "Download Direto 📥": st.column_config.LinkColumn(display_text="Baixar Arquivo 💾")})
+                        # 🛠️ MONTAGEM DOS EMBEDDINGS HTML EM STRINGS PARA EVITAR O RECARREGAMENTO VISUAL
+                        lista_html_abrir = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'])]
+                        lista_html_baixar = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_validos['URL_REAL_LINK'], df_validos['EMPENHO_COL'])]
+                        
+                        df_render = pd.DataFrame({
+                            'Data Lançamento': df_validos['DATA_LANCAMENTO'], 
+                            'Nº Empenho': df_validos['EMPENHO_COL'], 
+                            'Nota Fiscal': df_validos['NOTA_COL'], 
+                            'Valor Bruto NF': df_validos['bruto'], 
+                            'Comprovante/PDF 📄': lista_html_abrir,
+                            'Download Direto 📥': lista_html_baixar
+                        })
+                        # Renderiza via st.write ou st.markdown unificado por causa do HTML interno dos botões
+                        st.write(df_render.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
@@ -399,9 +434,20 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Plano — ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     df_pln_validos = df_despesas_fluxo[df_despesas_fluxo['EMPENHO_COL'] != '-']
                     if not df_pln_validos.empty:
-                        # 🛠️ NOVA COLUNA 'DOWNLOAD DIRETO' INJETADA NO CADERNO DE PLANOS
-                        df_render_pln = pd.DataFrame({'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 'Nº Empenho': df_pln_validos['EMPENHO_COL'], 'Nota Fiscal': df_pln_validos['NOTA_COL'], 'Secretaria Executor': df_pln_validos['secretaria'].astype(str).str.upper(), 'Valor Bruto NF': df_pln_validos['bruto'], 'Comprovante/PDF 📄': df_pln_validos['URL_REAL_LINK'], 'Download Direto 📥': df_pln_validos['URL_REAL_LINK']})
-                        st.dataframe(df_render_pln.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗"), "Download Direto 📥": st.column_config.LinkColumn(display_text="Baixar Arquivo 💾")})
+                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
+                        lista_html_abrir_p = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'])]
+                        lista_html_baixar_p = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_pln_validos['URL_REAL_LINK'], df_pln_validos['EMPENHO_COL'])]
+                        
+                        df_render_pln = pd.DataFrame({
+                            'Data Lançamento': df_pln_validos['DATA_LANCAMENTO'], 
+                            'Nº Empenho': df_pln_validos['EMPENHO_COL'], 
+                            'Nota Fiscal': df_pln_validos['NOTA_COL'], 
+                            'Secretaria Executor': df_pln_validos['secretaria'].astype(str).str.upper(), 
+                            'Valor Bruto NF': df_pln_validos['bruto'], 
+                            'Comprovante/PDF 📄': lista_html_abrir_p,
+                            'Download Direto 📥': lista_html_baixar_p
+                        })
+                        st.write(df_render_pln.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Plano de Ação no período selecionado.")
             else: st.info("ℹ️ Nenhum Plano de Ação identificado ou registrado na base de dados atual.")
 
@@ -482,9 +528,21 @@ try:
                     st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Caderno de Lançamentos da Pasta — ({lbl_ano_sec})</div>", unsafe_allow_html=True)
                     df_sec_validos = df_sec_fluxo[df_sec_fluxo['EMPENHO_COL'] != '-']
                     if not df_sec_validos.empty:
-                        # 🛠️ NOVA COLUNA 'DOWNLOAD DIRETO' INJETADA NO CADERNO DE SECRETARIAS
-                        df_render_sec = pd.DataFrame({'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_sec_validos['EMPENHO_COL'], 'Nota Fiscal': df_sec_validos['NOTA_COL'], 'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_sec_validos['bruto'], 'Comprovante/PDF 📄': df_sec_validos['URL_REAL_LINK'], 'Download Direto 📥': df_sec_validos['URL_REAL_LINK']})
-                        st.dataframe(df_render_sec.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗"), "Download Direto 📥": st.column_config.LinkColumn(display_text="Baixar Arquivo 💾")})
+                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
+                        lista_html_abrir_s = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'])]
+                        lista_html_baixar_s = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_sec_validos['URL_REAL_LINK'], df_sec_validos['EMPENHO_COL'])]
+                        
+                        df_render_sec = pd.DataFrame({
+                            'Data Lançamento': df_sec_validos['DATA_LANCAMENTO'], 
+                            'Fonte Recurso': df_sec_validos['fonte_clean'].astype(str).str.upper(), 
+                            'Nº Empenho': df_sec_validos['EMPENHO_COL'], 
+                            'Nota Fiscal': df_sec_validos['NOTA_COL'], 
+                            'Plano de Ação': df_sec_validos['plano_clean'].astype(str).str.upper(), 
+                            'Valor Bruto NF': df_sec_validos['bruto'], 
+                            'Comprovante/PDF 📄': lista_html_abrir_s,
+                            'Download Direto 📥': lista_html_baixar_s
+                        })
+                        st.write(df_render_sec.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ Gov. Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhum Nenhuma Secretaria identificada ou registrado na base de dados atual.")
 
@@ -565,10 +623,24 @@ try:
                     st.markdown(f"<div class='section-title'>📋 Caderno de Lançamentos Vinculados ao Deputado — ({lbl_ano_dep})</div>", unsafe_allow_html=True)
                     df_dep_validos = df_dep_fluxo[df_dep_fluxo['EMPENHO_COL'] != '-']
                     if not df_dep_validos.empty:
-                        # 🛠️ NOVA COLUNA 'DOWNLOAD DIRETO' INJETADA NO CADERNO DE DEPUTADOS
-                        df_render_dep = pd.DataFrame({'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 'Nº Emenda': df_dep_validos['emenda_clean'], 'Nº Empenho': df_dep_validos['EMPENHO_COL'], 'Nota Fiscal': df_dep_validos['NOTA_COL'], 'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_dep_validos['bruto'], 'Comprovante/PDF 📄': df_dep_validos['URL_REAL_LINK'], 'Download Direto 📥': df_dep_validos['URL_REAL_LINK']})
-                        st.dataframe(df_render_dep.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Emenda": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗"), "Download Direto 📥": st.column_config.LinkColumn(display_text="Baixar Arquivo 💾")})
-                    else: st.info("ℹ️ Gov. Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
+                        # 🛠️ CORREÇÃO EXECUTADA: Botões de download injetados via HTML forçado
+                        lista_html_abrir_d = [gerar_botoes_documento(url, emp, "abrir") for url, emp in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'])]
+                        lista_html_baixar_d = [gerar_botoes_documento(url, emp, "baixar") for url, emp in zip(df_dep_validos['URL_REAL_LINK'], df_dep_validos['EMPENHO_COL'])]
+                        
+                        df_render_dep = pd.DataFrame({
+                            'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 
+                            'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 
+                            'Nº Emenda': df_dep_validos['emenda_clean'], 
+                            'Nº Empenho': df_dep_validos['EMPENHO_COL'], 
+                            'Nota Fiscal': df_dep_validos['NOTA_COL'], 
+                            'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 
+                            'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 
+                            'Valor Bruto NF': df_dep_validos['bruto'], 
+                            'Comprovante/PDF 📄': lista_html_abrir_d,
+                            'Download Direto 📥': lista_html_baixar_d
+                        })
+                        st.write(df_render_dep.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+                    else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base diária atual.")
 
         # 5. 🌐 ABA PANORAMA GERAL
