@@ -318,8 +318,12 @@ try:
                 ano_plano_ativo = st.selectbox("📅 Selecione o Exercício Fiscal para este Plano:", options=opcoes_anos_plano, key="filtro_ano_exclusivo_plano")
                 
                 if not df_pln_ativo.empty:
-                    fonte_maee = df_pln_ativo['fonte_clean'].iloc[0].lower().strip(); df_fonte_maee_completa = df[df['fonte_clean'] == fonte_maee]
-                    dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]; eme_vinculo_pln = df_pln_ativo['emenda_clean'].unique()[0]; conta_vinculo_pln = df_pln_ativo['conta corrente'].iloc[0]
+                    fontes_do_plano = sorted(df_pln_ativo['fonte_clean'].unique())
+                    lista_fontes_str = ", ".join([f.upper() for f in fontes_do_plano])
+                    
+                    dep_vinculo_pln = df_pln_ativo['deputado'].unique()[0]
+                    eme_vinculo_pln = df_pln_ativo['emenda_clean'].unique()[0]
+                    conta_vinculo_pln = df_pln_ativo['conta corrente'].iloc[0]
                     lbl_ano_pln = "Histórico Total" if ano_plano_ativo == "Exibir Histórico Acumulado Completo" else f"Exercício {ano_plano_ativo}"
                     
                     if ano_plano_ativo == "Exibir Histórico Acumulado Completo": 
@@ -350,7 +354,7 @@ try:
                     </div>''', unsafe_allow_html=True)
                     
                     st.markdown(f'''<div style='margin-bottom:15px;'>
-                        <div class='meta-tag' style='border-color:#2563eb; color:#2563eb;'>🎯 Fonte Vinculada: {fonte_maee.upper()}</div>
+                        <div class='meta-tag' style='border-color:#2563eb; color:#2563eb;'>🎯 Fontes Vinculadas: {lista_fontes_str}</div>
                         <div class='meta-tag'>👤 Parlamentar: {dep_vinculo_pln}</div>
                         <div class='meta-tag'>📄 Nº Emenda: {eme_vinculo_pln}</div>
                     </div>''', unsafe_allow_html=True)
@@ -428,7 +432,7 @@ try:
                         st.markdown("<div style='font-size:12px; font-weight:700; color:#475569;'>👤 VÍNCULO DE AUTORIA PARLAMENTAR (DEPUTADO):</div>", unsafe_allow_html=True)
                         df_dep_split = df_despesas_fluxo.groupby('deputado').agg({'repasse': 'sum', 'bruto': 'sum'}).reset_index()
                         if not df_dep_split.empty:
-                            df_dep_split['Repasses Destinados'] = float(df_fonte_maee_completa['repasse'].sum()) if dep_vinculo_pln else 0.0
+                            df_dep_split['Repasses Destinados'] = float(df[df['plano_clean'] == plano_final_analise]['repasse'].sum())
                             df_dep_split['Repasses Destinados'] = df_dep_split['Repasses Destinados'].apply(fmt)
                             df_dep_split['Despesas Liquidadas'] = df_dep_split['bruto'].apply(fmt)
                             st.dataframe(df_dep_split[['deputado', 'Repasses Destinados', 'Despesas Liquidadas']], use_container_width=True, hide_index=True, column_config={"deputado": "Parlamentar Autor"})
