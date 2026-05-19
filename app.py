@@ -248,7 +248,7 @@ try:
                     else:
                         st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos especificamente no período selecionado.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO
+        # 2. 📋 ABA POR PLANO DE AÇÃO (TABELA DE SALDO BANCÁRIO EXTRAÍDA CONFORME PEDIDO)
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -375,29 +375,6 @@ try:
                     </table>'''
                     
                     st.markdown(html_extrato_plano, unsafe_allow_html=True)
-                    
-                    if conta_vinculo_pln != "Não Informada":
-                        st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ ABERTURA DE SALDOS DA CONTA BANCÁRIA POR PLANO DE AÇÃO ({lbl_ano_pln})</div>", unsafe_allow_html=True)
-                        df_banco_geral_pln = df[df['conta corrente'] == conta_vinculo_pln]
-                        planos_compartilhados = sorted([str(p).upper() for p in df_banco_geral_pln['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
-                        linhas_banco_pln = []
-                        t_rep, t_ren, t_gasto, t_saldo = 0.0, 0.0, 0.0, 0.0
-                        for p_item in planos_compartilhados:
-                            df_p_ativo = df_banco_geral_pln[df_banco_geral_pln['plano_clean'].str.upper() == p_item]
-                            if ano_plano_ativo == "Exibir Histórico Acumulado Completo": df_p_fluxo = df_p_ativo; df_p_saldo = df_p_ativo; f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item; df_f_fluxo = df_f_maee_item
-                            else:
-                                df_p_fluxo = df_p_ativo[df_p_ativo['ano_mov'] == ano_plano_ativo]; df_p_saldo = df_p_ativo[df_p_ativo['ano_mov'].astype(int) <= int(ano_plano_ativo)]
-                                f_maee_item = df_p_ativo['fonte_clean'].iloc[0].lower().strip(); df_f_maee_item = df[df['fonte_clean'] == f_maee_item]; df_f_saldo = df_f_maee_item[df_f_maee_item['ano_mov'].astype(int) <= int(ano_plano_ativo)]; df_f_fluxo = df_f_maee_item[df_f_maee_item['ano_mov'] == ano_plano_ativo]
-                            p_rep = float(df_f_fluxo['repasse'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['repasse'].sum())
-                            p_ren = float(df_f_fluxo['rendimento'].sum()) if p_item == plano_final_analise else float(df_p_fluxo['rendimento'].sum())
-                            p_des = float(df_p_fluxo['bruto'].sum())
-                            p_saldo_acum = (float(df_f_saldo['repasse'].sum() + df_f_saldo['rendimento'].sum()) - p_des) if p_item == plano_final_analise else (float(df_p_saldo['repasse'].sum() + df_p_saldo['rendimento'].sum()) - p_des)
-                            t_rep += p_rep; t_ren += p_ren; t_gasto += p_des; t_saldo += p_saldo_acum
-                            linhas_banco_pln.append({'Plano de Ação': p_item + (" (Ativo 🎯)" if p_item == plano_final_analise else ""), 'Fonte Vinculada': f_maee_item.upper(), 'Repasses no Período': p_rep, 'Rendimentos no Período': p_ren, 'Despesas no Período': p_des, 'Saldo Real do Plano (Acumulado)': p_saldo_acum})
-                        linhas_banco_pln.append({'Plano de Ação': 'TOTAL CONSOLIDADO DA CONTA CORRENTE 🏦', 'Fonte Vinculada': '-', 'Repasses no Período': t_rep, 'Rendimentos no Período': t_ren, 'Despesas no Período': t_gasto, 'Saldo Real do Plano (Acumulado)': t_saldo})
-                        df_tab_banco_pln = pd.DataFrame(linhas_banco_pln)
-                        def _style_linhas_pln(row): return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' if 'TOTAL CONSOLIDADO' in str(row['Plano de Ação']).upper() else ('background-color: #e0f2fe; font-weight: 700;' if '(ATIVO 🎯)' in str(row['Plano de Ação']).upper() else '') for _ in row]
-                        st.dataframe(df_tab_banco_pln.style.apply(_style_linhas_pln, axis=1).format({'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real do Plano (Acumulado)': fmt}), use_container_width=True, hide_index=True)
 
                     st.markdown(f"<div class='section-title' style='color:#0f172a; border-bottom:3px solid #0f172a;'>🏛️ RASTREABILIDADE DE VÍNCULOS INSTITUCIONAIS ({lbl_ano_pln})</div>", unsafe_allow_html=True)
                     col_vinculo_sec, col_vinculo_dep = st.columns(2)
@@ -588,7 +565,7 @@ try:
                     if not df_dep_validos.empty:
                         df_render_dep = pd.DataFrame({'Data Lançamento': df_dep_validos['DATA_LANCAMENTO'], 'Fonte Recurso': df_dep_validos['fonte_clean'].astype(str).str.upper(), 'Nº Empenho': df_dep_validos['EMPENHO_COL'], 'Nota Fiscal': df_dep_validos['NOTA_COL'], 'Secretaria Executor': df_dep_validos['secretaria'].astype(str).str.upper(), 'Plano de Ação': df_dep_validos['plano_clean'].astype(str).str.upper(), 'Valor Bruto NF': df_dep_validos['bruto'], 'Comprovante/PDF 📄': df_dep_validos['URL_REAL_LINK']})
                         st.dataframe(df_render_dep.style.format({'Valor Bruto NF': fmt}).set_properties(**{'font-weight': '500', 'font-size': '12px'}), use_container_width=True, hide_index=True, column_config={"Data Lançamento": st.column_config.TextColumn(alignment="center"), "Fonte Recurso": st.column_config.TextColumn(alignment="center"), "Nº Empenho": st.column_config.TextColumn(alignment="center"), "Nota Fiscal": st.column_config.TextColumn(alignment="center"), "Secretaria Executor": st.column_config.TextColumn(alignment="left"), "Plano de Ação": st.column_config.TextColumn(alignment="center"), "Valor Bruto NF": st.column_config.NumberColumn(alignment="right"), "Comprovante/PDF 📄": st.column_config.LinkColumn(display_text="Abrir Documento 🔗")})
-                    else: st.info("ℹ Nenhun empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
+                    else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Deputado no período selecionado.")
             else: st.info("ℹ️ Nenhum Deputado identificado ou registrado na base diária atual.")
 
         # 5. 🌐 ABA PANORAMA GERAL
