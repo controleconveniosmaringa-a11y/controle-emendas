@@ -133,7 +133,6 @@ try:
         def fmt(v):
             return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-        # 🛠️ TRATAMENTO DE DOWNLOAD CORRIGIDO: Força o nome do arquivo a salvar como o Número da Nota Fiscal
         def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
             if not link_url or link_url == '':
                 return '-'
@@ -146,11 +145,14 @@ try:
             if tipo_retorno == "abrir":
                 return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
             elif tipo_retorno == "baixar":
-                # ⚙️ REGRA DE NOMENCLATURA: Prioriza o número da Nota Fiscal, se não houver usa o Empenho
-                if num_nota != '-' and num_nota != '':
-                    nome_arquivo_sugerido = f"Nota_Fiscal_{num_nota}.pdf"
-                elif num_empenho != '-' and num_empenho != '':
-                    nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf"
+                # ⚙️ REGRA DE NOMENCLATURA: Prioriza o número da Nota Fiscal
+                nota_limpa = str(num_nota).strip()
+                empenho_limpo = str(num_empenho).strip()
+                
+                if nota_limpa != '-' and nota_limpa != '':
+                    nome_arquivo_sugerido = f"Nota_Fiscal_{nota_limpa}.pdf"
+                elif empenho_limpo != '-' and empenho_limpo != '':
+                    nome_arquivo_sugerido = f"Empenho_{empenho_limpo}.pdf"
                 else:
                     nome_arquivo_sugerido = "documento.pdf"
                 return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
@@ -158,7 +160,7 @@ try:
 
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
-        # 👔 Cabeçalho Executivo Limpo e Profissional
+        # 👔 Cabeçalho Executivo
         st.markdown('''
             <div class="header-container">
                 <div class="header-left">
@@ -377,7 +379,6 @@ try:
                         </thead>
                         <tbody>'''
                     
-                    # --- LINHA 1: REPASSES ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) COMPOSIÇÃO DE RECEITA (REPASSE ENTRADO)</td>'''
                     for s_linha in secretarias_do_plano:
                         df_rep_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
@@ -385,7 +386,6 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669; font-weight: 500;'>{fmt(val_rep_s)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669;'>{fmt(repasse_pln)}</td></tr>'''
                     
-                    # --- LINHA 2: RENDIMENTOS ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO NA CONTA</td>'''
                     for s_linha in secretarias_do_plano:
                         df_ren_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
@@ -393,7 +393,6 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb; font-weight: 500;'>{fmt(val_ren_s)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(rendimento_pln)}</td></tr>'''
                     
-                    # --- LINHA 3: DESPESAS LIQUIDADAS ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS LIQUIDADAS NO PERÍODO (NF BRUTA)</td>'''
                     for s_linha in secretarias_do_plano:
                         df_gasto_linha = df_despesas_fluxo[df_despesas_fluxo['secretaria'].str.upper() == s_linha]
@@ -401,7 +400,6 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626; font-weight: 500;'>{fmt(val_gasto_linha)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(despesa_pln)}</td></tr>'''
                     
-                    # --- LINHA FINAL: SALDO DISPONÍVEL REAL ACUMULADO ---
                     html_extrato_plano += f'''<tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label' style='font-size:13px;'>(=) SALDO DISPONÍVEL NO PLANO DE AÇÃO</td>'''
                     for s_saldo in secretarias_do_plano:
                         df_s_acum = df_despesas_saldo[df_despesas_saldo['secretaria'].str.upper() == s_saldo]
