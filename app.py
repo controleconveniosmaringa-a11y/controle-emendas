@@ -180,16 +180,7 @@ try:
         # 1. 🎯 ABA POR FONTE
        
      with tab_ativa:
-            # Certifique-se de que a linha abaixo tenha 12 espaços de recuo
-            opcoes = sorted(df['fonte_clean'].unique().tolist())
-            
-            fonte_sel = st.selectbox(
-                "🎯 Selecione ou digite a Fonte Orçamentária:", 
-                options=opcoes, 
-                index=None, 
-                placeholder="Digite o nome da fonte...",
-                key="selectbox_fonte_exclusiva_aba"
-            )
+         fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
             
             if fonte_sel:
                 # O restante do código abaixo deve ter 16 espaços de recuo
