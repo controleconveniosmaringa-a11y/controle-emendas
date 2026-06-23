@@ -179,11 +179,10 @@ try:
         
         # 1. 🎯 ABA POR FONTE
        
-      with tab_ativa:
-            # 1. Definindo as opções
+     with tab_ativa:
+            # Certifique-se de que a linha abaixo tenha 12 espaços de recuo
             opcoes = sorted(df['fonte_clean'].unique().tolist())
             
-            # 2. O novo seletor
             fonte_sel = st.selectbox(
                 "🎯 Selecione ou digite a Fonte Orçamentária:", 
                 options=opcoes, 
@@ -191,6 +190,11 @@ try:
                 placeholder="Digite o nome da fonte...",
                 key="selectbox_fonte_exclusiva_aba"
             )
+            
+            if fonte_sel:
+                # O restante do código abaixo deve ter 16 espaços de recuo
+                df_final = df[df['fonte_clean'] == fonte_sel]
+                # ... (aqui continua a sua lógica original)
             
             # 3. O código que exibe os dados (precisa estar recuado para dentro do with)
             if fonte_sel:
