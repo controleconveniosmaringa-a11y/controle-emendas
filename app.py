@@ -179,7 +179,7 @@ try:
         with tab_ativa:
              col_fonte_txt, col_fonte_sel = st.columns(2)
             
-            with col_fonte_txt:
+             with col_fonte_txt:
                 fonte_digitada = st.text_input(
                 "⌨️ Digite a Fonte Orçamentária:",
                 value="",
