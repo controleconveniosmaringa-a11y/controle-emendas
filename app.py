@@ -199,8 +199,8 @@ try:
                     index=indice_padrao,
                     key="selectbox_fonte_exclusiva_aba"
                 )
-           if fonte_digitada and fonte_digitada in fontes:
-                fonte_sel = fonte_digitada
+          if fonte_digitada and fonte_digitada in fontes:
+            fonte_sel = fonte_digitada
             else:
                 fonte_sel = fonte_lista              
             
