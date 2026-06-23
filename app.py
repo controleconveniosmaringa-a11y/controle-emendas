@@ -187,8 +187,8 @@ try:
                 key="input_texto_fonte"
                 ).strip().lower()
 
-            with col_fonte_sel:
-                indice_padrao = 0
+             with col_fonte_sel:
+                indice_padrao = 0   
 
                 if fonte_digitada in fontes:
                     indice_padrao = fontes.index(fonte_digitada)
