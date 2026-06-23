@@ -172,62 +172,10 @@ try:
                 </div>
             </div>
         ''', unsafe_allow_html=True)
-        
-        tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
-            "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
-        ])
-        
-        # 1. 🎯 ABA POR FONTE
-       with tab_ativa:
-            # 1. Busca por digitação e lista
-            opcoes_fontes = sorted(df['fonte_clean'].unique().tolist())
-            fonte_sel = st.selectbox(
-                "🎯 Selecione ou digite a Fonte Orçamentária:", 
-                options=opcoes_fontes, 
-                index=None, 
-                placeholder="Digite o nome da fonte...",
-                key="selectbox_fonte_exclusiva_aba"
-            )
-            
-            # 2. Lógica principal (apenas um if)
-            if fonte_sel:
-                df_final = df[df['fonte_clean'] == fonte_sel]
-                
-                # Filtro de Exercício
-                anos_da_fonte = sorted(list(set([str(a) for a in df_final['ano_mov'].unique() if a not in ['', 'nan']])))
-                opcoes_anos = ["Exibir Histórico Acumulado Completo"] + anos_da_fonte
-                ano_fonte_ativo = st.selectbox("📅 Selecione o Exercício Fiscal:", options=opcoes_anos, key="filtro_ano_exclusivo_fonte")
-                
-                # Cálculos
-                if ano_fonte_ativo == "Exibir Histórico Acumulado Completo":
-                    df_fonte_fluxo = df_final
-                    df_fonte_saldo = df_final
-                else:
-                    df_fonte_fluxo = df_final[df_final['ano_mov'] == ano_fonte_ativo]
-                    df_fonte_saldo = df_final[df_final['ano_mov'].astype(int) <= int(ano_fonte_ativo)]
-                
-                # Exibição (KPIs)
-                saldo_exclusivo = float(df_fonte_saldo['repasse'].sum() + df_fonte_saldo['rendimento'].sum()) - float(df_fonte_saldo['bruto'].sum())
-                
-                st.markdown(f'''<div class='kpi-row-container'>
-                    <div class='kpi-card-head'>
-                        <div class='kpi-label'>🎯 Saldo da Fonte</div>
-                        <div class='kpi-value'>{fmt(saldo_exclusivo)}</div>
-                    </div>
-                </div>''', unsafe_allow_html=True)
-                
-                # Tabela de Detalhamento
-                st.markdown("<div class='section-title'>📋 Detalhamento</div>", unsafe_allow_html=True)
-                df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
-                
-                if not df_validos.empty:
-                    df_render = df_validos.copy()
-                    df_render['Ação'] = [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_render['URL_REAL_LINK'], df_render['EMPENHO_COL'], df_render['NOTA_COL'])]
-                    st.write(df_render.to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                else:
-                    st.info("Nenhum lançamento no período.")
 
-        # 2. 📋 ABA POR PLANO DE AÇÃO
+        
+        
+        
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano de Ação</div>", unsafe_allow_html=True)
             lista_planos_validos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
