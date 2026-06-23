@@ -9,7 +9,7 @@ st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="w
 
 # Interface Visual Enxuta via CSS de Alta Performance
 st.markdown('''<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     
@@ -177,9 +177,15 @@ try:
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE
+        # 1. 🎯 ABA POR FONTE (AGORA COM BUSCA POR DIGITAÇÃO)
         with tab_ativa:
-            fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
+            fonte_sel = st.selectbox(
+                "🎯 Selecione ou digite a Fonte Orçamentária para detalhar:", 
+                options=fontes, 
+                index=None, 
+                placeholder="Clique aqui e digite para buscar...",
+                key="selectbox_fonte_exclusiva_aba"
+            )
             
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
@@ -379,6 +385,7 @@ try:
                         </thead>
                         <tbody>'''
                     
+                    # --- LINHA 1: REPASSES ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) COMPOSIÇÃO DE RECEITA (REPASSE ENTRADO)</td>'''
                     for s_linha in secretarias_do_plano:
                         df_rep_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
@@ -386,6 +393,7 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669; font-weight: 500;'>{fmt(val_rep_s)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#059669;'>{fmt(repasse_pln)}</td></tr>'''
                     
+                    # --- LINHA 2: RENDIMENTOS ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE APLICAÇÃO NA CONTA</td>'''
                     for s_linha in secretarias_do_plano:
                         df_ren_s = df_receitas_fluxo[df_receitas_fluxo['secretaria'].str.upper() == s_linha]
@@ -393,6 +401,7 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb; font-weight: 500;'>{fmt(val_ren_s)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(rendimento_pln)}</td></tr>'''
                     
+                    # --- LINHA 3: DESPESAS LIQUIDADAS ---
                     html_extrato_plano += f'''<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS LIQUIDADAS NO PERÍODO (NF BRUTA)</td>'''
                     for s_linha in secretarias_do_plano:
                         df_gasto_linha = df_despesas_fluxo[df_despesas_fluxo['secretaria'].str.upper() == s_linha]
@@ -400,6 +409,7 @@ try:
                         html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626; font-weight: 500;'>{fmt(val_gasto_linha)}</td>'''
                     html_extrato_plano += f'''<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(despesa_pln)}</td></tr>'''
                     
+                    # --- LINHA FINAL: SALDO DISPONÍVEL REAL ACUMULADO ---
                     html_extrato_plano += f'''<tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label' style='font-size:13px;'>(=) SALDO DISPONÍVEL NO PLANO DE AÇÃO</td>'''
                     for s_saldo in secretarias_do_plano:
                         df_s_acum = df_despesas_saldo[df_despesas_saldo['secretaria'].str.upper() == s_saldo]
@@ -545,8 +555,8 @@ try:
                             'Download Direto 📥': lista_html_baixar_s
                         })
                         st.write(df_render_sec.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                    else: st.info("ℹ Gov. Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
-            else: st.info("ℹ️ Nenhum Nenhuma Secretaria identificada ou registrado na base de dados atual.")
+                    else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para esta Secretaria no período selecionado.")
+            else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrada na base de dados atual.")
 
         # 4. 🔍 ABA POR DEPUTADO
         with tab_deputados:
