@@ -178,8 +178,7 @@ try:
         ])
         
         # 1. 🎯 ABA POR FONTE
-        with tab_ativa:
-           # --- COLE ISTO NO LUGAR ---
+       
 with tab_ativa:
     opcoes = sorted(df['fonte_clean'].unique().tolist())
     
