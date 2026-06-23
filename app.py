@@ -177,7 +177,32 @@ try:
         
         # 1. 🎯 ABA POR FONTE
         with tab_ativa:
-            fonte_sel = st.selectbox("🎯 Selecione a Fonte Orçamentária para detalhar:", options=fontes, index=0, key="selectbox_fonte_exclusiva_aba")
+             col_fonte_txt, col_fonte_sel = st.columns(2)
+            
+            with col_fonte_txt:
+                fonte_digitada = st.text_input(
+                "⌨️ Digite a Fonte Orçamentária:",
+                value="",
+                placeholder="Ex: 1234",
+                key="input_texto_fonte"
+                ).strip().lower()
+
+            with col_fonte_sel:
+                indice_padrao = 0
+
+                if fonte_digitada in fontes:
+                    indice_padrao = fontes.index(fonte_digitada)
+
+                fonte_lista = st.selectbox(
+                    "🖱️ Ou selecione na lista:",
+                    options=fontes,
+                    index=indice_padrao,
+                    key="selectbox_fonte_exclusiva_aba"
+                )
+           if fonte_digitada and fonte_digitada in fontes:
+                fonte_sel = fonte_digitada
+            else:
+                fonte_sel = fonte_lista              
             
             if fonte_sel:
                 df_final = df[df['fonte_clean'] == fonte_sel]
