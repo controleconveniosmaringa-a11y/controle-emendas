@@ -179,15 +179,25 @@ try:
         
         # 1. 🎯 ABA POR FONTE
        
-with tab_ativa:
-    opcoes = sorted(df['fonte_clean'].unique().tolist())
-    
-    sel = st.selectbox(
-        "Selecione a fonte (digite para buscar):", 
-        options=opcoes,
-        index=None,
-        placeholder="Digite o nome da fonte..."
-    )
+      with tab_ativa:
+            # 1. Definindo as opções
+            opcoes = sorted(df['fonte_clean'].unique().tolist())
+            
+            # 2. O novo seletor
+            fonte_sel = st.selectbox(
+                "🎯 Selecione ou digite a Fonte Orçamentária:", 
+                options=opcoes, 
+                index=None, 
+                placeholder="Digite o nome da fonte...",
+                key="selectbox_fonte_exclusiva_aba"
+            )
+            
+            # 3. O código que exibe os dados (precisa estar recuado para dentro do with)
+            if fonte_sel:
+                df_final = df[df['fonte_clean'] == fonte_sel]
+                # O restante do seu código vem aqui, tudo com um recuo (espaço) à direita
+                st.write(f"### Detalhes de: {fonte_sel}")
+                # ... (resto da sua lógica original)
     
     if sel:
         d = df[df['fonte_clean'] == sel]
