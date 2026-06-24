@@ -13,7 +13,7 @@ if 'pagina_atual' not in st.session_state:
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# 3. INTERFACE VISUAL (CSS)
+# 2. INTERFACE VISUAL (CSS)
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
@@ -46,25 +46,35 @@ st.markdown('''<style>
     .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
 </style>''', unsafe_allow_html=True)
 
+# 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
-    try: df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-    except:
-        if os.path.exists("dados.csv"): df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-        else: return pd.DataFrame()
+    try:
+        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+    except Exception:
+        if os.path.exists("dados.csv"):
+            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else:
+            return pd.DataFrame()
+            
+    if df_raw.empty:
+        return pd.DataFrame()
+
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
+    
     def ext(chave):
         c_real = next((o for l, o in col_orig.items() if chave in l), None)
-        return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]] if c_real else [''] * len(df_raw)
+        if c_real:
+            return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]]
+        return [''] * len(df_raw)
     
     df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in ext('fonte')]
     df['emenda_clean'] = [str(e).split('.')[0].strip() for e in ext('emenda')]
     df['plano_clean'] = [str(p).split('.')[0].upper().strip() for p in ext('plano')]
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in ext('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in ext('nota')]
-    df['PDF_GERAL'] = [x if x != '' else '-' for x in ext('pdf')]
     
     url_items = [''] * len(df_raw)
     for c in ['urllink', 'url', 'link', 'comprovante', 'pdf']:
@@ -79,9 +89,25 @@ def obter_base_dados_global():
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in ext('descricao')]
     df['conta corrente'] = [x if x != '' else 'Não Informada' for x in ext('conta')]
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
+    df['DATA_LANCAMENTO'] = ext('data')
     
+    # --- Solução Blindada para Valores Monetários ---
+    def limpar_moeda(val):
+        v_str = str(val).upper().replace('R$', '').strip()
+        if not v_str or v_str == '-' or v_str == 'NAN':
+            return 0.0
+        if '.' in v_str and ',' in v_str:
+            v_str = v_str.replace('.', '').replace(',', '.')
+        elif ',' in v_str:
+            v_str = v_str.replace(',', '.')
+        try:
+            return float(v_str)
+        except ValueError:
+            return 0.0
+
     for c in ['repasse', 'rendimento', 'bruto']:
-        df[c] = pd.to_numeric([str(v).replace('R$', '').replace('.', '').replace(',', '.') if ',' in str(v) and '.' not in str(v) else str(v).replace('R$', '').replace(',', '.') for v in ext(c)], errors='coerce').fillna(0.0)
+        df[c] = [limpar_moeda(v) for v in ext(c)]
+        
     return df
 
 @st.cache_data(ttl=3600)
@@ -91,7 +117,7 @@ def obter_base_convenios():
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
         d.columns = [str(c).strip() for c in d.columns]
         return d
-    except:
+    except Exception:
         if os.path.exists("divisao.csv"):
             d = pd.read_csv("divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
             d.columns = [str(c).strip() for c in d.columns]
@@ -99,16 +125,21 @@ def obter_base_convenios():
         return pd.DataFrame()
 
 df = obter_base_dados_global()
+
 def fmt(v): return f"R$ {float(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if not url or url == '': return '-'
-    if tipo == "baixar" and "drive.google.com" in url and "/file/d/" in url: url = f"https://drive.google.com/uc?export=download&id={url.split('/file/d/')[1].split('/')[0]}"
-    if tipo == "abrir": return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
+    if tipo == "baixar" and "drive.google.com" in url and "/file/d/" in url: 
+        url = f"https://drive.google.com/uc?export=download&id={url.split('/file/d/')[1].split('/')[0]}"
+    if tipo == "abrir": 
+        return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
     nome = f"Nota_Fiscal_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
     return f'<a href="{url}" download="{nome}" class="btn-download-direto">Baixar 💾</a>'
 
-# ================= ROTEAMENTO =================
+# ==============================================================================
+# 4. ROTEAMENTO DAS TELAS
+# ==============================================================================
 
 if st.session_state.pagina_atual == 'menu_principal':
     st.markdown('''<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 70px 20px; border-radius: 16px; text-align: center; margin-top: 20px; margin-bottom: 50px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-top: 5px solid #3b82f6;"><h1 style="font-size: 54px; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -1.5px; text-transform: uppercase;">Controle Convênios</h1></div>''', unsafe_allow_html=True)
@@ -243,11 +274,9 @@ elif st.session_state.pagina_atual == 'emendas':
                     
                     secs_p = sorted([str(s).upper() for s in dp['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']]) or ['NÃO ESPECIFICADA']
                     html_p = f"<table class='extrato-table'><thead><tr><th>DESCRIÇÃO</th>" + "".join([f"<th style='text-align: right;'>{s}</th>" for s in secs_p]) + "<th style='text-align: right;'>TOTAL</th></tr></thead><tbody>"
-                    
                     html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f['repasse'].sum()))}</td></tr>"
                     html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f['rendimento'].sum()))}</td></tr>"
                     html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f['bruto'].sum()))}</td></tr>"
-                    
                     html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_s[dp_s['secretaria'].str.upper() == s]['repasse'].sum() + dp_s[dp_s['secretaria'].str.upper() == s]['rendimento'].sum() - dp_s[dp_s['secretaria'].str.upper() == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_p)}</td></tr></tbody></table>"
                     st.markdown(f"<div class='section-title'>🌍 Extrato do Plano — ({lbl_p})</div>{html_p}", unsafe_allow_html=True)
                     
