@@ -147,7 +147,12 @@ def obter_base_convenios():
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 
-def fmt(v): return f"R$ {float(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+# CORREÇÃO PARA O SINAL DE ZERO NEGATIVO (-0.00)
+def fmt(v): 
+    val = float(v)
+    if round(val, 2) == 0: 
+        val = 0.0 # Transforma um zero negativo microscópico em um zero absoluto
+    return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if not url or url == '': return '-'
