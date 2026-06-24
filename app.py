@@ -154,7 +154,7 @@ if st.session_state.tela_atual_app == 'menu_principal':
     st.markdown('''
         <div style="background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%); padding: 50px 20px; border-radius: 12px; text-align: center; margin-bottom: 40px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
             <h1 style="color: #ffffff; font-size: 44px; font-weight: 900; margin-bottom: 10px; letter-spacing: -1px;">Controle Convênios</h1>
-            <p style="color: #94a3b8; font-size: 18px; font-weight: 500;">Sistema Integrado de Gestão Financeira e Institucional</p>
+            <p style="color: #94a3b8; font-size: 18px; font-weight: 500;">
         </div>
     ''', unsafe_allow_html=True)
     
