@@ -60,7 +60,7 @@ st.markdown('''<style>
 # 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
@@ -123,7 +123,7 @@ def obter_base_dados_global():
 
 @st.cache_data(ttl=3600)
 def obter_base_convenios():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
@@ -143,11 +143,9 @@ def obter_base_convenios():
             d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-# Chama as bases de dados e pega a última atualização delas
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 
-# CORREÇÃO PARA O SINAL DE ZERO NEGATIVO (-0.00)
 def fmt(v): 
     val = float(v)
     if round(val, 2) == 0: 
@@ -190,67 +188,87 @@ elif st.session_state.pagina_atual == 'convenios':
     st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
     
     if not df_conv.empty:
-        tab_conv_fonte, tab_conv_analista, tab_conv_geral = st.tabs([
-            "🎯 Por Fonte de Recurso", "👤 Por Analista", "📋 Base Completa (Filtros Avançados)"
-        ])
+        df_conv_tela = df_conv.copy()
         
-        # --- ABA 1: POR FONTE DE RECURSO ---
-        with tab_conv_fonte:
-            st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Fonte de Recurso</div>", unsafe_allow_html=True)
-            fontes_rec = sorted([str(f) for f in df_conv['FONTE DE RECURSO'].unique() if str(f) != ''])
+        # --- BUSCA GLOBAL INTELIGENTE ---
+        st.markdown("<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>🔍 Busca Inteligente Global</div>", unsafe_allow_html=True)
+        busca_global = st.text_input("Digite qualquer termo para pesquisar na base inteira:", placeholder="Ex: Nome de um analista, número SEI, secretaria, fonte...")
+        
+        if busca_global:
+            # Cria uma máscara varrendo todas as colunas
+            mask = pd.Series(False, index=df_conv_tela.index)
+            for col in df_conv_tela.columns:
+                mask |= df_conv_tela[col].astype(str).str.contains(busca_global, case=False, na=False)
             
-            ct1, cs1 = st.columns(2)
-            with ct1: f_dig = normalizar_texto(st.text_input("⌨️ Digite a Fonte de Recurso:", placeholder="Ex: 1000", key="txt_f_conv"))
-            with cs1: f_sel = st.selectbox("Ou escolha na lista:", options=fontes_rec, index=fontes_rec.index(f_dig) if f_dig in fontes_rec else 0, key="sel_f_conv")
+            df_conv_tela = df_conv_tela[mask]
             
-            f_final = f_dig if f_dig in fontes_rec else f_sel
-            if f_final:
-                df_filtro = df_conv[df_conv['FONTE DE RECURSO'] == f_final]
-                if not df_filtro.empty:
-                    resp = df_filtro['RESPONSÁVEL'].iloc[0] if 'RESPONSÁVEL' in df_filtro.columns and str(df_filtro['RESPONSÁVEL'].iloc[0]) != '' else "NÃO INFORMADO"
-                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista / Responsável</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{resp}</div></div></div>''', unsafe_allow_html=True)
-                    st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
-                    st.dataframe(df_filtro, use_container_width=True, hide_index=True)
-                    
-        # --- ABA 2: POR ANALISTA ---
-        with tab_conv_analista:
-            st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Analista</div>", unsafe_allow_html=True)
-            if 'RESPONSÁVEL' in df_conv.columns:
-                analistas = sorted([str(a) for a in df_conv['RESPONSÁVEL'].unique() if str(a) != ''])
+            if df_conv_tela.empty:
+                st.warning(f"⚠️ Nenhum registro encontrado contendo o termo: '{busca_global}'")
+        
+        # Só exibe as abas se houver dados após o filtro global
+        if not df_conv_tela.empty:
+            tab_conv_fonte, tab_conv_analista, tab_conv_geral = st.tabs([
+                "🎯 Por Fonte de Recurso", "👤 Por Analista", "📋 Base Completa (Filtros Avançados)"
+            ])
+            
+            # --- ABA 1: POR FONTE DE RECURSO ---
+            with tab_conv_fonte:
+                st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Fonte de Recurso</div>", unsafe_allow_html=True)
+                fontes_rec = sorted([str(f) for f in df_conv_tela['FONTE DE RECURSO'].unique() if str(f) != ''])
                 
-                if analistas:
-                    ca1, ca2 = st.columns(2)
-                    with ca1: a_dig = normalizar_texto(st.text_input("⌨️ Digite o nome do Analista:", placeholder="Ex: JOAO", key="txt_a_conv"))
-                    with ca2: a_sel = st.selectbox("Ou escolha na lista:", options=analistas, index=analistas.index(a_dig) if a_dig in analistas else 0, key="sel_a_conv")
+                if fontes_rec:
+                    ct1, cs1 = st.columns(2)
+                    with ct1: f_dig = normalizar_texto(st.text_input("⌨️ Digite a Fonte de Recurso:", placeholder="Ex: 1000", key="txt_f_conv"))
+                    with cs1: f_sel = st.selectbox("Ou escolha na lista:", options=fontes_rec, index=fontes_rec.index(f_dig) if f_dig in fontes_rec else 0, key="sel_f_conv")
                     
-                    a_final = a_dig if a_dig in analistas else a_sel
-                    if a_final:
-                        df_filtro_a = df_conv[df_conv['RESPONSÁVEL'] == a_final]
-                        qtd_conv = len(df_filtro_a)
+                    f_final = f_dig if f_dig in fontes_rec else f_sel
+                    if f_final:
+                        df_filtro = df_conv_tela[df_conv_tela['FONTE DE RECURSO'] == f_final]
+                        if not df_filtro.empty:
+                            resp = df_filtro['RESPONSÁVEL'].iloc[0] if 'RESPONSÁVEL' in df_filtro.columns and str(df_filtro['RESPONSÁVEL'].iloc[0]) != '' else "NÃO INFORMADO"
+                            st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista / Responsável</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{resp}</div></div></div>''', unsafe_allow_html=True)
+                            st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
+                            st.dataframe(df_filtro, use_container_width=True, hide_index=True)
                         
-                        st.markdown(f'''<div class='kpi-row-container'>
-                            <div class='kpi-card-head-blue'>
-                                <div class='kpi-label'>👤 Analista Selecionado</div>
-                                <div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div>
-                            </div>
-                            <div class='kpi-card-head' style='border-left: 6px solid #059669;'>
-                                <div class='kpi-label'>📋 Total de Convênios</div>
-                                <div class='kpi-value'>{qtd_conv}</div>
-                            </div>
-                        </div>''', unsafe_allow_html=True)
+            # --- ABA 2: POR ANALISTA ---
+            with tab_conv_analista:
+                st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Analista</div>", unsafe_allow_html=True)
+                if 'RESPONSÁVEL' in df_conv_tela.columns:
+                    analistas = sorted([str(a) for a in df_conv_tela['RESPONSÁVEL'].unique() if str(a) != ''])
+                    
+                    if analistas:
+                        ca1, ca2 = st.columns(2)
+                        with ca1: a_dig = normalizar_texto(st.text_input("⌨️ Digite o nome do Analista:", placeholder="Ex: JOAO", key="txt_a_conv"))
+                        with ca2: a_sel = st.selectbox("Ou escolha na lista:", options=analistas, index=analistas.index(a_dig) if a_dig in analistas else 0, key="sel_a_conv")
                         
-                        st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
-                        st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
+                        a_final = a_dig if a_dig in analistas else a_sel
+                        if a_final:
+                            df_filtro_a = df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final]
+                            qtd_conv = len(df_filtro_a)
+                            
+                            st.markdown(f'''<div class='kpi-row-container'>
+                                <div class='kpi-card-head-blue'>
+                                    <div class='kpi-label'>👤 Analista Selecionado</div>
+                                    <div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div>
+                                </div>
+                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'>
+                                    <div class='kpi-label'>📋 Total de Convênios</div>
+                                    <div class='kpi-value'>{qtd_conv}</div>
+                                </div>
+                            </div>''', unsafe_allow_html=True)
+                            
+                            st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
+                            st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("ℹ️ Nenhum Analista encontrado na base para esta busca.")
                 else:
-                    st.info("ℹ️ Nenhum Analista encontrado na base.")
-            else:
-                st.error("A coluna 'RESPONSÁVEL' não foi encontrada na planilha.")
+                    st.error("A coluna 'RESPONSÁVEL' não foi encontrada na planilha.")
 
-        # --- ABA 3: BASE COMPLETA (COM FILTROS INTERNOS) ---
-        with tab_conv_geral:
-            st.markdown("<div class='section-title'>📊 Base de Dados Completa</div>", unsafe_allow_html=True)
-            st.info("💡 **Dica de Filtro Nativo:** Passe o mouse sobre o cabeçalho de qualquer coluna da tabela abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados livremente!")
-            st.dataframe(df_conv, use_container_width=True, hide_index=True)
+            # --- ABA 3: BASE COMPLETA (COM FILTROS INTERNOS) ---
+            with tab_conv_geral:
+                st.markdown("<div class='section-title'>📊 Base de Dados</div>", unsafe_allow_html=True)
+                st.info("💡 **Dica de Filtro Nativo:** Passe o mouse sobre o cabeçalho de qualquer coluna da tabela abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados livremente!")
+                st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
 
     else: 
         st.warning("A base de dados de convênios (`Divisão Convenios - Divisao.csv`) não foi localizada ou está vazia.")
