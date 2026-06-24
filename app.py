@@ -4,16 +4,24 @@ import plotly.graph_objects as go
 import re
 import os
 
-# 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
-st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
+# 1. CONFIGURAÇÃO ESTRUTURAL
+st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
 
-# Interface Visual Enxuta via CSS de Alta Performance
+# 2. SISTEMA DE NAVEGAÇÃO (ROTEAMENTO)
+# Usando uma nova variável de sessão para garantir que ele resete para o menu
+if 'tela_atual_app' not in st.session_state:
+    st.session_state.tela_atual_app = 'menu_principal'
+
+def navegar(tela):
+    st.session_state.tela_atual_app = tela
+
+# 3. INTERFACE VISUAL (CSS)
 st.markdown('''<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     
-    /* 👔 Cabeçalho Executivo de Alta Performance */
+    /* Cabeçalhos e Cartões */
     .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background-color: #0f172a; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .header-left { display: flex; align-items: center; }
     .main-title { font-size: 28px; font-weight: 800; color: #ffffff !important; letter-spacing: -0.8px; margin: 0; padding: 0; line-height: 1.2; }
@@ -29,6 +37,8 @@ st.markdown('''<style>
     .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #000000; margin-top: 25px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 3px solid #000000; }
     .meta-tag { background-color: #f1f5f9; color: #000000; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; border: 1px solid #cbd5e1; margin-right: 6px; display: inline-block; }
     .secretaria-header { font-size: 16px; font-weight: 800; color: #000000; margin-top: 15px; padding-left: 6px; border-left: 5px solid #000000; }
+    
+    /* Tabelas e Botões */
     .extrato-table { width: 100%; border-collapse: collapse; margin-top: 8px; background-color: #ffffff; border: 2px solid #000000; border-radius: 6px; overflow: hidden; }
     .extrato-table th { background-color: #f1f5f9; padding: 10px 15px; font-size: 12px; font-weight: 800; border-bottom: 2px solid #000000; text-align: left;}
     .extrato-row { border-bottom: 1px solid #cbd5e1; }
@@ -42,33 +52,27 @@ st.markdown('''<style>
     .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
 </style>''', unsafe_allow_html=True)
 
-# 🛠️ CACHE PROTEGIDO CONTRA MULTIPLICAÇÃO DE VALORES EM MEMÓRIA
+# 4. BASE DE DADOS GLOBAL
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
     url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
-    
     try:
         df_raw = pd.read_csv(url_dados_efetivos, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
-        if os.path.exists("dados.csv"):
-            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-        else:
-            return pd.DataFrame()
+        if os.path.exists("dados.csv"): df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else: return pd.DataFrame()
            
     df = pd.DataFrame()
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
     def extrair_lista_limpa(nome_chave):
         col_real = next((orig for limpa, orig in colunas_originais.items() if nome_chave in limpa), None)
-        if col_real is not None:
-            return [str(item).strip() if (str(item).strip() != '' and str(item).strip().lower() != 'nan') else '' for item in df_raw[col_real]]
+        if col_real is not None: return [str(item).strip() if (str(item).strip() != '' and str(item).strip().lower() != 'nan') else '' for item in df_raw[col_real]]
         return [''] * len(df_raw)
 
-    fontes_brutas = extrair_lista_limpa('fonte')
-    df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in fontes_brutas]
+    df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in extrair_lista_limpa('fonte')]
     df['emenda_clean'] = [str(e).split('.')[0].strip() for e in extrair_lista_limpa('emenda')]
     df['plano_clean'] = [str(p).split('.')[0].upper().strip() for p in extrair_lista_limpa('plano')]
-    
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
     df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
@@ -83,16 +87,11 @@ def obter_base_dados_global():
     lista_links_processados = []
     for lk in url_items:
         lk_clean = str(lk).strip()
-        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-':
-            lista_links_processados.append('')
-        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE):
-            lista_links_processados.append(lk_clean)
-        else:
-            lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else ''
-            lista_links_processados.append(lista_links_processed_fallback)
+        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-': lista_links_processados.append('')
+        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE): lista_links_processados.append(lk_clean)
+        else: lista_links_processados.append("https://" + lk_clean if '.' in lk_clean else '')
             
     df['URL_REAL_LINK'] = lista_links_processados
-    
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in extrair_lista_limpa('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in extrair_lista_limpa('deputado')]
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in extrair_lista_limpa('descricao')]
@@ -114,51 +113,85 @@ def obter_base_dados_global():
             if not txt or txt == '-':
                 valores_limpos.append(0.0)
                 continue
-            if ',' in txt and '.' in txt:
-                txt = txt.replace('.', '').replace(',', '.')
-            elif ',' in txt:
-                txt = txt.replace(',', '.')
-            try:
-                valores_limpos.append(float(txt))
-            except ValueError:
-                valores_limpos.append(0.0)
+            if ',' in txt and '.' in txt: txt = txt.replace('.', '').replace(',', '.')
+            elif ',' in txt: txt = txt.replace(',', '.')
+            try: valores_limpos.append(float(txt))
+            except ValueError: valores_limpos.append(0.0)
         df[col_num] = valores_limpos
         
     return df
 
-try:
-    df = obter_base_dados_global()
+df = obter_base_dados_global()
+
+def fmt(v):
+    return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
+    if not link_url or link_url == '': return '-'
+    link_final = link_url
+    if tipo_retorno == "baixar" and "drive.google.com" in link_url:
+        if "/file/d/" in link_url:
+            id_arquivo = link_url.split("/file/d/")[1].split("/")[0]
+            link_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
+    if tipo_retorno == "abrir":
+        return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
+    elif tipo_retorno == "baixar":
+        nota_limpa = str(num_nota).strip()
+        empenho_limpo = str(num_empenho).strip()
+        if nota_limpa != '-' and nota_limpa != '': nome_arquivo_sugerido = f"Nota_Fiscal_{nota_limpa}.pdf"
+        elif empenho_limpo != '-' and empenho_limpo != '': nome_arquivo_sugerido = f"Empenho_{empenho_limpo}.pdf"
+        else: nome_arquivo_sugerido = "documento.pdf"
+        return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
+    return '-'
+
+
+# ==============================================================================
+# ROTEADOR DE PÁGINAS (MENU E MÓDULOS)
+# ==============================================================================
+
+if st.session_state.tela_atual_app == 'menu_principal':
+    # Banner Principal Elegante
+    st.markdown('''
+        <div style="background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%); padding: 50px 20px; border-radius: 12px; text-align: center; margin-bottom: 40px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+            <h1 style="color: #ffffff; font-size: 44px; font-weight: 900; margin-bottom: 10px; letter-spacing: -1px;">Controle Convênios</h1>
+            <p style="color: #94a3b8; font-size: 18px; font-weight: 500;">Sistema Integrado de Gestão Financeira e Institucional</p>
+        </div>
+    ''', unsafe_allow_html=True)
+    
+    # Criando os 3 cartões de forma profissional
+    col1, col2, col3 = st.columns(3, gap="large")
+    
+    with col1:
+        with st.container(border=True):
+            st.markdown("<div style='text-align: center; padding: 10px;'><span style='font-size: 40px;'>📊</span><h3 style='color: #0f172a; margin-top: 15px; font-weight: 800;'>Emendas Orçamentárias</h3><p style='color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 20px;'>Gestão completa e consolidada de fontes, repasses, notas fiscais e vínculos parlamentares.</p></div>", unsafe_allow_html=True)
+            st.button("Acessar Módulo", key="btn_emendas", use_container_width=True, type="primary", on_click=navegar, args=('emendas',))
+                
+    with col2:
+        with st.container(border=True):
+            st.markdown("<div style='text-align: center; padding: 10px;'><span style='font-size: 40px;'>🏦</span><h3 style='color: #0f172a; margin-top: 15px; font-weight: 800;'>Operações de Crédito</h3><p style='color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 20px;'>Acompanhamento de financiamentos, repasses bancários, amortizações e saldos contratuais.</p></div>", unsafe_allow_html=True)
+            st.button("Acessar Módulo", key="btn_credito", use_container_width=True, on_click=navegar, args=('credito',))
+                
+    with col3:
+        with st.container(border=True):
+            st.markdown("<div style='text-align: center; padding: 10px;'><span style='font-size: 40px;'>🤝</span><h3 style='color: #0f172a; margin-top: 15px; font-weight: 800;'>Divisão Convênios</h3><p style='color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 20px;'>Gestão de instrumentos de repasse, controle de vigências, prestações de contas e cronogramas.</p></div>", unsafe_allow_html=True)
+            st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, on_click=navegar, args=('convenios',))
+
+elif st.session_state.tela_atual_app == 'credito':
+    st.button("⬅️ Voltar ao Menu Principal", on_click=navegar, args=('menu_principal',))
+    st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
+    st.info("🚧 Este módulo está em desenvolvimento. A infraestrutura para a base de dados de operações de crédito está sendo preparada.")
+
+elif st.session_state.tela_atual_app == 'convenios':
+    st.button("⬅️ Voltar ao Menu Principal", on_click=navegar, args=('menu_principal',))
+    st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
+    st.info("🚧 Este módulo está em fase de planejamento arquitetural. Em breve disponível.")
+
+elif st.session_state.tela_atual_app == 'emendas':
+    st.button("⬅️ Voltar ao Menu Principal", on_click=navegar, args=('menu_principal',))
     
     if not df.empty:
-        def fmt(v):
-            return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-        # 🛠️ TRATAMENTO DE DOWNLOAD CORRIGIDO: Força o nome do arquivo a salvar como o Número da Nota Fiscal
-        def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
-            if not link_url or link_url == '':
-                return '-'
-            link_final = link_url
-            if tipo_retorno == "baixar" and "drive.google.com" in link_url:
-                if "/file/d/" in link_url:
-                    id_arquivo = link_url.split("/file/d/")[1].split("/")[0]
-                    link_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
-            
-            if tipo_retorno == "abrir":
-                return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
-            elif tipo_retorno == "baixar":
-                # ⚙️ REGRA DE NOMENCLATURA: Prioriza o número da Nota Fiscal, se não houver usa o Empenho
-                if num_nota != '-' and num_nota != '':
-                    nome_arquivo_sugerido = f"Nota_Fiscal_{num_nota}.pdf"
-                elif num_empenho != '-' and num_empenho != '':
-                    nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf"
-                else:
-                    nome_arquivo_sugerido = "documento.pdf"
-                return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
-            return '-'
-
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
-        # 👔 Cabeçalho Executivo Limpo e Profissional
         st.markdown('''
             <div class="header-container">
                 <div class="header-left">
@@ -175,7 +208,7 @@ try:
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE (COM PAINEL HÍBRIDO)
+        # 1. 🎯 ABA POR FONTE (COM PAINEL HÍBRIDO IGUAL AOS OUTROS)
         with tab_ativa:
             st.markdown("<div class='section-title'> 🎯 Painel Híbrido: Pesquisa e Seleção de Fonte</div>", unsafe_allow_html=True)
             
@@ -189,11 +222,8 @@ try:
                         fonte_padrao_idx = fontes.index(fonte_digitada_raw)
                     fonte_selecionada_listbox = st.selectbox("🖱️ Ou selecione a Fonte na lista abaixo:", options=fontes, index=fonte_padrao_idx, key="selectbox_fonte_exclusiva_aba")
                 
-                # Lógica Híbrida: Prioriza o que foi digitado, se não, usa o que foi clicado
-                if fonte_digitada_raw and fonte_digitada_raw in fontes: 
-                    fonte_sel = fonte_digitada_raw
-                else: 
-                    fonte_sel = fonte_selecionada_listbox
+                if fonte_digitada_raw and fonte_digitada_raw in fontes: fonte_sel = fonte_digitada_raw
+                else: fonte_sel = fonte_selecionada_listbox
                 
                 if fonte_sel:
                     df_final = df[df['fonte_clean'] == fonte_sel]
@@ -706,6 +736,3 @@ try:
                 fig4 = go.Figure(go.Bar(x=df_g_deputado['deputado'].astype(str).str.upper(), y=df_g_deputado['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_deputado['saldo']], textposition='auto'))
                 fig4.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
                 st.plotly_chart(fig4, use_container_width=True)
-            
-except Exception as e:
-    pass
