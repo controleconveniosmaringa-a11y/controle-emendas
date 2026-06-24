@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 import os
+import unicodedata
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -12,6 +13,14 @@ if 'pagina_atual' not in st.session_state:
 
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
+
+# Função de limpeza APENAS para os nomes dos Analistas/Responsáveis
+def normalizar_texto(texto):
+    if pd.isna(texto) or str(texto).strip() == '':
+        return ""
+    texto_limpo = str(texto).strip().upper()
+    nfkd_form = unicodedata.normalize('NFKD', texto_limpo)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 # 2. INTERFACE VISUAL (CSS)
 st.markdown('''<style>
@@ -84,6 +93,8 @@ def obter_base_dados_global():
             break
             
     df['URL_REAL_LINK'] = [lk if re.match(r'^(http|https|www\.)', lk, re.IGNORECASE) else ("https://" + lk if '.' in lk and lk.lower() not in ['nan','','-'] else '') for lk in url_items]
+    
+    # Dados mantidos com seus textos e formatos originais
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in ext('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in ext('deputado')]
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in ext('descricao')]
@@ -93,16 +104,11 @@ def obter_base_dados_global():
     
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
-        if not v_str or v_str == '-' or v_str == 'NAN':
-            return 0.0
-        if '.' in v_str and ',' in v_str:
-            v_str = v_str.replace('.', '').replace(',', '.')
-        elif ',' in v_str:
-            v_str = v_str.replace(',', '.')
-        try:
-            return float(v_str)
-        except ValueError:
-            return 0.0
+        if not v_str or v_str == '-' or v_str == 'NAN': return 0.0
+        if '.' in v_str and ',' in v_str: v_str = v_str.replace('.', '').replace(',', '.')
+        elif ',' in v_str: v_str = v_str.replace(',', '.')
+        try: return float(v_str)
+        except ValueError: return 0.0
 
     for c in ['repasse', 'rendimento', 'bruto']:
         df[c] = [limpar_moeda(v) for v in ext(c)]
@@ -114,14 +120,18 @@ def obter_base_convenios():
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-        d.columns = [str(c).strip() for c in d.columns]
-        return d
     except Exception:
         if os.path.exists("Divisão Convenios - Divisao.csv"):
             d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-            d.columns = [str(c).strip() for c in d.columns]
-            return d
-        return pd.DataFrame()
+        else:
+            return pd.DataFrame()
+            
+    if not d.empty:
+        d.columns = [str(c).strip() for c in d.columns]
+        # Aplica a limpeza de acentos e maiúsculas APENAS na coluna do Analista Responsável
+        if 'RESPONSÁVEL' in d.columns: 
+            d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
+    return d
 
 df = obter_base_dados_global()
 
@@ -182,8 +192,8 @@ elif st.session_state.pagina_atual == 'convenios':
             if f_final:
                 df_filtro = df_conv[df_conv['FONTE DE RECURSO'] == f_final]
                 if not df_filtro.empty:
-                    resp = df_filtro['RESPONSÁVEL'].iloc[0] if 'RESPONSÁVEL' in df_filtro.columns else "Não Informado"
-                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{resp.upper()}</div></div></div>''', unsafe_allow_html=True)
+                    resp = df_filtro['RESPONSÁVEL'].iloc[0] if 'RESPONSÁVEL' in df_filtro.columns and str(df_filtro['RESPONSÁVEL'].iloc[0]) != '' else "NÃO INFORMADO"
+                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista / Responsável</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{resp}</div></div></div>''', unsafe_allow_html=True)
                     st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
                     st.dataframe(df_filtro, use_container_width=True, hide_index=True)
                     
@@ -191,16 +201,16 @@ elif st.session_state.pagina_atual == 'convenios':
         with tab_conv_analista:
             st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Analista</div>", unsafe_allow_html=True)
             if 'RESPONSÁVEL' in df_conv.columns:
-                analistas = sorted([str(a).strip().upper() for a in df_conv['RESPONSÁVEL'].unique() if str(a).strip() not in ['', 'nan']])
+                analistas = sorted([str(a) for a in df_conv['RESPONSÁVEL'].unique() if str(a) != ''])
                 
                 if analistas:
                     ca1, ca2 = st.columns(2)
-                    with ca1: a_dig = st.text_input("⌨️ Digite o nome do Analista:", placeholder="Ex: JOÃO", key="txt_a_conv").strip().upper()
+                    with ca1: a_dig = normalizar_texto(st.text_input("⌨️ Digite o nome do Analista:", placeholder="Ex: JOAO", key="txt_a_conv"))
                     with ca2: a_sel = st.selectbox("Ou escolha na lista:", options=analistas, index=analistas.index(a_dig) if a_dig in analistas else 0, key="sel_a_conv")
                     
                     a_final = a_dig if a_dig in analistas else a_sel
                     if a_final:
-                        df_filtro_a = df_conv[df_conv['RESPONSÁVEL'].str.upper() == a_final]
+                        df_filtro_a = df_conv[df_conv['RESPONSÁVEL'] == a_final]
                         qtd_conv = len(df_filtro_a)
                         
                         st.markdown(f'''<div class='kpi-row-container'>
@@ -224,9 +234,9 @@ elif st.session_state.pagina_atual == 'convenios':
         # --- ABA 3: BASE COMPLETA (COM FILTROS INTERNOS) ---
         with tab_conv_geral:
             st.markdown("<div class='section-title'>📊 Base de Dados Completa</div>", unsafe_allow_html=True)
-            st.info("💡 **Dica de Filtro:** Passe o mouse sobre o cabeçalho de qualquer coluna abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados diretamente dentro da tabela!")
+            st.info("💡 **Dica de Filtro Nativo:** Passe o mouse sobre o cabeçalho de qualquer coluna da tabela abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados livremente!")
             
-            # O Streamlit já possui filtro nativo dentro do st.dataframe()
+            # Tabela completa que permite filtrar internamente
             st.dataframe(df_conv, use_container_width=True, hide_index=True)
 
     else: 
@@ -274,7 +284,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.markdown(f"<div class='section-title'>🏢 Divisão por Secretaria — ({lbl})</div>", unsafe_allow_html=True)
                         for sec in secs:
                             ds_f, ds_s = d_fluxo[d_fluxo['secretaria'] == sec], d_saldo[d_saldo['secretaria'] == sec]
-                            st.markdown(f"<div class='secretaria-header'>🏛️ {sec.upper()}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='secretaria-header'>🏛️ {sec}</div>", unsafe_allow_html=True)
                             st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(ds_s['repasse'].sum() + ds_s['rendimento'].sum()) - float(ds_s['bruto'].sum()))}</td></tr></table>''', unsafe_allow_html=True)
 
                         if conta != "Não Informada" and not d_bc_saldo.empty:
@@ -324,32 +334,32 @@ elif st.session_state.pagina_atual == 'emendas':
                     st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value' style='color:#0f172a;'>{p_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_p})</div><div class='kpi-value'>{fmt(sal_p)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Conta</div><div class='kpi-value' style='color:#2563eb; font-size: 20px;'>{dp['conta corrente'].iloc[0]}</div></div></div>''', unsafe_allow_html=True)
                     st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(dp['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {dp['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {dp['emenda_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
                     
-                    secs_p = sorted([str(s).upper() for s in dp['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']]) or ['NÃO ESPECIFICADA']
+                    secs_p = sorted([str(s) for s in dp['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']]) or ['NÃO ESPECIFICADA']
                     html_p = f"<table class='extrato-table'><thead><tr><th>DESCRIÇÃO</th>" + "".join([f"<th style='text-align: right;'>{s}</th>" for s in secs_p]) + "<th style='text-align: right;'>TOTAL</th></tr></thead><tbody>"
-                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f['repasse'].sum()))}</td></tr>"
-                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f['rendimento'].sum()))}</td></tr>"
-                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f[dp_f['secretaria'].str.upper() == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f['bruto'].sum()))}</td></tr>"
-                    html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_s[dp_s['secretaria'].str.upper() == s]['repasse'].sum() + dp_s[dp_s['secretaria'].str.upper() == s]['rendimento'].sum() - dp_s[dp_s['secretaria'].str.upper() == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_p)}</td></tr></tbody></table>"
+                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f[dp_f['secretaria'] == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_f['repasse'].sum()))}</td></tr>"
+                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f[dp_f['secretaria'] == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dp_f['rendimento'].sum()))}</td></tr>"
+                    html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f[dp_f['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dp_f['bruto'].sum()))}</td></tr>"
+                    html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dp_s[dp_s['secretaria'] == s]['repasse'].sum() + dp_s[dp_s['secretaria'] == s]['rendimento'].sum() - dp_s[dp_s['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_p)}</td></tr></tbody></table>"
                     st.markdown(f"<div class='section-title'>🌍 Extrato do Plano — ({lbl_p})</div>{html_p}", unsafe_allow_html=True)
                     
                     st.markdown(f"<div class='section-title'>📋 Lançamentos do Plano — ({lbl_p})</div>", unsafe_allow_html=True)
                     dp_val = dp_f[dp_f['EMPENHO_COL'] != '-']
                     if not dp_val.empty:
-                        df_rp = pd.DataFrame({'Data': dp_val['DATA_LANCAMENTO'], 'Empenho': dp_val['EMPENHO_COL'], 'NF': dp_val['NOTA_COL'], 'Secretaria': dp_val['secretaria'].str.upper(), 'Valor NF': dp_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])]})
+                        df_rp = pd.DataFrame({'Data': dp_val['DATA_LANCAMENTO'], 'Empenho': dp_val['EMPENHO_COL'], 'NF': dp_val['NOTA_COL'], 'Secretaria': dp_val['secretaria'], 'Valor NF': dp_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])]})
                         st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum lançamento no período.")
 
         # 3. 🏛️ ABA POR SECRETARIA
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria</div>", unsafe_allow_html=True)
-            secs = sorted([str(s).upper() for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'Não Especificada']])
+            secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
             if secs:
                 c_txt, c_sel = st.columns(2)
                 with c_txt: s_dig = st.text_input("⌨️ Digite a Secretaria:", placeholder="Ex: SEINFRA", key="txt_s").strip().upper()
                 with c_sel: s_sel = st.selectbox("🖱️ Ou selecione:", options=secs, index=secs.index(s_dig) if s_dig in secs else 0, key="sel_s")
                 s_fin = s_dig if s_dig in secs else s_sel
                 
-                ds = df[df['secretaria'].str.upper() == s_fin]
+                ds = df[df['secretaria'] == s_fin]
                 anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in ds['ano_mov'].unique() if a not in ['', 'nan']])))
                 ano_s = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
                 
@@ -366,14 +376,14 @@ elif st.session_state.pagina_atual == 'emendas':
         # 4. 🔍 ABA POR DEPUTADO
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar</div>", unsafe_allow_html=True)
-            deps = sorted([str(d).upper() for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'Não Informado']])
+            deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
             if deps:
                 c_txt, c_sel = st.columns(2)
                 with c_txt: d_dig = st.text_input("⌨️ Digite o Deputado:", placeholder="Ex: DEPUTADO ABC", key="txt_d").strip().upper()
                 with c_sel: d_sel = st.selectbox("🖱️ Ou selecione:", options=deps, index=deps.index(d_dig) if d_dig in deps else 0, key="sel_d")
                 d_fin = d_dig if d_dig in deps else d_sel
                 
-                dd = df[df['deputado'].str.upper() == d_fin]
+                dd = df[df['deputado'] == d_fin]
                 anos_d = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in dd['ano_mov'].unique() if a not in ['', 'nan']])))
                 ano_d = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
                 
@@ -398,11 +408,11 @@ elif st.session_state.pagina_atual == 'emendas':
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
-                fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'].str.upper(), y=df_g_sec['saldo'], marker_color='#2563eb', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
+                fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#2563eb', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
                 fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10))
                 st.plotly_chart(fig1, use_container_width=True)
             with c2:
                 st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
-                fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'].str.upper(), y=df_g_dep['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
+                fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
                 fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10))
                 st.plotly_chart(fig2, use_container_width=True)
