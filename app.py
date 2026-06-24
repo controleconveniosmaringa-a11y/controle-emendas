@@ -91,7 +91,6 @@ def obter_base_dados_global():
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
     
-    # --- Solução Blindada para Valores Monetários ---
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
         if not v_str or v_str == '-' or v_str == 'NAN':
@@ -112,14 +111,16 @@ def obter_base_dados_global():
 
 @st.cache_data(ttl=3600)
 def obter_base_convenios():
-    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/divisao.csv"
+    # O link com o nome do arquivo codificado para a web aceitar espaços e acentos
+    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
         d.columns = [str(c).strip() for c in d.columns]
         return d
     except Exception:
-        if os.path.exists("divisao.csv"):
-            d = pd.read_csv("divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        # Tenta buscar localmente pelo nome exato também
+        if os.path.exists("Divisão Convenios - Divisao.csv"):
+            d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
             d.columns = [str(c).strip() for c in d.columns]
             return d
         return pd.DataFrame()
@@ -178,7 +179,7 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Responsável Técnico / Gestor</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{resp.upper()}</div></div></div>''', unsafe_allow_html=True)
                 st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
                 st.dataframe(df_filtro, use_container_width=True, hide_index=True)
-    else: st.warning("A base de dados de convênios (`divisao.csv`) não foi localizada ou está vazia.")
+    else: st.warning("A base de dados de convênios (`Divisão Convenios - Divisao.csv`) não foi localizada ou está vazia.")
 
 elif st.session_state.pagina_atual == 'emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
