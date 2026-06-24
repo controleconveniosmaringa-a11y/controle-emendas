@@ -5,14 +5,7 @@ import re
 import os
 
 # 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL (Deve ser o primeiro comando)
-st.set_page_config(page_title="Portal de Gestão", page_icon="🏛️", layout="wide")
-
-# 2. CONTROLE DE NAVEGAÇÃO (ROTEAMENTO)
-if 'pagina_atual' not in st.session_state:
-    st.session_state.pagina_atual = 'inicio'
-
-def mudar_pagina(nome_pagina):
-    st.session_state.pagina_atual = nome_pagina
+st.set_page_config(page_title="Controle de Emendas", page_icon="📊", layout="wide")
 
 # Interface Visual Enxuta via CSS de Alta Performance
 st.markdown('''<style>
@@ -47,24 +40,20 @@ st.markdown('''<style>
     .btn-download-direto:hover { background-color: #cbd5e1; color: #000000 !important; border-color: #94a3b8; }
     .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; }
     .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
-    
-    /* Customização dos botões da tela inicial */
-    .home-card { background-color: #f8fafc; border: 2px solid #cbd5e1; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-    .home-card:hover { border-color: #2563eb; transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); background-color: #eff6ff; }
-    .home-icon { font-size: 48px; margin-bottom: 15px; }
-    .home-title { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 10px; }
-    .home-desc { font-size: 13px; color: #64748b; font-weight: 500; }
 </style>''', unsafe_allow_html=True)
 
-# 🛠️ CACHE E BASE DE DADOS (Carregado globalmente para ser rápido)
+# 🛠️ CACHE PROTEGIDO CONTRA MULTIPLICAÇÃO DE VALORES EM MEMÓRIA
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
     url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
+    
     try:
         df_raw = pd.read_csv(url_dados_efetivos, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
-        if os.path.exists("dados.csv"): df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-        else: return pd.DataFrame()
+        if os.path.exists("dados.csv"):
+            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else:
+            return pd.DataFrame()
            
     df = pd.DataFrame()
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -79,6 +68,7 @@ def obter_base_dados_global():
     df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in fontes_brutas]
     df['emenda_clean'] = [str(e).split('.')[0].strip() for e in extrair_lista_limpa('emenda')]
     df['plano_clean'] = [str(p).split('.')[0].upper().strip() for p in extrair_lista_limpa('plano')]
+    
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in extrair_lista_limpa('nota')]
     df['PDF_GERAL'] = [x if x != '' else '-' for x in extrair_lista_limpa('pdf')]
@@ -93,13 +83,16 @@ def obter_base_dados_global():
     lista_links_processados = []
     for lk in url_items:
         lk_clean = str(lk).strip()
-        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-': lista_links_processados.append('')
-        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE): lista_links_processados.append(lk_clean)
+        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-':
+            lista_links_processados.append('')
+        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE):
+            lista_links_processados.append(lk_clean)
         else:
             lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else ''
             lista_links_processados.append(lista_links_processed_fallback)
             
     df['URL_REAL_LINK'] = lista_links_processados
+    
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in extrair_lista_limpa('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in extrair_lista_limpa('deputado')]
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in extrair_lista_limpa('descricao')]
@@ -121,82 +114,51 @@ def obter_base_dados_global():
             if not txt or txt == '-':
                 valores_limpos.append(0.0)
                 continue
-            if ',' in txt and '.' in txt: txt = txt.replace('.', '').replace(',', '.')
-            elif ',' in txt: txt = txt.replace(',', '.')
-            try: valores_limpos.append(float(txt))
-            except ValueError: valores_limpos.append(0.0)
+            if ',' in txt and '.' in txt:
+                txt = txt.replace('.', '').replace(',', '.')
+            elif ',' in txt:
+                txt = txt.replace(',', '.')
+            try:
+                valores_limpos.append(float(txt))
+            except ValueError:
+                valores_limpos.append(0.0)
         df[col_num] = valores_limpos
         
     return df
 
-df = obter_base_dados_global()
-
-def fmt(v):
-    return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
-    if not link_url or link_url == '': return '-'
-    link_final = link_url
-    if tipo_retorno == "baixar" and "drive.google.com" in link_url:
-        if "/file/d/" in link_url:
-            id_arquivo = link_url.split("/file/d/")[1].split("/")[0]
-            link_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
-    if tipo_retorno == "abrir":
-        return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
-    elif tipo_retorno == "baixar":
-        nota_limpa = str(num_nota).strip()
-        empenho_limpo = str(num_empenho).strip()
-        if nota_limpa != '-' and nota_limpa != '': nome_arquivo_sugerido = f"Nota_Fiscal_{nota_limpa}.pdf"
-        elif empenho_limpo != '-' and empenho_limpo != '': nome_arquivo_sugerido = f"Empenho_{empenho_limpo}.pdf"
-        else: nome_arquivo_sugerido = "documento.pdf"
-        return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
-    return '-'
-
-# ==============================================================================
-# SISTEMA DE ROTEAMENTO (O que define qual tela será mostrada)
-# ==============================================================================
-
-# ----------------- TELA INICIAL (MENU) -----------------
-if st.session_state.pagina_atual == 'inicio':
-    st.markdown("<div style='text-align: center; padding: 40px 0px 20px 0px;'><h1 style='font-weight: 900; font-size: 38px; color: #0f172a;'>Portal de Gestão Governamental</h1><p style='color: #64748b; font-size: 18px;'>Selecione o módulo que deseja acessar</p></div>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📊\n\nCONTROLE DE\nEMENDAS ORÇAMENTÁRIAS", use_container_width=True, help="Painel consolidado de fontes e repasses"):
-            mudar_pagina('emendas')
-            st.rerun()
-            
-    with col2:
-        if st.button("🏦\n\nCONTROLE DAS\nOPERAÇÕES DE CRÉDITO", use_container_width=True, help="Módulo em desenvolvimento"):
-            mudar_pagina('credito')
-            st.rerun()
-            
-    with col3:
-        if st.button("🤝\n\nDIVISÃO CONTROLE\nCONVÊNIOS", use_container_width=True, help="Módulo em desenvolvimento"):
-            mudar_pagina('convenios')
-            st.rerun()
-
-# ----------------- MÓDULO: OPERAÇÕES DE CRÉDITO -----------------
-elif st.session_state.pagina_atual == 'credito':
-    st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('inicio',))
-    st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
-    st.info("🚧 Este módulo está em desenvolvimento. A infraestrutura para a base de dados de operações de crédito está sendo preparada.")
-
-# ----------------- MÓDULO: CONTROLE DE CONVÊNIOS -----------------
-elif st.session_state.pagina_atual == 'convenios':
-    st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('inicio',))
-    st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
-    st.info("🚧 Este módulo está em fase de planejamento arquitetural. Em breve disponível.")
-
-# ----------------- MÓDULO: CONTROLE DE EMENDAS (Seu código completo) -----------------
-elif st.session_state.pagina_atual == 'emendas':
-    # Botão de voltar no topo do módulo
-    st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('inicio',))
+try:
+    df = obter_base_dados_global()
     
     if not df.empty:
+        def fmt(v):
+            return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+        # 🛠️ TRATAMENTO DE DOWNLOAD CORRIGIDO: Força o nome do arquivo a salvar como o Número da Nota Fiscal
+        def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
+            if not link_url or link_url == '':
+                return '-'
+            link_final = link_url
+            if tipo_retorno == "baixar" and "drive.google.com" in link_url:
+                if "/file/d/" in link_url:
+                    id_arquivo = link_url.split("/file/d/")[1].split("/")[0]
+                    link_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
+            
+            if tipo_retorno == "abrir":
+                return f'<a href="{link_final}" target="_blank" class="link-abrir-doc">Visualizar Documento 🔗</a>'
+            elif tipo_retorno == "baixar":
+                # ⚙️ REGRA DE NOMENCLATURA: Prioriza o número da Nota Fiscal, se não houver usa o Empenho
+                if num_nota != '-' and num_nota != '':
+                    nome_arquivo_sugerido = f"Nota_Fiscal_{num_nota}.pdf"
+                elif num_empenho != '-' and num_empenho != '':
+                    nome_arquivo_sugerido = f"Empenho_{num_empenho}.pdf"
+                else:
+                    nome_arquivo_sugerido = "documento.pdf"
+                return f'<a href="{link_final}" download="{nome_arquivo_sugerido}" class="btn-download-direto">Baixar Arquivo 💾</a>'
+            return '-'
+
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         
+        # 👔 Cabeçalho Executivo Limpo e Profissional
         st.markdown('''
             <div class="header-container">
                 <div class="header-left">
@@ -213,7 +175,7 @@ elif st.session_state.pagina_atual == 'emendas':
             "🎯 Por Fonte Orçamentária", "📋 Por Plano de Ação", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # 1. 🎯 ABA POR FONTE (COM PAINEL HÍBRIDO IGUAL AOS OUTROS)
+        # 1. 🎯 ABA POR FONTE (COM PAINEL HÍBRIDO)
         with tab_ativa:
             st.markdown("<div class='section-title'> 🎯 Painel Híbrido: Pesquisa e Seleção de Fonte</div>", unsafe_allow_html=True)
             
@@ -227,8 +189,11 @@ elif st.session_state.pagina_atual == 'emendas':
                         fonte_padrao_idx = fontes.index(fonte_digitada_raw)
                     fonte_selecionada_listbox = st.selectbox("🖱️ Ou selecione a Fonte na lista abaixo:", options=fontes, index=fonte_padrao_idx, key="selectbox_fonte_exclusiva_aba")
                 
-                if fonte_digitada_raw and fonte_digitada_raw in fontes: fonte_sel = fonte_digitada_raw
-                else: fonte_sel = fonte_selecionada_listbox
+                # Lógica Híbrida: Prioriza o que foi digitado, se não, usa o que foi clicado
+                if fonte_digitada_raw and fonte_digitada_raw in fontes: 
+                    fonte_sel = fonte_digitada_raw
+                else: 
+                    fonte_sel = fonte_selecionada_listbox
                 
                 if fonte_sel:
                     df_final = df[df['fonte_clean'] == fonte_sel]
@@ -741,3 +706,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 fig4 = go.Figure(go.Bar(x=df_g_deputado['deputado'].astype(str).str.upper(), y=df_g_deputado['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_deputado['saldo']], textposition='auto'))
                 fig4.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
                 st.plotly_chart(fig4, use_container_width=True)
+            
+except Exception as e:
+    pass
