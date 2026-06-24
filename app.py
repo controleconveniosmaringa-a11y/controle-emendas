@@ -4,8 +4,9 @@ import plotly.graph_objects as go
 import re
 import os
 import unicodedata
+import datetime
 
-# 1. CONFIGURAÇÃO ESTRUTURAL
+# 1. CONFIGURAÇÃO ESTRUTURAL E FUNÇÃO DE NORMALIZAÇÃO
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
 
 if 'pagina_atual' not in st.session_state:
@@ -34,7 +35,8 @@ st.markdown('''<style>
     .status-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #10b981; }
     .status-text { font-size: 11px; font-weight: 700; color: #f8fafc !important; text-transform: uppercase; letter-spacing: 0.5px; }
     .home-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 15px; }
-    .home-title { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 10px; }
+    .home-title { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; }
+    .home-subtitle { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 20px; }
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 14px 20px; }
     .kpi-card-head-blue { flex: 1; background-color: #f8fafc; border: 2px solid #2563eb; border-radius: 8px; padding: 14px 20px; border-left: 6px solid #2563eb; }
@@ -58,17 +60,22 @@ st.markdown('''<style>
 # 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    att = agora.strftime("%d/%m/%Y às %H:%M")
+    
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
         if os.path.exists("dados.csv"):
             df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            timestamp = os.path.getmtime("dados.csv")
+            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
         else:
-            return pd.DataFrame()
+            return pd.DataFrame(), "Indisponível"
             
     if df_raw.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), "Base Vazia"
 
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -94,7 +101,6 @@ def obter_base_dados_global():
             
     df['URL_REAL_LINK'] = [lk if re.match(r'^(http|https|www\.)', lk, re.IGNORECASE) else ("https://" + lk if '.' in lk and lk.lower() not in ['nan','','-'] else '') for lk in url_items]
     
-    # Dados mantidos com seus textos e formatos originais
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in ext('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in ext('deputado')]
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in ext('descricao')]
@@ -113,27 +119,33 @@ def obter_base_dados_global():
     for c in ['repasse', 'rendimento', 'bruto']:
         df[c] = [limpar_moeda(v) for v in ext(c)]
         
-    return df
+    return df, att
 
 @st.cache_data(ttl=3600)
 def obter_base_convenios():
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    att = agora.strftime("%d/%m/%Y às %H:%M")
+    
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
         if os.path.exists("Divisão Convenios - Divisao.csv"):
             d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
+            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
         else:
-            return pd.DataFrame()
+            return pd.DataFrame(), "Indisponível"
             
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
-        # Aplica a limpeza de acentos e maiúsculas APENAS na coluna do Analista Responsável
         if 'RESPONSÁVEL' in d.columns: 
             d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
-    return d
+    return d, att
 
-df = obter_base_dados_global()
+# Chama as bases de dados e pega a última atualização delas
+df, att_emendas = obter_base_dados_global()
+df_conv, att_convenios = obter_base_convenios()
 
 def fmt(v): return f"R$ {float(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
@@ -154,14 +166,14 @@ if st.session_state.pagina_atual == 'menu_principal':
     st.markdown('''<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 70px 20px; border-radius: 16px; text-align: center; margin-top: 20px; margin-bottom: 50px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-top: 5px solid #3b82f6;"><h1 style="font-size: 54px; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -1.5px; text-transform: uppercase;">Controle Convênios</h1></div>''', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
-        st.markdown("<div class='home-card'><span style='font-size: 50px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>🔄 Sincronizado em: {att_emendas}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
     with c2:
-        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏦</span><div class='home-title'>Operações de Crédito</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Módulo", key="btn_credito", use_container_width=True, on_click=mudar_pagina, args=('credito',))
+        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏦</span><div class='home-title'>Operações de Crédito</div><div class='home-subtitle'>⚙️ Módulo em Construção</div></div>", unsafe_allow_html=True)
+        st.button("Acessar Módulo", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
     with c3:
-        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🤝</span><div class='home-title'>Divisão Convênios</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, on_click=mudar_pagina, args=('convenios',))
+        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>🤝</span><div class='home-title'>Divisão Convênios</div><div class='home-subtitle'>🔄 Sincronizado em: {att_convenios}</div></div>", unsafe_allow_html=True)
+        st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -171,10 +183,8 @@ elif st.session_state.pagina_atual == 'credito':
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
-    df_conv = obter_base_convenios()
     
     if not df_conv.empty:
-        # Criando o sistema de abas para o módulo de Convênios
         tab_conv_fonte, tab_conv_analista, tab_conv_geral = st.tabs([
             "🎯 Por Fonte de Recurso", "👤 Por Analista", "📋 Base Completa (Filtros Avançados)"
         ])
@@ -182,10 +192,10 @@ elif st.session_state.pagina_atual == 'convenios':
         # --- ABA 1: POR FONTE DE RECURSO ---
         with tab_conv_fonte:
             st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Fonte de Recurso</div>", unsafe_allow_html=True)
-            fontes_rec = sorted([str(f).strip() for f in df_conv['FONTE DE RECURSO'].unique() if str(f).strip() not in ['', 'nan']])
+            fontes_rec = sorted([str(f) for f in df_conv['FONTE DE RECURSO'].unique() if str(f) != ''])
             
             ct1, cs1 = st.columns(2)
-            with ct1: f_dig = st.text_input("⌨️ Digite a Fonte de Recurso:", placeholder="Ex: 1000", key="txt_f_conv").strip()
+            with ct1: f_dig = normalizar_texto(st.text_input("⌨️ Digite a Fonte de Recurso:", placeholder="Ex: 1000", key="txt_f_conv"))
             with cs1: f_sel = st.selectbox("Ou escolha na lista:", options=fontes_rec, index=fontes_rec.index(f_dig) if f_dig in fontes_rec else 0, key="sel_f_conv")
             
             f_final = f_dig if f_dig in fontes_rec else f_sel
@@ -235,8 +245,6 @@ elif st.session_state.pagina_atual == 'convenios':
         with tab_conv_geral:
             st.markdown("<div class='section-title'>📊 Base de Dados Completa</div>", unsafe_allow_html=True)
             st.info("💡 **Dica de Filtro Nativo:** Passe o mouse sobre o cabeçalho de qualquer coluna da tabela abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados livremente!")
-            
-            # Tabela completa que permite filtrar internamente
             st.dataframe(df_conv, use_container_width=True, hide_index=True)
 
     else: 
@@ -355,7 +363,7 @@ elif st.session_state.pagina_atual == 'emendas':
             secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
             if secs:
                 c_txt, c_sel = st.columns(2)
-                with c_txt: s_dig = st.text_input("⌨️ Digite a Secretaria:", placeholder="Ex: SEINFRA", key="txt_s").strip().upper()
+                with c_txt: s_dig = normalizar_texto(st.text_input("⌨️ Digite a Secretaria:", placeholder="Ex: SEINFRA", key="txt_s"))
                 with c_sel: s_sel = st.selectbox("🖱️ Ou selecione:", options=secs, index=secs.index(s_dig) if s_dig in secs else 0, key="sel_s")
                 s_fin = s_dig if s_dig in secs else s_sel
                 
@@ -379,7 +387,7 @@ elif st.session_state.pagina_atual == 'emendas':
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
             if deps:
                 c_txt, c_sel = st.columns(2)
-                with c_txt: d_dig = st.text_input("⌨️ Digite o Deputado:", placeholder="Ex: DEPUTADO ABC", key="txt_d").strip().upper()
+                with c_txt: d_dig = normalizar_texto(st.text_input("⌨️ Digite o Deputado:", placeholder="Ex: DEPUTADO ABC", key="txt_d"))
                 with c_sel: d_sel = st.selectbox("🖱️ Ou selecione:", options=deps, index=deps.index(d_dig) if d_dig in deps else 0, key="sel_d")
                 d_fin = d_dig if d_dig in deps else d_sel
                 
@@ -400,9 +408,9 @@ elif st.session_state.pagina_atual == 'emendas':
         # 5. 🌐 ABA PANORAMA
         with tab_geral:
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
-            df_g_sec = df[df['secretaria'] != 'Não Especificada'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+            df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
-            df_g_dep = df[df['deputado'] != 'Não Informado'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+            df_g_dep = df[df['deputado'] != 'NÃO INFORMADO'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
             
             c1, c2 = st.columns(2)
