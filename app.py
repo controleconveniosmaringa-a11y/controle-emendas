@@ -4,19 +4,19 @@ import plotly.graph_objects as go
 import re
 import os
 
-# 1. CONFIGURAÇÃO ESTRUTURAL
+# 1. CONFIGURAÇÃO ESTRUTURAL DE NÍVEL DE KERNEL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
 
-# 2. CONTROLE DE NAVEGAÇÃO
+# 2. CONTROLE DE NAVEGAÇÃO (ROTEAMENTO)
 if 'pagina_atual' not in st.session_state:
     st.session_state.pagina_atual = 'menu_principal'
 
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# 3. INTERFACE VISUAL (CSS)
+# 3. INTERFACE VISUAL (CSS DE ALTA PERFORMANCE)
 st.markdown('''<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     
@@ -27,9 +27,9 @@ st.markdown('''<style>
     .status-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #10b981; }
     .status-text { font-size: 11px; font-weight: 700; color: #f8fafc !important; text-transform: uppercase; letter-spacing: 0.5px; }
     
-    /* Cartões do Menu */
-    .home-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 15px;}
-    .home-title { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 15px; }
+    /* Cartões Minimalistas do Menu */
+    .home-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 15px; }
+    .home-title { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 10px; }
 
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 14px 20px; }
@@ -53,15 +53,17 @@ st.markdown('''<style>
     .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
 </style>''', unsafe_allow_html=True)
 
-# 4. BASE DE DADOS GLOBAL E FUNÇÕES
+# 4. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
     url_dados_efetivos = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     try:
         df_raw = pd.read_csv(url_dados_efetivos, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
-        if os.path.exists("dados.csv"): df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-        else: return pd.DataFrame()
+        if os.path.exists("dados.csv"):
+            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else:
+            return pd.DataFrame()
            
     df = pd.DataFrame()
     colunas_originais = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -91,8 +93,10 @@ def obter_base_dados_global():
     lista_links_processados = []
     for lk in url_items:
         lk_clean = str(lk).strip()
-        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-': lista_links_processados.append('')
-        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE): lista_links_processados.append(lk_clean)
+        if lk_clean.lower() == 'nan' or lk_clean == '' or lk_clean == '-':
+            lista_links_processados.append('')
+        elif re.match(r'^(http|https|www\.)', lk_clean, re.IGNORECASE):
+            lista_links_processados.append(lk_clean)
         else:
             lista_links_processed_fallback = "https://" + lk_clean if '.' in lk_clean else ''
             lista_links_processados.append(lista_links_processed_fallback)
@@ -121,18 +125,37 @@ def obter_base_dados_global():
                 continue
             if ',' in txt and '.' in txt: txt = txt.replace('.', '').replace(',', '.')
             elif ',' in txt: txt = txt.replace(',', '.')
-            try: valores_limpos.append(float(txt))
-            except ValueError: valores_limpos.append(0.0)
+            try:
+                valores_limpos.append(float(txt))
+            except ValueError:
+                valores_limpos.append(0.0)
         df[col_num] = valores_limpos
         
     return df
 
+@st.cache_data(ttl=3600)
+def obter_base_convenios():
+    url_divisao = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/divisao.csv"
+    try:
+        df_conv = pd.read_csv(url_divisao, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        # Padroniza e limpa os espaços do nome das colunas
+        df_conv.columns = [str(c).strip() for c in df_conv.columns]
+        return df_conv
+    except Exception:
+        if os.path.exists("divisao.csv"):
+            df_conv = pd.read_csv("divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            df_conv.columns = [str(c).strip() for c in df_conv.columns]
+            return df_conv
+        return pd.DataFrame()
+
 df = obter_base_dados_global()
 
-def fmt(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+def fmt(v):
+    return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"):
-    if not link_url or link_url == '': return '-'
+    if not link_url or link_url == '':
+        return '-'
     link_final = link_url
     if tipo_retorno == "baixar" and "drive.google.com" in link_url:
         if "/file/d/" in link_url:
@@ -149,7 +172,7 @@ def gerar_botoes_documento(link_url, num_empenho, num_nota, tipo_retorno="abrir"
     return '-'
 
 # ==============================================================================
-# 5. ROTEAMENTO DAS TELAS
+# ROTEAMENTO LOGICO DE TELAS
 # ==============================================================================
 
 # --- TELA 1: MENU PRINCIPAL ---
@@ -183,11 +206,54 @@ elif st.session_state.pagina_atual == 'credito':
     st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
     st.info("🚧 Este módulo está em desenvolvimento.")
 
-# --- TELA 3: CONTROLE DE CONVÊNIOS ---
+# --- TELA 3: DIVISÃO DE CONVÊNIOS ---
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
-    st.info("🚧 Este módulo está em fase de planejamento.")
+    
+    df_convenios = obter_base_convenios()
+    
+    if not df_convenios.empty:
+        st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Fonte de Recurso</div>", unsafe_allow_html=True)
+        
+        # Garante a lista de opções única da coluna FONTE DE RECURSO
+        lista_fontes_rec = sorted([str(f).strip() for f in df_convenios['FONTE DE RECURSO'].unique() if str(f).strip() not in ['', 'nan']])
+        
+        col_conv_txt, col_conv_sel = st.columns(2)
+        with col_conv_txt:
+            fonte_conv_digitada = st.text_input("⌨️ Digite a Fonte de Recurso (Prioridade):", value="", placeholder="Ex: 1000", key="input_txt_fonte_convenio").strip()
+        with col_conv_sel:
+            index_padrao_conv = 0
+            if fonte_conv_digitada in lista_fontes_rec:
+                index_padrao_conv = lista_fontes_rec.index(fonte_conv_digitada)
+            fonte_conv_selecionada = st.selectbox("Apenas escolha na lista:", options=lista_fontes_rec, index=index_padrao_conv, key="selectbox_fonte_convenio")
+            
+        # Lógica de decisão híbrida
+        if fonte_conv_digitada and fonte_conv_digitada in lista_fontes_rec:
+            fonte_convenio_final = fonte_conv_digitada
+        else:
+            fonte_convenio_final = fonte_conv_selecionada
+            
+        if fonte_convenio_final:
+            df_conv_filtrado = df_convenios[df_convenios['FONTE DE RECURSO'] == fonte_convenio_final]
+            
+            if not df_conv_filtrado.empty:
+                responsavel_conv = df_conv_filtrado['RESPONSÁVEL'].iloc[0] if 'RESPONSÁVEL' in df_conv_filtrado.columns else "Não Informado"
+                
+                # Exibição do Responsável em formato KPI de alto padrão
+                st.markdown(f'''<div class='kpi-row-container'>
+                    <div class='kpi-card-head-blue'>
+                        <div class='kpi-label'>👤 Responsável Técnico / Gestor</div>
+                        <div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{responsavel_conv.upper()}</div>
+                    </div>
+                </div>''', unsafe_allow_html=True)
+                
+                st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
+                
+                # Exibe a tabela formatada com os dados do convênio específico
+                st.dataframe(df_conv_filtrado, use_container_width=True, hide_index=True)
+    else:
+        st.warning("A base de dados de convênios (`divisao.csv`) não foi localizada ou está vazia.")
 
 # --- TELA 4: EMENDAS ORÇAMENTÁRIAS ---
 elif st.session_state.pagina_atual == 'emendas':
@@ -313,7 +379,8 @@ elif st.session_state.pagina_atual == 'emendas':
                                 if 'TOTAL CONSOLIDADO' in txt_fonte: return ['background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #000000;' for _ in row]
                                 elif '(ATIVA)' in txt_fonte: return ['background-color: #e0f2fe; font-weight: 700;' for _ in row]
                                 return ['' for _ in row]
-                            st.dataframe(df_tab_banco.style.apply(_style_linhas, axis=1).format({'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real em Conta (Acumulado)': fmt}), use_container_width=True, hide_index=True)
+                            df_estilizado = df_tab_banco.style.apply(_style_linhas, axis=1).format({'Repasses no Período': fmt, 'Rendimentos no Período': fmt, 'Despesas no Período': fmt, 'Saldo Real em Conta (Acumulado)': fmt})
+                            st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
 
                         st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Detalhamento dos Lançamentos do Período — ({lbl_ano})</div>", unsafe_allow_html=True)
                         df_validos = df_fonte_fluxo[df_fonte_fluxo['EMPENHO_COL'] != '-']
@@ -526,7 +593,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         </div>
                     </div>''', unsafe_allow_html=True)
                     
-                    st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado da Pasta — ({lbl_ano_sec})</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='section-title'>🌍 Extrato Convênios da Pasta — ({lbl_ano_sec})</div>", unsafe_allow_html=True)
                     st.markdown(f'''<table class='extrato-table'>
                         <tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS DESTINADOS À PASTA</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(df_sec_fluxo['repasse'].sum()))}</td></tr>
                         <tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS DE ACONTA DA PASTA NO PERÍODO</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(df_sec_fluxo['rendimento'].sum()))}</td></tr>
@@ -567,7 +634,7 @@ elif st.session_state.pagina_atual == 'emendas':
                             'Download Direto 📥': lista_html_baixar_s
                         })
                         st.write(df_render_sec.style.format({'Valor Bruto NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                    else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para este Secretaria no período selecionado.")
+                    else: st.info("ℹ️ Nenhum empenho ou nota fiscal emitidos para esta Secretaria no período selecionado.")
             else: st.info("ℹ️ Nenhuma Secretaria identificada ou registrado na base de dados atual.")
 
         # 4. 🔍 ABA POR DEPUTADO
@@ -708,3 +775,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 fig4 = go.Figure(go.Bar(x=df_g_deputado['deputado'].astype(str).str.upper(), y=df_g_deputado['saldo'], marker_color='#7c3aed', text=[fmt(v) for v in df_g_deputado['saldo']], textposition='auto'))
                 fig4.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', height=280, margin=dict(l=10,r=10,t=30,b=10), yaxis=dict(showgrid=True, gridcolor='#e2e8f0'))
                 st.plotly_chart(fig4, use_container_width=True)
+            
+except Exception as e:
+    pass
