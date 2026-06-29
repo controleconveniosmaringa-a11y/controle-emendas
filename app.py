@@ -24,7 +24,7 @@ def normalizar_texto(texto):
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 # 2. INTERFACE VISUAL (CSS)
-st.markdown('''<style>
+st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: #ffffff !important; color: #000000 !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
@@ -55,12 +55,12 @@ st.markdown('''<style>
     .btn-download-direto:hover { background-color: #cbd5e1; color: #000000 !important; border-color: #94a3b8; }
     .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; }
     .link-abrir-doc:hover { text-decoration: underline !important; color: #1d4ed8 !important; }
-</style>''', unsafe_allow_html=True)
+</style>""", unsafe_allow_html=True)
 
 # 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
@@ -123,7 +123,7 @@ def obter_base_dados_global():
 
 @st.cache_data(ttl=3600)
 def obter_base_convenios():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
@@ -143,11 +143,9 @@ def obter_base_convenios():
             d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-# Chama as bases de dados e pega a última atualização delas
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 
-# CORREÇÃO PARA O SINAL DE ZERO NEGATIVO (-0.00)
 def fmt(v): 
     val = float(v)
     if round(val, 2) == 0: 
@@ -168,7 +166,7 @@ def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
 # ==============================================================================
 
 if st.session_state.pagina_atual == 'menu_principal':
-    st.markdown('''<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 70px 20px; border-radius: 16px; text-align: center; margin-top: 20px; margin-bottom: 50px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-top: 5px solid #3b82f6;"><h1 style="font-size: 54px; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -1.5px; text-transform: uppercase;">Controle Convênios</h1></div>''', unsafe_allow_html=True)
+    st.markdown("""<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 70px 20px; border-radius: 16px; text-align: center; margin-top: 20px; margin-bottom: 50px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-top: 5px solid #3b82f6;"><h1 style="font-size: 54px; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -1.5px; text-transform: uppercase;">Controle Convênios</h1></div>""", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
         st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>🔄 Atualizado em: {att_emendas}</div></div>", unsafe_allow_html=True)
@@ -180,20 +178,31 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>🤝</span><div class='home-title'>Divisão Convênios</div><div class='home-subtitle'>🔄 Atualizado em: {att_convenios}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
+# --- NOVO MENU DE OPERAÇÕES DE CRÉDITO ---
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
     
-    # NOVAS ABAS DE OPERAÇÕES DE CRÉDITO
-    tab_finisa, tab_usina = st.tabs(["🏦 Programa FINISA", "☀️ Usina Fotovoltaica"])
-    
-    with tab_finisa:
-        st.markdown("<div class='section-title'>🏦 Operação de Crédito: FINISA</div>", unsafe_allow_html=True)
-        st.info("🚧 O painel de controle e monitoramento do FINISA está em fase de estruturação de dados.")
-        
-    with tab_usina:
-        st.markdown("<div class='section-title'>☀️ Operação de Crédito: Usina Fotovoltaica</div>", unsafe_allow_html=True)
-        st.info("🚧 O painel de execução da Usina Fotovoltaica está em fase de estruturação de dados.")
+    # Exibe os dois cards como se fossem o menu principal
+    c1, c2 = st.columns(2, gap="large")
+    with c1:
+        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏛️</span><div class='home-title'>Programa FINISA</div><div class='home-subtitle'>Controle de Financiamento</div></div>", unsafe_allow_html=True)
+        st.button("Acessar FINISA", key="btn_finisa", use_container_width=True, type="primary", on_click=mudar_pagina, args=('finisa',))
+    with c2:
+        st.markdown("<div class='home-card'><span style='font-size: 50px;'>☀️</span><div class='home-title'>Usina Fotovoltaica</div><div class='home-subtitle'>Execução do Projeto</div></div>", unsafe_allow_html=True)
+        st.button("Acessar Usina", key="btn_usina", use_container_width=True, type="primary", on_click=mudar_pagina, args=('fotovoltaica',))
+
+# --- TELA FINISA ---
+elif st.session_state.pagina_atual == 'finisa':
+    st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
+    st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
+    st.info("🚧 O painel de controle e monitoramento do FINISA está em fase de estruturação de dados.")
+
+# --- TELA USINA FOTOVOLTAICA ---
+elif st.session_state.pagina_atual == 'fotovoltaica':
+    st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
+    st.markdown('<div class="header-container"><div class="main-title">☀️ Operação de Crédito: Usina Fotovoltaica</div></div>', unsafe_allow_html=True)
+    st.info("🚧 O painel de execução da Usina Fotovoltaica está em fase de estruturação de dados.")
 
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -282,7 +291,7 @@ elif st.session_state.pagina_atual == 'convenios':
                 if busca_global:
                     st.success(f"🎯 Exibindo {len(df_conv_tela)} resultados para o termo: '{busca_global}'")
                 else:
-                    st.info("Utilize a barra de pesquisa acima para filtrar resultados aqui.")
+                    st.info("Utilize a barra de pesquisa inteligente acima para filtrar os resultados aqui.")
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
 
             # --- ABA 4: BASE COMPLETA (COM FILTROS INTERNOS) ---
@@ -407,7 +416,7 @@ elif st.session_state.pagina_atual == 'emendas':
             secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
             if secs:
                 c_txt, c_sel = st.columns(2)
-                with c_txt: s_dig = st.text_input("⌨️ Digite a Secretaria:", placeholder="Ex: SEINFRA", key="txt_s").strip()
+                with c_txt: s_dig = normalizar_texto(st.text_input("⌨️ Digite a Secretaria:", placeholder="Ex: SEINFRA", key="txt_s"))
                 s_enc = next((s for s in secs if s.upper() == s_dig.upper()), None) if s_dig else None
                 with c_sel: s_sel = st.selectbox("🖱️ Ou selecione:", options=secs, index=secs.index(s_enc) if s_enc else 0, key="sel_s")
                 s_fin = s_enc if s_enc else s_sel
@@ -462,7 +471,7 @@ elif st.session_state.pagina_atual == 'emendas':
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
             if deps:
                 c_txt, c_sel = st.columns(2)
-                with c_txt: d_dig = st.text_input("⌨️ Digite o Deputado:", placeholder="Ex: DEPUTADO ABC", key="txt_d").strip()
+                with c_txt: d_dig = normalizar_texto(st.text_input("⌨️ Digite o Deputado:", placeholder="Ex: DEPUTADO ABC", key="txt_d"))
                 d_enc = next((d for d in deps if d.upper() == d_dig.upper()), None) if d_dig else None
                 with c_sel: d_sel = st.selectbox("🖱️ Ou selecione:", options=deps, index=deps.index(d_enc) if d_enc else 0, key="sel_d")
                 d_fin = d_enc if d_enc else d_sel
