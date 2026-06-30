@@ -5,7 +5,6 @@ import re
 import os
 import unicodedata
 import datetime
-import urllib.parse
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -37,8 +36,8 @@ st.markdown("""<style>
     .status-text { font-size: 11px; font-weight: 700; color: #f8fafc !important; text-transform: uppercase; letter-spacing: 0.5px; }
     .home-card { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: transform 0.2s; }
     .home-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1); border-color: #cbd5e1; }
-    .home-title { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; }
-    .home-subtitle { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 20px; }
+    .home-title { font-size: 22px; font-weight: 800; margin-top: 15px; margin-bottom: 5px; }
+    .home-subtitle { font-size: 12px; font-weight: 700; margin-bottom: 20px; }
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .kpi-card-head-blue { flex: 1; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; border-left: 6px solid #2563eb; box-shadow: 0 4px 6px -1px rgba(37,99,235,0.1); }
@@ -242,17 +241,59 @@ def style_abertura_banco(row):
 # ==============================================================================
 
 if st.session_state.pagina_atual == 'menu_principal':
-    st.markdown("""<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 80px 20px; border-radius: 16px; text-align: center; margin-top: 20px; margin-bottom: 50px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-bottom: 6px solid #3b82f6;"><h1 style="font-size: 58px; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -1.5px; text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Controle Convênios</h1></div>""", unsafe_allow_html=True)
+    
+    tz_br = datetime.timezone(datetime.timedelta(hours=-3))
+    agora_br = datetime.datetime.now(tz_br)
+    hora_str = agora_br.strftime("%H:%M")
+    data_str = agora_br.strftime("%d/%m/%Y")
+    
+    # Renderização do Novo Banner Executivo e Colorido (RÁPIDO SEM API CLIMA)
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); padding: 60px 20px; border-radius: 20px; text-align: center; margin-top: 10px; margin-bottom: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); position: relative; overflow: hidden; border: 1px solid #7dd3fc;">
+        
+        <!-- WIDGET SUPERIOR DIREITO RÁPIDO -->
+        <div style="position: absolute; top: 15px; right: 20px; font-size: 13px; color: #ffffff; font-weight: 600; display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.25); padding: 8px 18px; border-radius: 30px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);">
+            <span style="display:flex; align-items:center; gap:5px;">📍 Maringá, PR</span>
+            <span style="display:flex; align-items:center; gap:5px;">📅 {data_str}</span>
+            <span style="display:flex; align-items:center; gap:5px;">🕒 {hora_str}</span>
+        </div>
+        
+        <h1 style="font-size: 52px; font-weight: 900; color: #ffffff; margin: 0; margin-top: 20px; letter-spacing: -1.5px; text-transform: uppercase; text-shadow: 2px 4px 8px rgba(0,0,0,0.2);">Portal Gestão Pública</h1>
+        <p style="color: #e0f2fe; font-size: 18px; font-weight: 500; margin-top: 10px; letter-spacing: 0.5px;">Monitoramento Inteligente de Convênios, Créditos e Emendas</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 3. Os 3 Módulos com Cores Independentes e Modernas
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
-        st.markdown(f"<div class='home-card'><span style='font-size: 56px; display:block; margin-bottom:10px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>🔄 Atualizado em: {att_emendas}</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Módulo", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
+        st.markdown(f"""
+        <div class='home-card' style='background: linear-gradient(135deg, #fdf4ff 0%, #f3e8ff 100%); border-color: #e9d5ff;'>
+            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>📊</span>
+            <div class='home-title' style='color: #6b21a8;'>Emendas Orçamentárias</div>
+            <div class='home-subtitle' style='color: #9333ea;'>🔄 Última Atualização: {att_emendas}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.button("Acessar Emendas", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
+        
     with c2:
-        st.markdown("<div class='home-card'><span style='font-size: 56px; display:block; margin-bottom:10px;'>🏦</span><div class='home-title'>Operações de Crédito</div><div class='home-subtitle'>🔄 Gerenciamento Ativo</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Módulo", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
+        st.markdown(f"""
+        <div class='home-card' style='background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-color: #bbf7d0;'>
+            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🏦</span>
+            <div class='home-title' style='color: #065f46;'>Operações de Crédito</div>
+            <div class='home-subtitle' style='color: #059669;'>🔄 Status: Monitoramento Ativo</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.button("Acessar Crédito", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
+        
     with c3:
-        st.markdown(f"<div class='home-card'><span style='font-size: 56px; display:block; margin-bottom:10px;'>🤝</span><div class='home-title'>Divisão Convênios</div><div class='home-subtitle'>🔄 Atualizado em: {att_convenios}</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
+        st.markdown(f"""
+        <div class='home-card' style='background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a;'>
+            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🤝</span>
+            <div class='home-title' style='color: #92400e;'>Divisão Convênios</div>
+            <div class='home-subtitle' style='color: #d97706;'>🔄 Última Atualização: {att_convenios}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.button("Acessar Convênios", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -382,10 +423,7 @@ elif st.session_state.pagina_atual == 'convenios':
                         a_final = a_dig if a_dig in analistas else a_sel
                         if a_final:
                             df_filtro_a = df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final]
-                            st.markdown(f'''<div class='kpi-row-container'>
-                                <div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div>
-                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div>
-                            </div>''', unsafe_allow_html=True)
+                            st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div></div>''', unsafe_allow_html=True)
                             st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
                             st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
             with tab_conv_busca:
@@ -397,7 +435,6 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
     else: st.warning("A base de dados de convênios não foi localizada ou está vazia.")
 
-# --- MÓDULO: EMENDAS ORÇAMENTÁRIAS COM TABELAS PANDAS STYLER ---
 elif st.session_state.pagina_atual == 'emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     if not df.empty:
@@ -409,7 +446,7 @@ elif st.session_state.pagina_atual == 'emendas':
         ])
         
         # ==============================================================================
-        # 🚀 ABA 1: RESUMO EXECUTIVO DASHBOARD (CORES VIBRANTES APLICADAS)
+        # 🚀 ABA 1: RESUMO EXECUTIVO DASHBOARD
         # ==============================================================================
         with tab_resumo:
             st.markdown("<div class='section-title' style='font-size:18px;'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
@@ -422,7 +459,6 @@ elif st.session_state.pagina_atual == 'emendas':
             df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
             df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
             
-            # LAYOUT SUPERIOR: Aguardando Recursos e Finalizadas
             c_ag, c_fin = st.columns(2, gap="large")
             with c_ag:
                 st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #f59e0b; margin-bottom: 15px;'>
@@ -432,7 +468,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 if not df_aguardando.empty:
                     df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
                     df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
-                    # APLICANDO COR DE ALERTA NO PANDAS
                     st.dataframe(df_ag_show.style.apply(style_row_warning, axis=1), use_container_width=True, hide_index=True, height=250)
                 else: st.info("Nenhuma fonte aguardando recursos.")
 
@@ -444,11 +479,9 @@ elif st.session_state.pagina_atual == 'emendas':
                 if not df_finalizadas.empty:
                     df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                     df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
-                    # APLICANDO DESTAQUE AZUL NO TOTAL EXECUTADO
                     st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
                 else: st.info("Nenhuma fonte 100% executada no momento.")
             
-            # LAYOUT MEIO: 5 Gráficos de Rosca
             st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
             st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 20px;'>Comparativo entre Gasto Liquidado e Saldo Restante para as 5 fontes com mais recursos em caixa.</p>", unsafe_allow_html=True)
             
@@ -478,15 +511,12 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.plotly_chart(fig, use_container_width=True)
             else: st.info("Nenhuma fonte com saldo positivo disponível no momento.")
 
-            # LAYOUT INFERIOR: Tabela em ordem decrescente (COM COR VERDE NO SALDO)
             st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
             st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>Role para baixo para visualizar todas as fontes ativas, organizadas do maior para o menor saldo.</p>", unsafe_allow_html=True)
             
             df_todas = df_fontes.sort_values(by='saldo', ascending=False)
             df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
             df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
-            
-            # APLICANDO O DESTAQUE VERDE CLARO NO PANDAS
             tabela_todas_colorida = df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL'])
             st.dataframe(tabela_todas_colorida, use_container_width=True, hide_index=True, height=450)
                     
@@ -533,7 +563,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         
                         with c_tab:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO FINANCEIRO CONSOLIDADO ({lbl})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE ENTRADO NO PERÍODO</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(d_fluxo['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(d_fluxo['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS LIQUIDADAS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(d_fluxo['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL DA FONTE</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
+                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE ENTRADO NO PERÍODO</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(d_fluxo['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(d_fluxo['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS LIQUIDADAS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(d_fluxo['bruto'].sum()))}</td></tr><tr class='extrato-row-final' style='background-color:#ecf2ff;'><td class='extrato-cell-label'>(=) SALDO REAL DA FONTE</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
                         
                         secs = [s for s in d_fin['secretaria'].unique() if s != '']
                         if len(secs) > 1:
@@ -552,7 +582,6 @@ elif st.session_state.pagina_atual == 'emendas':
                                 di_s = d_bc_saldo[d_bc_saldo['fonte_clean'] == fi]; fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum()); tr += fr; trn += frn; tg += fd; ts += fs
                                 l_bc.append({'Fonte Orçamentária': fi.upper() + (" (Ativa)" if fi == fonte_final else ""), 'Repasses': fr, 'Rendimentos': frn, 'Despesas': fd, 'Saldo Real': fs})
                             l_bc.append({'Fonte Orçamentária': 'TOTAL CONTA 🏦', 'Repasses': tr, 'Rendimentos': trn, 'Despesas': tg, 'Saldo Real': ts})
-                            # APLICAÇÃO DA COR AUTOMÁTICA NAS CONTAS
                             st.dataframe(pd.DataFrame(l_bc).style.apply(style_abertura_banco, axis=1).format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Real': fmt}), use_container_width=True, hide_index=True)
                         
                         st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #e2e8f0;'>📋 Lançamentos do Período — ({lbl})</div>", unsafe_allow_html=True)
@@ -660,7 +689,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             'Fonte Vinculada': fi.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre da Fonte': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())
                         })
                     if linhas_fontes_sec:
-                        # APLICANDO DESTAQUE VERDE
                         st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre da Fonte': fmt}).apply(highlight_saldo_verde, subset=['Saldo Livre da Fonte']), use_container_width=True, hide_index=True)
         
         # === 🔍 ABA 5: POR DEPUTADO ===
@@ -710,7 +738,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             'Fonte Vinculada': fi.upper(), 'Secretaria Contemplada': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())
                         })
                     if linhas_detalhe_dep: 
-                        # APLICANDO DESTAQUE VERDE
                         st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
         
         with tab_geral:
