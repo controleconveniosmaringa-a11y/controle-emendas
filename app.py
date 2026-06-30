@@ -379,7 +379,6 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
     else: st.warning("A base de dados de convênios não foi localizada ou está vazia.")
 
-# --- MÓDULO: EMENDAS ORÇAMENTÁRIAS COM ABA DE RESUMO EXECUTIVO ---
 elif st.session_state.pagina_atual == 'emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     if not df.empty:
@@ -391,65 +390,77 @@ elif st.session_state.pagina_atual == 'emendas':
             "🚀 Resumo Executivo", "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # === 🚀 ABA 1: RESUMO EXECUTIVO ===
+        # ==============================================================================
+        # 🚀 ABA 1: RESUMO EXECUTIVO DASHBOARD
+        # ==============================================================================
         with tab_resumo:
-            st.markdown("<div class='section-title'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title' style='font-size:18px;'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
             
-            # Agrupa dados por fonte_clean
-            df_fontes = df.groupby('fonte_clean').agg({
-                'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum',
-                'deputado': 'first', 'secretaria': 'first'
-            }).reset_index()
-            
+            # Agrupa dados por fonte_clean para gerar o painel inteligente
+            df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
             df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
             df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
             
             # 1. Top 5 Fontes com Maior Saldo
             df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
-            
             # 2. Fontes Aguardando Recursos (Inativas)
             df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
-            
             # 3. Emendas Finalizadas (Movimentadas, mas saldo zerado)
             df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
             
-            st.markdown("### 🏆 Top 5 Fontes com Maior Saldo Disponível")
-            if not df_top5.empty:
-                fig_top5 = go.Figure(go.Bar(
-                    x=df_top5['fonte_clean'].str.upper(),
-                    y=df_top5['saldo'],
-                    text=[fmt(v) for v in df_top5['saldo']],
-                    textposition='auto',
-                    marker_color='#059669'
-                ))
-                fig_top5.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig_top5, use_container_width=True)
-                
-                df_top_show = df_top5[['fonte_clean', 'deputado', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
-                df_top_show['FONTE'] = df_top_show['FONTE'].str.upper()
-                st.dataframe(df_top_show.style.format({'SALDO DISPONÍVEL': fmt}), use_container_width=True, hide_index=True)
-            else:
-                st.info("Nenhuma fonte com saldo positivo disponível no momento.")
-                
-            c_ag, c_fin = st.columns(2, gap="large")
-            with c_ag:
-                st.markdown("<div class='section-title'>⏳ Aguardando Recursos (Sem Movimentação)</div>", unsafe_allow_html=True)
+            # LAYOUT SUPERIOR: Gráfico Rosca Top 5 + Tabela Aguardando Recursos
+            c_chart, c_await = st.columns([1, 1], gap="large")
+            
+            with c_chart:
+                st.markdown("### 🍩 Top 5 Fontes (Maior Saldo)")
+                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>As 5 fontes com o maior volume de recursos em caixa.</p>", unsafe_allow_html=True)
+                if not df_top5.empty:
+                    fig_top5 = go.Figure(data=[go.Pie(
+                        labels=df_top5['fonte_clean'].str.upper(),
+                        values=df_top5['saldo'],
+                        hole=.5,
+                        textinfo='label+percent',
+                        hoverinfo='label+value',
+                        marker=dict(colors=['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'])
+                    )])
+                    fig_top5.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), showlegend=False)
+                    st.plotly_chart(fig_top5, use_container_width=True)
+                else:
+                    st.info("Nenhuma fonte com saldo positivo disponível no momento.")
+                    
+            with c_await:
+                st.markdown("### ⏳ Aguardando Recursos")
+                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Fontes cadastradas sem movimentação financeira de entrada ou saída.</p>", unsafe_allow_html=True)
                 if not df_aguardando.empty:
                     df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
                     df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
-                    st.dataframe(df_ag_show, use_container_width=True, hide_index=True)
+                    st.dataframe(df_ag_show, use_container_width=True, hide_index=True, height=320)
                 else:
-                    st.info("Não há fontes aguardando recursos.")
-                    
+                    st.info("Excelente! Não há fontes aguardando recursos.")
+
+            st.markdown("---")
+            
+            # LAYOUT INFERIOR: Lista completa crescente + Lista Finalizadas
+            c_all, c_fin = st.columns([1.5, 1], gap="large")
+            
+            with c_all:
+                st.markdown("### 📋 Todas as Fontes (Ordem Crescente de Saldo)")
+                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Role para baixo para visualizar todas as fontes ativas, organizadas do menor para o maior saldo.</p>", unsafe_allow_html=True)
+                df_todas = df_fontes.sort_values(by='saldo', ascending=True)
+                df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+                df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
+                st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}), use_container_width=True, hide_index=True, height=400)
+                
             with c_fin:
-                st.markdown("<div class='section-title'>✅ Fontes Finalizadas (100% Executadas)</div>", unsafe_allow_html=True)
+                st.markdown("### ✅ Emendas Finalizadas")
+                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Fontes com repasse utilizado integralmente (Saldo exato de R$ 0,00).</p>", unsafe_allow_html=True)
                 if not df_finalizadas.empty:
                     df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                     df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
-                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}), use_container_width=True, hide_index=True)
+                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}), use_container_width=True, hide_index=True, height=400)
                 else:
                     st.info("Nenhuma fonte/emenda foi 100% finalizada ainda.")
-
+                    
         # === 🎯 ABA 2: POR FONTE ===
         with tab_ativa:
             st.markdown("<div class='section-title'> 🎯 Painel Híbrido: Pesquisa e Seleção de Fonte</div>", unsafe_allow_html=True)
