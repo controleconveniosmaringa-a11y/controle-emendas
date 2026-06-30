@@ -239,7 +239,6 @@ def style_abertura_banco(row):
     elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: #e0f2fe; color: #0369a1; font-weight: 700;'] * len(row)
     return [''] * len(row)
 
-
 # ==============================================================================
 # ROTEAMENTO DAS TELAS
 # ==============================================================================
@@ -251,7 +250,7 @@ if st.session_state.pagina_atual == 'menu_principal':
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
-    # Renderização do Banner Executivo e Sóbrio
+    # Renderização do Banner Executivo Sóbrio
     st.markdown(f"<div style='background: #0f172a; padding: 45px 20px; border-radius: 12px; text-align: center; margin-top: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; border-bottom: 4px solid #3b82f6;'><div style='position: absolute; top: 15px; right: 20px; font-size: 12px; color: #94a3b8; font-weight: 600; display: flex; gap: 15px; align-items: center; background: #1e293b; padding: 6px 14px; border-radius: 6px; border: 1px solid #334155;'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div><h1 style='font-size: 42px; font-weight: 800; color: #f8fafc; margin: 0; margin-top: 15px; letter-spacing: -1px; text-transform: uppercase;'>Controle Convênios</h1><p style='color: #cbd5e1; font-size: 16px; font-weight: 500; margin-top: 5px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p></div>", unsafe_allow_html=True)
     
     # 3 Módulos - Clean e Profissional
@@ -270,7 +269,7 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     st.markdown("---")
     
-    # --- NOVO MÓDULO: ÚLTIMAS MOVIMENTAÇÕES ---
+    # --- NOVO MÓDULO: ÚLTIMAS MOVIMENTAÇÕES COM DADOS MAIS CLAROS ---
     st.markdown("<div class='section-title'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
     c_ult_1, c_ult_2 = st.columns(2, gap="large")
     
@@ -281,12 +280,13 @@ if st.session_state.pagina_atual == 'menu_principal':
             if not df_em_mov.empty:
                 ultimas_emendas = df_em_mov.tail(5)[::-1]
                 disp_emendas = pd.DataFrame({
+                    'Data': ultimas_emendas['DATA_LANCAMENTO'],
                     'Fonte': ultimas_emendas['fonte_clean'].str.upper(),
-                    'Secretaria': ultimas_emendas['secretaria'],
+                    'Doc/Empenho': [f"NF: {n}" if n != '-' else (f"Emp: {e}" if e != '-' else "-") for e, n in zip(ultimas_emendas['EMPENHO_COL'], ultimas_emendas['NOTA_COL'])],
                     'Tipo': ['Despesa' if b > 0 else 'Repasse' for b in ultimas_emendas['bruto']],
-                    'Valor Lançado': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
+                    'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
-                st.dataframe(disp_emendas.style.format({'Valor Lançado': fmt}), use_container_width=True, hide_index=True)
+                st.dataframe(disp_emendas.style.format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
             
@@ -376,7 +376,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
                         fig_bar_desc = go.Figure(go.Bar(x=df_desc['VALOR DESPESA'], y=df_desc['DESCRIÇÃO'], orientation='h', marker_color='#3b82f6', text=[fmt(v) for v in df_desc['VALOR DESPESA']], textposition='auto'))
                         fig_bar_desc.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                         st.plotly_chart(fig_bar_desc, use_container_width=True)
-                    else: st.info("Sem despesas registradas.")
+                    else: st.info("Sem despesas registradas para exibir no gráfico.")
                 st.markdown("<div class='section-title'>📋 Detalhes Fiscais das Despesas Liquidadas</div>", unsafe_allow_html=True)
                 df_exibicao = pd.DataFrame({'Empenho': info['df_filtrado']['EMPENHO'], 'Fornecedor': info['df_filtrado']['FORNECEDOR'], 'Tipo Doc': info['df_filtrado']['TIPO DE DOCUMENTO'], 'Nº Doc': info['df_filtrado']['Nº DOCUMENTO'], 'Descrição': info['df_filtrado']['DESCRIÇÃO'], 'Valor Despesa': info['df_filtrado']['VALOR DESPESA'], 'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])]})
                 df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
