@@ -5,6 +5,7 @@ import re
 import os
 import unicodedata
 import datetime
+import urllib.parse
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -125,11 +126,12 @@ def obter_base_convenios():
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-# --- LEITOR MULTI-ARQUIVOS DINÂMICO PARA OPERAÇÕES DE CRÉDITO ---
+# --- LEITOR ÚNICO DE CRÉDITO COM SEPARAÇÃO DE ABAS ---
 @st.cache_data(ttl=3600)
-def obter_base_credito(nome_arquivo):
+def obter_base_credito():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
+    nome_arquivo = "operacoes_credito.csv"
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/{nome_arquivo}"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
@@ -152,6 +154,7 @@ def obter_base_credito(nome_arquivo):
         return [''] * len(df_raw)
         
     df = pd.DataFrame()
+    df['PROGRAMA'] = [str(x).upper().strip() for x in ext_c('programa', 'programa')]
     df['EMPENHO'] = ext_c('empenho', 'empenho')
     df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
     df['TIPO DE DOCUMENTO'] = ext_c('tipo de documento', 'tipo')
@@ -175,11 +178,13 @@ def obter_base_credito(nome_arquivo):
     df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valor despesa', 'despesa')]
     return df, att
 
-# Carrega todas as bases de forma independente e mapeada
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
-df_finisa, att_finisa = obter_base_credito("finisa.csv")
-df_usina, att_usina = obter_base_credito("usina_fotovoltaica.csv")
+
+# Puxa a base única e separa os universos FINISA e USINA automaticamente
+df_cred_completo, att_cred = obter_base_credito()
+df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA'] if not df_cred_completo.empty else pd.DataFrame()
+df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA'] if not df_cred_completo.empty else pd.DataFrame()
 
 def fmt(v): 
     val = float(v)
@@ -216,13 +221,14 @@ elif st.session_state.pagina_atual == 'credito':
     st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2, gap="large")
     with c1:
-        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>🏛️</span><div class='home-title'>Programa FINISA</div><div class='home-subtitle'>🔄 Atualizado em: {att_finisa}</div></div>", unsafe_allow_html=True)
+        status_credito = att_cred if "Aguardando" not in att_cred else "Pendente de Conexão"
+        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>🏛️</span><div class='home-title'>Programa FINISA</div><div class='home-subtitle'>🔄 Atualizado em: {status_credito}</div></div>", unsafe_allow_html=True)
         st.button("Acessar FINISA", key="btn_finisa", use_container_width=True, type="primary", on_click=mudar_pagina, args=('finisa',))
     with c2:
-        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>☀️</span><div class='home-title'>Usina Fotovoltaica</div><div class='home-subtitle'>🔄 Atualizado em: {att_usina}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>☀️</span><div class='home-title'>Usina Fotovoltaica</div><div class='home-subtitle'>🔄 Atualizado em: {status_credito}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Usina", key="btn_usina", use_container_width=True, type="primary", on_click=mudar_pagina, args=('fotovoltaica',))
 
-# --- TELA FINISA (LÊ EXCLUSIVAMENTE FINISA.CSV) ---
+# --- TELA FINISA (LÊ DF_FINISA SEPARADO PELO SCRIPT) ---
 elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
@@ -257,10 +263,10 @@ elif st.session_state.pagina_atual == 'finisa':
                     
                     if not df_exibicao.empty: st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum detalhamento foi encontrado para esta aba na planilha.")
-        else: st.info("ℹ️ A coluna 'REF VALOR REPASSADO' parece estar vazia na sua planilha do FINISA.")
-    else: st.info(f"ℹ️ {att_finisa}")
+        else: st.info("ℹ️ Nenhuma referência de repasse preenchida na aba FINISA.")
+    else: st.info(f"ℹ️ Sem dados do FINISA. {att_cred}")
 
-# --- TELA USINA FOTOVOLTAICA (LÊ EXCLUSIVAMENTE USINA_FOTOVOLTAICA.CSV) ---
+# --- TELA USINA FOTOVOLTAICA (LÊ DF_USINA SEPARADO PELO SCRIPT) ---
 elif st.session_state.pagina_atual == 'fotovoltaica':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">☀️ Operação de Crédito: Usina Fotovoltaica</div></div>', unsafe_allow_html=True)
@@ -295,11 +301,12 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
                     
                     if not df_exibicao.empty: st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum detalhamento foi encontrado para esta aba na planilha.")
-        else: st.info("ℹ️ A coluna 'REF VALOR REPASSADO' parece estar vazia na sua planilha da Usina.")
-    else: st.info(f"ℹ️ {att_usina}")
+        else: st.info("ℹ️ Nenhuma referência de repasse preenchida na aba da Usina.")
+    else: st.info(f"ℹ️ Sem dados da Usina. {att_cred}")
+
 
 # ==============================================================================
-# OS DEMAIS MÓDULOS PERMANECEM TOTALMENTE PRESERVADOS E INTACTOS
+# CONVÊNIOS E EMENDAS CONTINUAM INALTERADOS ABAIXO...
 # ==============================================================================
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -487,6 +494,8 @@ elif st.session_state.pagina_atual == 'emendas':
                         <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value'>{d_fin}</div></div>
                         <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo Consolidado ({lbl_d})</div><div class='kpi-value'>{fmt(sal_d)}</div></div>
                     </div>''', unsafe_allow_html=True)
+                    st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado do Deputado — ({lbl_d})</div>", unsafe_allow_html=True)
+                    st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dd_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dd_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dd_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LÍQUIDO GERAL</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_d)}</td></tr></table>''', unsafe_allow_html=True)
                     grupo_deputado = dd_s.groupby(['fonte_clean', 'secretaria']); linhas_detalhe_dep = []
                     for (fi, sec), df_grupo_saldo in grupo_deputado:
                         if fi == '': continue
