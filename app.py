@@ -60,9 +60,8 @@ st.markdown("""<style>
 # 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
     att = agora.strftime("%d/%m/%Y às %H:%M")
-    
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
@@ -73,40 +72,82 @@ def obter_base_dados_global():
             att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
         else:
             return pd.DataFrame(), "Indisponível"
-            
-    if df_raw.empty:
-        return pd.DataFrame(), "Base Vazia"
-
+    if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
-    
     def ext(chave):
         c_real = next((o for l, o in col_orig.items() if chave in l), None)
-        if c_real:
-            return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]]
+        if c_real: return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]]
         return [''] * len(df_raw)
-    
     df['fonte_clean'] = [str(f).split('.')[0].lower().replace('-', '').strip() for f in ext('fonte')]
     df['emenda_clean'] = [str(e).split('.')[0].strip() for e in ext('emenda')]
     df['plano_clean'] = [str(p).split('.')[0].upper().strip() for p in ext('plano')]
     df['EMPENHO_COL'] = [x if x != '' else '-' for x in ext('empenho')]
     df['NOTA_COL'] = [x if x != '' else '-' for x in ext('nota')]
-    
     url_items = [''] * len(df_raw)
     for c in ['urllink', 'url', 'link', 'comprovante', 'pdf']:
         c_achada = next((o for l, o in col_orig.items() if c in l), None)
-        if c_achada:
-            url_items = [str(i).strip() for i in df_raw[c_achada]]
-            break
-            
+        if c_achada: url_items = [str(i).strip() for i in df_raw[c_achada]]; break
     df['URL_REAL_LINK'] = [lk if re.match(r'^(http|https|www\.)', lk, re.IGNORECASE) else ("https://" + lk if '.' in lk and lk.lower() not in ['nan','','-'] else '') for lk in url_items]
-    
     df['secretaria'] = [x if x != '' else 'Não Especificada' for x in ext('secretaria')]
     df['deputado'] = [x if x != '' else 'Não Informado' for x in ext('deputado')]
     df['desc_clean'] = [x if x != '' else 'Sem descrição informada' for x in ext('descricao')]
     df['conta corrente'] = [x if x != '' else 'Não Informada' for x in ext('conta')]
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
+    def limpar_moeda(val):
+        v_str = str(val).upper().replace('R$', '').strip()
+        if not v_str or v_str == '-' or v_str == 'NAN': return 0.0
+        if '.' in v_str and ',' in v_str: v_str = v_str.replace('.', '').replace(',', '.')
+        elif ',' in v_str: v_str = v_str.replace(',', '.')
+        try: return float(v_str)
+        except ValueError: return 0.0
+    for c in ['repasse', 'rendimento', 'bruto']: df[c] = [limpar_moeda(v) for v in ext(c)]
+    return df, att
+
+@st.cache_data(ttl=3600)
+def obter_base_convenios():
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
+    att = agora.strftime("%d/%m/%Y às %H:%M")
+    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
+    try:
+        d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+    except Exception:
+        if os.path.exists("Divisão Convenios - Divisao.csv"):
+            d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
+            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+        else: return pd.DataFrame(), "Indisponível"
+    if not d.empty:
+        d.columns = [str(c).strip() for c in d.columns]
+        if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
+    return d, att
+
+# --- NOVA FUNÇÃO BLINDADA: CARREGAR BASE DE OPERAÇÕES DE CRÉDITO ---
+@st.cache_data(ttl=3600)
+def obter_base_credito():
+    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/operacoes_credito.csv"
+    try:
+        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+    except Exception:
+        if os.path.exists("operacoes_credito.csv"):
+            df_raw = pd.read_csv("operacoes_credito.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        else: return pd.DataFrame()
+    if df_raw.empty: return pd.DataFrame()
+    
+    # Padroniza cabeçalhos em caixa alta
+    df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
+    df = pd.DataFrame()
+    def ext_c(nome):
+        return [str(i).strip() for i in df_raw[nome]] if nome in df_raw.columns else [''] * len(df_raw)
+        
+    df['EMPENHO'] = ext_c('EMPENHO')
+    df['FORNECEDOR'] = ext_c('FORNECEDOR')
+    df['TIPO DE DOCUMENTO'] = ext_c('TIPO DE DOCUMENTO')
+    df['Nº DOCUMENTO'] = ext_c('Nº DOCUMENTO')
+    df['DESCRIÇÃO'] = ext_c('DESCRIÇÃO')
+    df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('REF VALOR REPASSADO')]
+    df['LINK DOCUMENTO'] = ext_c('LINK DOCUMENTO')
     
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
@@ -116,49 +157,25 @@ def obter_base_dados_global():
         try: return float(v_str)
         except ValueError: return 0.0
 
-    for c in ['repasse', 'rendimento', 'bruto']:
-        df[c] = [limpar_moeda(v) for v in ext(c)]
-        
-    return df, att
-
-@st.cache_data(ttl=3600)
-def obter_base_convenios():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
-    att = agora.strftime("%d/%m/%Y às %H:%M")
-    
-    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
-    try:
-        d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-    except Exception:
-        if os.path.exists("Divisão Convenios - Divisao.csv"):
-            d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-            timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
-            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
-        else:
-            return pd.DataFrame(), "Indisponível"
-            
-    if not d.empty:
-        d.columns = [str(c).strip() for c in d.columns]
-        if 'RESPONSÁVEL' in d.columns: 
-            d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
-    return d, att
+    df['REPASSE'] = [limpar_moeda(v) for v in ext_c('REPASSE')]
+    df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('VALOR DESPESA')]
+    return df
 
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
+df_cred = obter_base_credito()
 
 def fmt(v): 
     val = float(v)
-    if round(val, 2) == 0: 
-        val = 0.0
+    if round(val, 2) == 0: val = 0.0
     return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if not url or url == '': return '-'
     if tipo == "baixar" and "drive.google.com" in url and "/file/d/" in url: 
         url = f"https://drive.google.com/uc?export=download&id={url.split('/file/d/')[1].split('/')[0]}"
-    if tipo == "abrir": 
-        return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
-    nome = f"Nota_Fiscal_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
+    if tipo == "abrir": return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
+    nome = f"Doc_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
     return f'<a href="{url}" download="{nome}" class="btn-download-direto">Baixar 💾</a>'
 
 # ==============================================================================
@@ -172,18 +189,15 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>🔄 Atualizado em: {att_emendas}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
     with c2:
-        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏦</span><div class='home-title'>Operações de Crédito</div><div class='home-subtitle'>⚙️ Módulo em Construção</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏦</span><div class='home-title'>Operações de Crédito</div><div class='home-subtitle'>🔄 Gerenciamento Ativo</div></div>", unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
     with c3:
         st.markdown(f"<div class='home-card'><span style='font-size: 50px;'>🤝</span><div class='home-title'>Divisão Convênios</div><div class='home-subtitle'>🔄 Atualizado em: {att_convenios}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
-# --- NOVO MENU DE OPERAÇÕES DE CRÉDITO ---
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">Controle das Operações de Crédito</div></div>', unsafe_allow_html=True)
-    
-    # Exibe os dois cards como se fossem o menu principal
     c1, c2 = st.columns(2, gap="large")
     with c1:
         st.markdown("<div class='home-card'><span style='font-size: 50px;'>🏛️</span><div class='home-title'>Programa FINISA</div><div class='home-subtitle'>Controle de Financiamento</div></div>", unsafe_allow_html=True)
@@ -192,17 +206,78 @@ elif st.session_state.pagina_atual == 'credito':
         st.markdown("<div class='home-card'><span style='font-size: 50px;'>☀️</span><div class='home-title'>Usina Fotovoltaica</div><div class='home-subtitle'>Execução do Projeto</div></div>", unsafe_allow_html=True)
         st.button("Acessar Usina", key="btn_usina", use_container_width=True, type="primary", on_click=mudar_pagina, args=('fotovoltaica',))
 
-# --- TELA FINISA ---
+# --- TELA FINISA DINÂMICA ---
 elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
-    st.info("🚧 O painel de controle e monitoramento do FINISA está em fase de estruturação de dados.")
+    
+    if not df_cred.empty:
+        # Coleta os repasses dinamicamente (1º repasse, 2º repasse, etc.)
+        abas_disponiveis = sorted(list(df_cred['REF VALOR REPASSADO'].unique()))
+        if abas_disponiveis:
+            tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_disponiveis])
+            for i, aba_nome in enumerate(abas_disponiveis):
+                with tabs_cred[i]:
+                    df_aba = df_cred[df_cred['REF VALOR REPASSADO'] == aba_nome]
+                    total_repasse = df_aba['REPASSE'].sum()
+                    total_despesa = df_aba['VALOR DESPESA'].sum()
+                    saldo_disponivel = total_repasse - total_despesa
+                    
+                    st.markdown(f'''<div class='kpi-row-container'>
+                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Total Repassado</div><div class='kpi-value'>{fmt(total_repasse)}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(total_despesa)}</div></div>
+                        <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Disponível</div><div class='kpi-value'>{fmt(saldo_disponivel)}</div></div>
+                    </div>''', unsafe_allow_html=True)
+                    
+                    st.markdown("<div class='section-title'>📋 Detalhamento das Despesas Lançadas</div>", unsafe_allow_html=True)
+                    df_exibicao = pd.DataFrame({
+                        'Empenho': df_aba['EMPENHO'],
+                        'Fornecedor': df_aba['FORNECEDOR'],
+                        'Tipo de Documento': df_aba['TIPO DE DOCUMENTO'],
+                        'Nº Documento': df_aba['Nº DOCUMENTO'],
+                        'Descrição': df_aba['DESCRIÇÃO'],
+                        'Valor Despesa': df_aba['VALOR DESPESA'],
+                        'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])],
+                        'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])]
+                    })
+                    st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+    else: st.info("ℹ️ A base de dados de Crédito está vazia ou aguardando o envio do Sheets.")
 
-# --- TELA USINA FOTOVOLTAICA ---
+# --- TELA USINA FOTOVOLTAICA DINÂMICA ---
 elif st.session_state.pagina_atual == 'fotovoltaica':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">☀️ Operação de Crédito: Usina Fotovoltaica</div></div>', unsafe_allow_html=True)
-    st.info("🚧 O painel de execução da Usina Fotovoltaica está em fase de estruturação de dados.")
+    
+    if not df_cred.empty:
+        abas_disponiveis = sorted(list(df_cred['REF VALOR REPASSADO'].unique()))
+        if abas_disponiveis:
+            tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_disponiveis])
+            for i, aba_nome in enumerate(abas_disponiveis):
+                with tabs_cred[i]:
+                    df_aba = df_cred[df_cred['REF VALOR REPASSADO'] == aba_nome]
+                    total_repasse = df_aba['REPASSE'].sum()
+                    total_despesa = df_aba['VALOR DESPESA'].sum()
+                    saldo_disponivel = total_repasse - total_despesa
+                    
+                    st.markdown(f'''<div class='kpi-row-container'>
+                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Total Repassado</div><div class='kpi-value'>{fmt(total_repasse)}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(total_despesa)}</div></div>
+                        <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Disponível</div><div class='kpi-value'>{fmt(saldo_disponivel)}</div></div>
+                    </div>''', unsafe_allow_html=True)
+                    
+                    st.markdown("<div class='section-title'>📋 Detalhamento das Despesas Lançadas</div>", unsafe_allow_html=True)
+                    df_exibicao = pd.DataFrame({
+                        'Empenho': df_aba['EMPENHO'],
+                        'Fornecedor': df_aba['FORNECEDOR'],
+                        'Tipo de Documento': df_aba['TIPO DE DOCUMENTO'],
+                        'Nº Documento': df_aba['Nº DOCUMENTO'],
+                        'Descrição': df_aba['DESCRIÇÃO'],
+                        'Valor Despesa': df_aba['VALOR DESPESA'],
+                        'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])],
+                        'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])]
+                    })
+                    st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+    else: st.info("ℹ️ A base de dados de Crédito está vazia ou aguardando o envio do Sheets.")
 
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -210,38 +285,28 @@ elif st.session_state.pagina_atual == 'convenios':
     
     if not df_conv.empty:
         df_conv_tela = df_conv.copy()
-        
-        # --- BUSCA GLOBAL INTELIGENTE ---
         st.markdown("<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>🔍 Busca Inteligente Global</div>", unsafe_allow_html=True)
         busca_global = st.text_input("Digite qualquer termo para pesquisar na base inteira:", placeholder="Ex: Nome de um analista, número SEI, secretaria, fonte...")
         
         if busca_global:
-            # Cria uma máscara varrendo todas as colunas
             mask = pd.Series(False, index=df_conv_tela.index)
             for col in df_conv_tela.columns:
                 mask |= df_conv_tela[col].astype(str).str.contains(busca_global, case=False, na=False)
-            
             df_conv_tela = df_conv_tela[mask]
-            
-            if df_conv_tela.empty:
-                st.warning(f"⚠️ Nenhum registro encontrado contendo o termo: '{busca_global}'")
+            if df_conv_tela.empty: st.warning(f"⚠️ Nenhum registro encontrado contendo o termo: '{busca_global}'")
         
-        # Só exibe as abas se houver dados após o filtro global
         if not df_conv_tela.empty:
             tab_conv_fonte, tab_conv_analista, tab_conv_busca, tab_conv_geral = st.tabs([
                 "🎯 Por Fonte de Recurso", "👤 Por Analista", "🔍 Busca Detalhada", "📋 Base Completa"
             ])
             
-            # --- ABA 1: POR FONTE DE RECURSO ---
             with tab_conv_fonte:
                 st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Fonte de Recurso</div>", unsafe_allow_html=True)
                 fontes_rec = sorted([str(f).strip() for f in df_conv_tela['FONTE DE RECURSO'].unique() if str(f).strip() not in ['', 'nan']])
-                
                 if fontes_rec:
                     ct1, cs1 = st.columns(2)
                     with ct1: f_dig = normalizar_texto(st.text_input("⌨️ Digite a Fonte de Recurso:", placeholder="Ex: 1000", key="txt_f_conv"))
                     with cs1: f_sel = st.selectbox("Ou escolha na lista:", options=fontes_rec, index=fontes_rec.index(f_dig) if f_dig in fontes_rec else 0, key="sel_f_conv")
-                    
                     f_final = f_dig if f_dig in fontes_rec else f_sel
                     if f_final:
                         df_filtro = df_conv_tela[df_conv_tela['FONTE DE RECURSO'] == f_final]
@@ -251,57 +316,36 @@ elif st.session_state.pagina_atual == 'convenios':
                             st.markdown("<div class='section-title'>📋 Dados do Convênio</div>", unsafe_allow_html=True)
                             st.dataframe(df_filtro, use_container_width=True, hide_index=True)
                         
-            # --- ABA 2: POR ANALISTA ---
             with tab_conv_analista:
                 st.markdown("<div class='section-title'>🔍 Painel Híbrido: Pesquisa e Seleção por Analista</div>", unsafe_allow_html=True)
                 if 'RESPONSÁVEL' in df_conv_tela.columns:
                     analistas = sorted([str(a) for a in df_conv_tela['RESPONSÁVEL'].unique() if str(a) != ''])
-                    
                     if analistas:
                         ca1, ca2 = st.columns(2)
                         with ca1: a_dig = normalizar_texto(st.text_input("⌨️ Digite o nome do Analista:", placeholder="Ex: JOAO", key="txt_a_conv"))
                         with ca2: a_sel = st.selectbox("Ou escolha na lista:", options=analistas, index=analistas.index(a_dig) if a_dig in analistas else 0, key="sel_a_conv")
-                        
                         a_final = a_dig if a_dig in analistas else a_sel
                         if a_final:
                             df_filtro_a = df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final]
-                            qtd_conv = len(df_filtro_a)
-                            
                             st.markdown(f'''<div class='kpi-row-container'>
-                                <div class='kpi-card-head-blue'>
-                                    <div class='kpi-label'>👤 Analista Selecionado</div>
-                                    <div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div>
-                                </div>
-                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'>
-                                    <div class='kpi-label'>📋 Total de Convênios</div>
-                                    <div class='kpi-value'>{qtd_conv}</div>
-                                </div>
+                                <div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div>
+                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div>
                             </div>''', unsafe_allow_html=True)
-                            
                             st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
                             st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("ℹ️ Nenhum Analista encontrado na base para esta busca.")
-                else:
-                    st.error("A coluna 'RESPONSÁVEL' não foi encontrada na planilha.")
+                else: st.error("A coluna 'RESPONSÁVEL' não foi encontrada na planilha.")
 
-            # --- ABA 3: BUSCA DETALHADA ---
             with tab_conv_busca:
                 st.markdown("<div class='section-title'>🔍 Resultados da Busca</div>", unsafe_allow_html=True)
-                if busca_global:
-                    st.success(f"🎯 Exibindo {len(df_conv_tela)} resultados para o termo: '{busca_global}'")
-                else:
-                    st.info("Utilize a barra de pesquisa inteligente acima para filtrar os resultados aqui.")
+                if busca_global: st.success(f"🎯 Exibindo {len(df_conv_tela)} resultados para o termo: '{busca_global}'")
+                else: st.info("Utilize a barra de pesquisa inteligente acima para filtrar os resultados aqui.")
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
 
-            # --- ABA 4: BASE COMPLETA (COM FILTROS INTERNOS) ---
             with tab_conv_geral:
                 st.markdown("<div class='section-title'>📊 Base de Dados Completa</div>", unsafe_allow_html=True)
                 st.info("💡 **Dica de Filtro Nativo:** Passe o mouse sobre o cabeçalho de qualquer coluna da tabela abaixo e clique no ícone da **lupa** ou das **linhas** para pesquisar e filtrar os dados livremente!")
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
-
-    else: 
-        st.warning("A base de dados de convênios (`Divisão Convenios - Divisao.csv`) não foi localizada ou está vazia.")
+    else: st.warning("A base de dados de convênios (`Divisão Convenios - Divisao.csv`) não foi localizada ou está vazia.")
 
 elif st.session_state.pagina_atual == 'emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -317,7 +361,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 with c_txt: f_dig = st.text_input("⌨️ Digite a Fonte:", placeholder="Ex: 1000", key="txt_f").strip().lower()
                 with c_sel: f_sel = st.selectbox("🖱️ Ou selecione:", options=fontes, index=fontes.index(f_dig) if f_dig in fontes else 0, key="sel_f")
                 fonte_final = f_dig if f_dig in fontes else f_sel
-                
                 if fonte_final:
                     d_fin = df[df['fonte_clean'] == fonte_final]
                     anos = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in d_fin['ano_mov'].unique() if a not in ['', 'nan']])))
@@ -329,12 +372,14 @@ elif st.session_state.pagina_atual == 'emendas':
                         d_bc = df[df['conta corrente'] == conta] if conta != "Não Informada" else pd.DataFrame()
                         d_bc_fluxo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'] == ano_sel] if not d_bc.empty else pd.DataFrame())
                         d_bc_saldo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'].astype(int) <= int(ano_sel)] if not d_bc.empty else pd.DataFrame())
-                        
                         sal_fonte = float(d_saldo['repasse'].sum() + d_saldo['rendimento'].sum()) - float(d_saldo['bruto'].sum())
                         sal_banco = float(d_bc_saldo['repasse'].sum() + d_bc_saldo['rendimento'].sum()) - float(d_bc_saldo['bruto'].sum()) if not d_bc_saldo.empty else sal_fonte
                         lbl = "Histórico Total" if ano_sel == anos[0] else f"Exercício {ano_sel}"
                         
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head'><div class='kpi-label'>🎯 Saldo Fonte ({lbl})</div><div class='kpi-value'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label' style='color:#1e40af;'>🏦 Saldo Conta: {conta} ({lbl})</div><div class='kpi-value' style='color:#2563eb;'>{fmt(sal_banco)}</div></div></div>''', unsafe_allow_html=True)
+                        st.markdown(f'''<div class='kpi-row-container'>
+                            <div class='kpi-card-head'><div class='kpi-label'>🎯 Saldo Fonte ({lbl})</div><div class='kpi-value'>{fmt(sal_fonte)}</div></div>
+                            <div class='kpi-card-head-blue'><div class='kpi-label' style='color:#1e40af;'>🏦 Saldo Conta: {conta} ({lbl})</div><div class='kpi-value' style='color:#2563eb;'>{fmt(sal_banco)}</div></div>
+                        </div>''', unsafe_allow_html=True)
                         st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {d_fin['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {d_fin['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {d_fin['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
                         
                         secs = [s for s in d_fin['secretaria'].unique() if s != '']
@@ -356,13 +401,11 @@ elif st.session_state.pagina_atual == 'emendas':
                             for fi in f_comp:
                                 di_f = d_bc_fluxo[d_bc_fluxo['fonte_clean'] == fi] if not d_bc_fluxo.empty else pd.DataFrame()
                                 fr, frn, fd = float(di_f['repasse'].sum() if not di_f.empty else 0), float(di_f['rendimento'].sum() if not di_f.empty else 0), float(di_f['bruto'].sum() if not di_f.empty else 0)
-                                di_s = d_bc_saldo[d_bc_saldo['fonte_clean'] == fi]
-                                fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum())
+                                di_s = d_bc_saldo[d_bc_saldo['fonte_clean'] == fi]; fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum())
                                 tr += fr; trn += frn; tg += fd; ts += fs
                                 l_bc.append({'Fonte Orçamentária': fi.upper() + (" (Ativa)" if fi == fonte_final else ""), 'Repasses': fr, 'Rendimentos': frn, 'Despesas': fd, 'Saldo Real': fs})
                             l_bc.append({'Fonte Orçamentária': 'TOTAL CONTA 🏦', 'Repasses': tr, 'Rendimentos': trn, 'Despesas': tg, 'Saldo Real': ts})
-                            df_bc = pd.DataFrame(l_bc)
-                            st.dataframe(df_bc.style.apply(lambda r: ['background-color: #f1f5f9; font-weight: 800;' if 'TOTAL' in r['Fonte Orçamentária'] else ('background-color: #e0f2fe; font-weight: 700;' if '(ATIVA)' in r['Fonte Orçamentária'] else '') for _ in r], axis=1).format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Real': fmt}), use_container_width=True, hide_index=True)
+                            st.dataframe(pd.DataFrame(l_bc).style.apply(lambda r: ['background-color: #f1f5f9; font-weight: 800;' if 'TOTAL' in r['Fonte Orçamentária'] else ('background-color: #e0f2fe; font-weight: 700;' if '(ATIVA)' in r['Fonte Orçamentária'] else '') for _ in r], axis=1).format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Real': fmt}), use_container_width=True, hide_index=True)
 
                         st.markdown(f"<div class='section-title' style='color: #0f172a; border-bottom: 3px solid #0f172a;'>📋 Lançamentos do Período — ({lbl})</div>", unsafe_allow_html=True)
                         d_val = d_fluxo[d_fluxo['EMPENHO_COL'] != '-']
@@ -371,7 +414,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("ℹ️ Nenhum lançamento no período.")
 
-        # 2. 📋 ABA POR PLANO
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano</div>", unsafe_allow_html=True)
             planos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -381,7 +423,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 p_enc = next((p for p in planos if re.sub(r'\D', '', p) == p_dig), None) if p_dig else None
                 with c_sel: p_sel = st.selectbox("🖱️ Ou escolha na lista:", options=planos, index=planos.index(p_enc) if p_enc else 0, key="sel_p")
                 p_fin = p_enc if p_enc else p_sel
-                
                 dp = df[df['plano_clean'].str.upper() == p_fin]
                 anos_p = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in dp['ano_mov'].unique() if a not in ['', 'nan']])))
                 ano_p = st.selectbox("📅 Exercício Fiscal:", options=anos_p, key="ano_p")
@@ -392,7 +433,11 @@ elif st.session_state.pagina_atual == 'emendas':
                     dp_s = dp if ano_p == anos_p[0] else dp[dp['ano_mov'].astype(int) <= int(ano_p)]
                     sal_p = float(dp_s['repasse'].sum() + dp_s['rendimento'].sum()) - float(dp_s['bruto'].sum())
                     
-                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value' style='color:#0f172a;'>{p_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_p})</div><div class='kpi-value'>{fmt(sal_p)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Conta</div><div class='kpi-value' style='color:#2563eb; font-size: 20px;'>{dp['conta corrente'].iloc[0]}</div></div></div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class='kpi-row-container'>
+                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value'>{p_fin}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_p})</div><div class='kpi-value'>{fmt(sal_p)}</div></div>
+                        <div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Conta</div><div class='kpi-value' style='font-size: 20px;'>{dp['conta corrente'].iloc[0]}</div></div>
+                    </div>''', unsafe_allow_html=True)
                     st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(dp['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {dp['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {dp['emenda_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
                     
                     secs_p = sorted([str(s) for s in dp['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']]) or ['NÃO ESPECIFICADA']
@@ -410,7 +455,6 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum lançamento no período.")
 
-        # 3. 🏛️ ABA POR SECRETARIA
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria</div>", unsafe_allow_html=True)
             secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
@@ -420,7 +464,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 s_enc = next((s for s in secs if s.upper() == s_dig.upper()), None) if s_dig else None
                 with c_sel: s_sel = st.selectbox("🖱️ Ou selecione:", options=secs, index=secs.index(s_enc) if s_enc else 0, key="sel_s")
                 s_fin = s_enc if s_enc else s_sel
-                
                 ds = df[df['secretaria'] == s_fin]
                 anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in ds['ano_mov'].unique() if a not in ['', 'nan']])))
                 ano_s = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
@@ -431,7 +474,11 @@ elif st.session_state.pagina_atual == 'emendas':
                     ds_s = ds if ano_s == anos_s[0] else ds[ds['ano_mov'].astype(int) <= int(ano_s)]
                     sal_s = float(ds_s['repasse'].sum() + ds_s['rendimento'].sum()) - float(ds_s['bruto'].sum())
                     
-                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value' style='color:#0f172a;'>{s_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_s})</div><div class='kpi-value'>{fmt(sal_s)}</div></div><div class='kpi-card-head' style='border-left: 6px solid #0f172a;'><div class='kpi-label'>📊 Fontes</div><div class='kpi-value' style='color:#0f172a;'>{len(ds['fonte_clean'].unique())} Emenda(s)</div></div></div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class='kpi-row-container'>
+                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value'>{s_fin}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_s})</div><div class='kpi-value'>{fmt(sal_s)}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #0f172a;'><div class='kpi-label'>📊 Fontes</div><div class='kpi-value'>{len(ds['fonte_clean'].unique())} Emenda(s)</div></div>
+                    </div>''', unsafe_allow_html=True)
                     
                     st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado da Pasta — ({lbl_s})</div>", unsafe_allow_html=True)
                     st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE DA PASTA</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
@@ -439,33 +486,15 @@ elif st.session_state.pagina_atual == 'emendas':
                     st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ Detalhamento por Fonte de Recurso vinculada à {s_fin} — ({lbl_s})</div>", unsafe_allow_html=True)
                     fontes_da_secretaria = sorted([f for f in ds_s['fonte_clean'].unique() if f != ''])
                     linhas_fontes_sec = []
-                    
                     for fi in fontes_da_secretaria:
-                        df_i_fluxo = ds_f[ds_f['fonte_clean'] == fi]
-                        df_i_saldo = ds_s[ds_s['fonte_clean'] == fi]
-                        
-                        f_rep = float(df_i_fluxo['repasse'].sum())
-                        f_ren = float(df_i_fluxo['rendimento'].sum())
-                        f_desp = float(df_i_fluxo['bruto'].sum())
-                        f_saldo = float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())
-                        
+                        df_i_fluxo = ds_f[ds_f['fonte_clean'] == fi]; df_i_saldo = ds_s[ds_s['fonte_clean'] == fi]
                         linhas_fontes_sec.append({
-                            'Fonte Vinculada': fi.upper(),
-                            'Repasses': f_rep,
-                            'Rendimentos': f_ren,
-                            'Despesas': f_desp,
-                            'Saldo Livre da Fonte': f_saldo
+                            'Fonte Vinculada': fi.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()),
+                            'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()),
+                            'Saldo Livre da Fonte': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())
                         })
-                        
-                    if linhas_fontes_sec:
-                        df_tabela_sec = pd.DataFrame(linhas_fontes_sec)
-                        st.dataframe(df_tabela_sec.style.format({
-                            'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre da Fonte': fmt
-                        }), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Nenhuma fonte movimentada para esta secretaria no período selecionado.")
+                    if linhas_fontes_sec: st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre da Fonte': fmt}), use_container_width=True, hide_index=True)
 
-        # 4. 🔍 ABA POR DEPUTADO
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar</div>", unsafe_allow_html=True)
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
@@ -475,7 +504,6 @@ elif st.session_state.pagina_atual == 'emendas':
                 d_enc = next((d for d in deps if d.upper() == d_dig.upper()), None) if d_dig else None
                 with c_sel: d_sel = st.selectbox("🖱️ Ou selecione:", options=deps, index=deps.index(d_enc) if d_enc else 0, key="sel_d")
                 d_fin = d_enc if d_enc else d_sel
-                
                 dd = df[df['deputado'] == d_fin]
                 anos_d = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in dd['ano_mov'].unique() if a not in ['', 'nan']])))
                 ano_d = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
@@ -486,50 +514,31 @@ elif st.session_state.pagina_atual == 'emendas':
                     dd_s = dd if ano_d == anos_d[0] else dd[dd['ano_mov'].astype(int) <= int(ano_d)]
                     sal_d = float(dd_s['repasse'].sum() + dd_s['rendimento'].sum()) - float(dd_s['bruto'].sum())
                     
-                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value' style='color:#0f172a;'>{d_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo Consolidado ({lbl_d})</div><div class='kpi-value'>{fmt(sal_d)}</div></div></div>''', unsafe_allow_html=True)
-                    
+                    st.markdown(f'''<div class='kpi-row-container'>
+                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value'>{d_fin}</div></div>
+                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo Consolidado ({lbl_d})</div><div class='kpi-value'>{fmt(sal_d)}</div></div>
+                    </div>''', unsafe_allow_html=True)
                     st.markdown(f"<div class='section-title'>🌍 Extrato Consolidado do Deputado — ({lbl_d})</div>", unsafe_allow_html=True)
                     st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(dd_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(dd_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(dd_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LÍQUIDO GERAL</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(sal_d)}</td></tr></table>''', unsafe_allow_html=True)
 
                     st.markdown(f"<div class='section-title' style='color:#2563eb; border-bottom:3px solid #2563eb;'>⚖️ Detalhamento: Onde o recurso foi aplicado (Por Fonte e Secretaria) — ({lbl_d})</div>", unsafe_allow_html=True)
-                    
                     grupo_deputado = dd_s.groupby(['fonte_clean', 'secretaria'])
                     linhas_detalhe_dep = []
-                    
                     for (fi, sec), df_grupo_saldo in grupo_deputado:
                         if fi == '': continue
                         df_grupo_fluxo = dd_f[(dd_f['fonte_clean'] == fi) & (dd_f['secretaria'] == sec)]
-                        
-                        d_rep = float(df_grupo_fluxo['repasse'].sum())
-                        d_ren = float(df_grupo_fluxo['rendimento'].sum())
-                        d_desp = float(df_grupo_fluxo['bruto'].sum())
-                        d_saldo = float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())
-                        
                         linhas_detalhe_dep.append({
-                            'Fonte Vinculada': fi.upper(),
-                            'Secretaria Contemplada': sec.upper(),
-                            'Repasses': d_rep,
-                            'Rendimentos': d_ren,
-                            'Despesas': d_desp,
-                            'Saldo Específico': d_saldo
+                            'Fonte Vinculada': fi.upper(), 'Secretaria Contemplada': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()),
+                            'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())
                         })
-                    
-                    if linhas_detalhe_dep:
-                        df_tabela_dep = pd.DataFrame(linhas_detalhe_dep)
-                        st.dataframe(df_tabela_dep.style.format({
-                            'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt
-                        }), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Nenhuma destinação detalhada localizada para este parlamentar no período.")
+                    if linhas_detalhe_dep: st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}), use_container_width=True, hide_index=True)
 
-        # 5. 🌐 ABA PANORAMA
         with tab_geral:
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
             df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
             df_g_dep = df[df['deputado'] != 'NÃO INFORMADO'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
-            
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
