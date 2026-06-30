@@ -126,7 +126,7 @@ def obter_base_convenios():
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-# --- LEITOR ÚNICO DE CRÉDITO COM SEPARAÇÃO DE ABAS BLINDADA ---
+# --- LEITOR ÚNICO DE CRÉDITO COM MAPEAMENTO DE COLUNAS EXCLUSIVAS ---
 @st.cache_data(ttl=3600)
 def obter_base_credito():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -143,30 +143,36 @@ def obter_base_credito():
         else: return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     
+    # Dicionário de colunas com as chaves limpas
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     
-    def ext_c(chave_exata, chave_parcial):
-        c_real = next((orig for limpo, orig in col_orig.items() if chave_exata in limpo), None)
-        if not c_real:
-            c_real = next((orig for limpo, orig in col_orig.items() if chave_parcial in limpo), None)
-        if c_real:
-            return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]]
+    # A MÁGICA DE CAPTURA EXCLUSIVA ACONTECE AQUI
+    def get_and_remove_col(*chaves):
+        for chave in chaves:
+            for limpo, orig in list(col_orig.items()):
+                if chave in limpo:
+                    del col_orig[limpo] # Remove da lista para não dar conflito (Evita que o Tipo Doc seja puxado pelo Nº Doc)
+                    return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         return [''] * len(df_raw)
         
     df = pd.DataFrame()
-    # Verifica se a coluna mágica PROGRAMA existe. Se não existir, avisa sem quebrar o app.
-    if ext_c('programa', 'programa') == [''] * len(df_raw):
+    if get_and_remove_col('programa') == [''] * len(df_raw):
         df['PROGRAMA'] = ['NÃO ESPECIFICADO'] * len(df_raw)
     else:
-        df['PROGRAMA'] = [str(x).upper().strip() for x in ext_c('programa', 'programa')]
-        
-    df['EMPENHO'] = ext_c('empenho', 'empenho')
-    df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
-    df['TIPO DE DOCUMENTO'] = ext_c('tipo de documento', 'tipo')
-    df['Nº DOCUMENTO'] = ext_c('n documento', 'documento')
-    df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
-    df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('ref valor', 'ref')]
-    df['LINK DOCUMENTO'] = ext_c('link documento', 'link')
+        # Se for preenchido a coluna mágica pelo script Google Sheets, recarrega a tabela base e puxa o programa correto
+        df['PROGRAMA'] = [str(i).upper().strip() if str(i).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for i in df_raw['PROGRAMA'] ] if 'PROGRAMA' in df_raw.columns else ['NÃO ESPECIFICADO'] * len(df_raw)
+
+    df['EMPENHO'] = get_and_remove_col('empenho')
+    df['FORNECEDOR'] = get_and_remove_col('fornecedor')
+    
+    # Aqui o TIPO captura a palavra 'tipo' e já retira a coluna dele de campo
+    df['TIPO DE DOCUMENTO'] = get_and_remove_col('tipodedoc', 'tipo')
+    # O que sobrar com 'doc' ou 'numero' é garantidamente o número do documento
+    df['Nº DOCUMENTO'] = get_and_remove_col('ndoc', 'ndocumento', 'nmero', 'numero', 'doc')
+    
+    df['DESCRIÇÃO'] = get_and_remove_col('descricao', 'descri')
+    df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in get_and_remove_col('refvalor', 'ref')]
+    df['LINK DOCUMENTO'] = get_and_remove_col('link', 'url')
     
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
@@ -179,8 +185,8 @@ def obter_base_credito():
         try: return float(v_str)
         except ValueError: return 0.0
 
-    df['REPASSE'] = [limpar_moeda(v) for v in ext_c('repasse', 'repasse')]
-    df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valor despesa', 'despesa')]
+    df['REPASSE'] = [limpar_moeda(v) for v in get_and_remove_col('repasse', 'repass')]
+    df['VALOR DESPESA'] = [limpar_moeda(v) for v in get_and_remove_col('valordespesa', 'despesa', 'valor')]
     return df, att
 
 df, att_emendas = obter_base_dados_global()
@@ -189,7 +195,6 @@ df_conv, att_convenios = obter_base_convenios()
 # Puxa a base única e separa os universos FINISA e USINA automaticamente
 df_cred_completo, att_cred = obter_base_credito()
 
-# Tratamento para não dar erro KeyError ou se o DF for vazio
 if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA']
     df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA']
@@ -212,10 +217,11 @@ def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
 
 def processar_saldos_acumulados(df_programa):
     if not df_programa.empty:
+        # A matemática precisa varrer da aba mais velha pra mais nova para calcular o saldo residual
         abas = sorted([aba for aba in df_programa['REF VALOR REPASSADO'].unique() if aba != 'NÃO ESPECIFICADO'])
         saldo_anterior = 0.0
         dados_finais = {}
-        for index_aba, aba_nome in enumerate(abas):
+        for aba_nome in abas:
             df_aba = df_programa[df_programa['REF VALOR REPASSADO'] == aba_nome]
             repasse_puro_atual = df_aba['REPASSE'].sum()
             despesas_atuais = df_aba['VALOR DESPESA'].sum()
@@ -269,8 +275,11 @@ elif st.session_state.pagina_atual == 'finisa':
     
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa)
     if abas_disponiveis:
-        tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_disponiveis])
-        for i, aba_nome in enumerate(abas_disponiveis):
+        # AQUI INVERTEMOS A ORDEM PARA EXIBIR A MAIS RECENTE PRIMEIRO
+        abas_exibicao = list(reversed(abas_disponiveis))
+        tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_exibicao])
+        
+        for i, aba_nome in enumerate(abas_exibicao):
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 porcentagem_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
@@ -313,8 +322,11 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
     
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_usina)
     if abas_disponiveis:
-        tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_disponiveis])
-        for i, aba_nome in enumerate(abas_disponiveis):
+        # AQUI INVERTEMOS A ORDEM PARA EXIBIR A MAIS RECENTE PRIMEIRO
+        abas_exibicao = list(reversed(abas_disponiveis))
+        tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_exibicao])
+        
+        for i, aba_nome in enumerate(abas_exibicao):
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 porcentagem_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
