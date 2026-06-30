@@ -42,9 +42,6 @@ st.markdown("""<style>
     .home-title { font-size: 18px; font-weight: 800; color: #1e293b; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
     .home-subtitle { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 20px; }
     
-    /* CARD DE BUSCA DESTAQUE */
-    .search-box-highlight { background-color: #f0f9ff; border: 1px solid #bae6fd; border-left: 6px solid #0284c7; padding: 22px; border-radius: 8px; margin-top: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-    
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .kpi-card-head-blue { flex: 1; background-color: #f8fafc; border: 1px solid #bfdbfe; border-radius: 8px; padding: 18px 20px; border-left: 5px solid #2563eb; }
@@ -54,7 +51,7 @@ st.markdown("""<style>
     .meta-tag { background-color: #f1f5f9; color: #334155; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; border: 1px solid #cbd5e1; margin-right: 6px; display: inline-block; }
     .secretaria-header { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 20px; padding-left: 8px; border-left: 4px solid #3b82f6; background-color: #f8fafc; padding-top: 6px; padding-bottom: 6px; border-radius: 0 6px 6px 0; }
     
-    /* TABELAS SÓBRIAS GERAIS */
+    /* TABELAS SÓBRIAS */
     .extrato-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; margin-bottom: 20px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .extrato-table th { background-color: #1e293b; color: #f8fafc; padding: 12px 15px; font-size: 12px; font-weight: 700; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; }
     .extrato-row { transition: all 0.2s ease; background-color: #ffffff; }
@@ -68,7 +65,7 @@ st.markdown("""<style>
     
     .btn-download-direto { background-color: #f1f5f9; color: #0f172a !important; text-decoration: none !important; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid #cbd5e1; display: inline-block; transition: all 0.2s ease; text-transform: uppercase; }
     .btn-download-direto:hover { background-color: #e2e8f0; color: #000000 !important; border-color: #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; background-color: #eff6ff; padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid #bfdbfe; transition: 0.2s; }
+    .link-abrir-doc { color: #2563eb !important; text-decoration: none !important; font-size: 12px; font-weight: 700; background-color: #eff6ff; padding: 6px 12px; border-radius: 6px; display: inline-block; border: 1px solid #bfdbfe; transition: 0.2s; }
     .link-abrir-doc:hover { background-color: #dbeafe; color: #1d4ed8 !important; }
 </style>""", unsafe_allow_html=True)
 
@@ -272,13 +269,13 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     st.markdown("---")
     
-    # --- 🔍 FILTRO / BUSCA RÁPIDA DE CONVÊNIOS DESTAQUE PREMIUM ---
-    st.markdown("<div class='search-box-highlight'>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 14px; font-weight: 800; color: #0369a1; margin-top:0; margin-bottom:10px; text-transform: uppercase; letter-spacing:0.5px;'>🔍 Identificação Pronta de Analista</p>", unsafe_allow_html=True)
-    busca_conv_home = st.text_input("Busque por número da fonte, do convênio ou da emenda:", key="busca_conv_home", placeholder="Digite o termo ou código da pesquisa aqui...")
+    # --- 🔍 FILTRO / BUSCA RÁPIDA DE CONVÊNIOS SOLICITADA ---
+    st.markdown("<div class='section-title'>🔍 Consulta Identificação de Analista</div>", unsafe_allow_html=True)
+    busca_conv_home = st.text_input("Digite aqui alguma informações sobre o convenio", key="busca_conv_home", placeholder="Ex: Número do convênio, objeto, secretaria...")
     
     if busca_conv_home:
         if not df_conv.empty:
+            # Varre todas as colunas para encontrar correspondências
             mask_home = pd.Series(False, index=df_conv.index)
             for col in df_conv.columns:
                 mask_home |= df_conv[col].astype(str).str.contains(busca_conv_home, case=False, na=False)
@@ -289,13 +286,15 @@ if st.session_state.pagina_atual == 'menu_principal':
                     analistas_unicos = [a for a in df_encontrado_home['RESPONSÁVEL'].unique() if str(a).strip() != ""]
                     if analistas_unicos:
                         for analista in analistas_unicos:
-                            st.markdown(f"<div style='background-color:#ffffff; border-left:4px solid #10b981; padding:12px 18px; border-radius:4px; margin-top:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-size:14px; color:#1e293b;'><b>Analista responsável:</b> <span style='color:#059669; font-weight:700;'>{analista}</span></div>", unsafe_allow_html=True)
-                    else: st.markdown("<p style='font-size:13px; color:#64748b; margin-top:5px;'>⚠️ Registro localizado, mas sem analista associado.</p>", unsafe_allow_html=True)
-                else: st.markdown("<p style='font-size:13px; color:#dc2626; margin-top:5px;'>⚠️ Coluna de responsabilidade ausente.</p>", unsafe_allow_html=True)
-            else: st.markdown("<p style='font-size:13px; color:#dc2626; margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background-color:#eff6ff; border-left:4px solid #2563eb; padding:12px 18px; border-radius:4px; margin-bottom:8px;'><b>Analista responsável:</b> {analista}</div>", unsafe_allow_html=True)
+                    else: st.warning("⚠️ Convênio localizado, mas sem analista associado no momento.")
+                else: st.error("⚠️ Coluna de responsabilidade não mapeada na base.")
+            else: st.error("❌ Nenhum registro de convênio localizado com esse termo.")
+        else: st.error("⚠️ A base de dados de convênios está indisponível.")
 
-    # --- MÓDULO: ÚLTIMAS MOVIMENTAÇÕES COM CABEÇALHOS COLORIDOS PREMIUM ---
+    st.markdown("---")
+    
+    # --- MÓDULO: ÚLTIMAS MOVIMENTAÇÕES ---
     st.markdown("<div class='section-title'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
     c_ult_1, c_ult_2 = st.columns(2, gap="large")
     
@@ -312,10 +311,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Tipo': ['Despesa' if b > 0 else 'Repasse' for b in ultimas_emendas['bruto']],
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
-                # Estilização com cabeçalho azul escuro profissional
-                st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', 'white'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
-                ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
+                st.dataframe(disp_emendas.style.format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
             
@@ -331,10 +327,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Fornecedor': ultimas_cred['FORNECEDOR'],
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
-                # Estilização com cabeçalho verde floresta profissional
-                st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', 'white'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
-                ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
+                st.dataframe(disp_cred.style.format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma despesa de crédito registrada.")
         else: st.info("Base de crédito vazia.")
 
@@ -361,12 +354,7 @@ elif st.session_state.pagina_atual == 'finisa':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'>
-                    <div class='kpi-card-head' style='border-left: 5px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#64748b; margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 5px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div>
-                    <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#1e40af; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 5px solid #6366f1;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#6366f1;'>{pct_gasta:.2f}%</div></div>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#64748b; margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#1e40af; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid #6366f1;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#6366f1;'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -399,12 +387,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'>
-                    <div class='kpi-card-head' style='border-left: 5px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#64748b; margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 5px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div>
-                    <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#1e40af; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 5px solid #6366f1;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#6366f1;'>{pct_gasta:.2f}%</div></div>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#64748b; margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br><b>Saldo Anterior Remanescente:</b> {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#1e40af; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid #6366f1;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#6366f1;'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -418,7 +401,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
                         fig_bar_desc = go.Figure(go.Bar(x=df_desc['VALOR DESPESA'], y=df_desc['DESCRIÇÃO'], orientation='h', marker_color='#3b82f6', text=[fmt(v) for v in df_desc['VALOR DESPESA']], textposition='auto'))
                         fig_bar_desc.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                         st.plotly_chart(fig_bar_desc, use_container_width=True)
-                    else: st.info("Sem despesas registradas para exibir no gráfico.")
+                    else: st.info("Sem despesas registradas.")
                 st.markdown("<div class='section-title'>📋 Detalhes Fiscais das Despesas Liquidadas</div>", unsafe_allow_html=True)
                 df_exibicao = pd.DataFrame({'Empenho': info['df_filtrado']['EMPENHO'], 'Fornecedor': info['df_filtrado']['FORNECEDOR'], 'Tipo Doc': info['df_filtrado']['TIPO DE DOCUMENTO'], 'Nº Doc': info['df_filtrado']['Nº DOCUMENTO'], 'Descrição': info['df_filtrado']['DESCRIÇÃO'], 'Valor Despesa': info['df_filtrado']['VALOR DESPESA'], 'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])]})
                 df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
@@ -539,13 +522,13 @@ elif st.session_state.pagina_atual == 'emendas':
                     d_fin = df[df['fonte_clean'] == fonte_final]
                     anos = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in d_fin['ano_mov'].unique() if a not in ['', 'nan']])))
                     ano_sel = st.selectbox("📅 Exercício Fiscal:", options=anos, key="ano_f")
-                    if d_fin := d_fin:
+                    if not d_fin.empty:
                         d_fluxo = d_fin if ano_sel == anos[0] else d_fin[d_fin['ano_mov'] == ano_sel]
                         d_saldo = d_fin if ano_sel == anos[0] else d_fin[d_fin['ano_mov'].astype(int) <= int(ano_sel)]
                         conta = d_fin['conta corrente'].iloc[0]
                         d_bc = df[df['conta corrente'] == conta] if conta != "Não Informada" else pd.DataFrame()
-                        d_bc_fluxo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'] == _ano_sel] if not d_bc.empty else pd.DataFrame())
-                        d_bc_saldo = d_bc if ano_sel == _anos[0] else (d_bc[d_bc['ano_mov'].astype(int) <= int(ano_sel)] if not d_bc.empty else pd.DataFrame())
+                        d_bc_fluxo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'] == ano_sel] if not d_bc.empty else pd.DataFrame())
+                        d_bc_saldo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'].astype(int) <= int(ano_sel)] if not d_bc.empty else pd.DataFrame())
                         
                         tot_ent = float(d_saldo['repasse'].sum() + d_saldo['rendimento'].sum())
                         tot_sai = float(d_saldo['bruto'].sum())
@@ -607,7 +590,7 @@ elif st.session_state.pagina_atual == 'emendas':
                 ano_p = st.selectbox("📅 Exercício Fiscal:", options=anos_p, key="ano_p")
                 if not dp.empty:
                     lbl_p = "Histórico Total" if ano_p == anos_p[0] else f"Exercício {ano_p}"
-                    dp_f = dp if ano_p == anos_p[0] else dp[dp['ano_mov'] ==_ano_p]; dp_s = dp if ano_p ==_anos_p[0] else dp[dp['ano_mov'].astype(int) <= int(ano_p)]
+                    dp_f = dp if ano_p == anos_p[0] else dp[dp['ano_mov'] == ano_p]; dp_s = dp if ano_p == anos_p[0] else dp[dp['ano_mov'].astype(int) <= int(ano_p)]
                     tot_ent_p = float(dp_s['repasse'].sum() + dp_s['rendimento'].sum()); tot_sai_p = float(dp_s['bruto'].sum()); sal_p = tot_ent_p - tot_sai_p
                     pct_disp_p = (sal_p / tot_ent_p * 100) if tot_ent_p > 0 else 0.0
 
@@ -650,8 +633,8 @@ elif st.session_state.pagina_atual == 'emendas':
                 anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in ds['ano_mov'].unique() if a not in ['', 'nan'] ])))
                 ano_s = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
                 if not ds.empty:
-                    lbl_s = "Histórico Total" if ano_s == _anos_s[0] else f"Exercício {ano_s}"
-                    ds_f = ds if ano_s == anos_s[0] else ds[ds['ano_mov'] ==_ano_s]; ds_s = ds if ano_s ==_anos_s[0] else ds[ds['ano_mov'].astype(int) <= int(ano_s)]
+                    lbl_s = "Histórico Total" if ano_s == anos_s[0] else f"Exercício {ano_s}"
+                    ds_f = ds if ano_s == anos_s[0] else ds[ds['ano_mov'] == ano_s]; ds_s = ds if ano_s == anos_s[0] else ds[ds['ano_mov'].astype(int) <= int(ano_s)]
                     tot_ent_s = float(ds_s['repasse'].sum() + ds_s['rendimento'].sum()); tot_sai_s = float(ds_s['bruto'].sum()); sal_s = tot_ent_s - tot_sai_s
                     pct_disp_s = (sal_s / tot_ent_s * 100) if tot_ent_s > 0 else 0.0
                     
@@ -666,7 +649,7 @@ elif st.session_state.pagina_atual == 'emendas':
 
                     with c_tab_s:
                         st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 EXTRATO DA PASTA ({lbl_s})</div>", unsafe_allow_html=True)
-                        st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
+                        st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:#059669;'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:#2563eb;'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:#dc2626;'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE DA PASTA</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
 
                     st.markdown(f"<div class='section-title'>⚖️ Detalhamento por Fonte de Recurso</div>", unsafe_allow_html=True)
                     fontes_da_secretaria = sorted([f for f in ds_s['fonte_clean'].unique() if f != '']); linhas_fontes_sec = []
@@ -689,7 +672,7 @@ elif st.session_state.pagina_atual == 'emendas':
                 ano_d = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
                 if not dd.empty:
                     lbl_d = "Histórico Total" if  ano_d == anos_d[0] else f"Exercício {ano_d}"
-                    dd_f = dd if  ano_d == anos_d[0] else dd[dd['ano_mov'] ==  ano_d]; dd_s = dd if  ano_d ==_ano_d[0] else dd[dd['ano_mov'].astype(int) <= int( ano_d)]
+                    dd_f = dd if  ano_d == anos_d[0] else dd[dd['ano_mov'] ==  ano_d]; dd_s = dd if  ano_d == anos_d[0] else dd[dd['ano_mov'].astype(int) <= int( ano_d)]
                     tot_ent_d = float(dd_s['repasse'].sum() + dd_s['rendimento'].sum()); tot_sai_d = float(dd_s['bruto'].sum()); sal_d = tot_ent_d - tot_sai_d
                     pct_disp_d = (sal_d / tot_ent_d * 100) if tot_ent_d > 0 else 0.0
 
@@ -712,8 +695,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         if fi == '': continue
                         df_grupo_fluxo = dd_f[(dd_f['fonte_clean'] == fi) & (dd_f['secretaria'] == sec)]
                         linhas_detalhe_dep.append({'Fonte Vinculada': fi.upper(), 'Secretaria': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())})
-                    if linhas_detalhe_dep: 
-                        st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
+                    if linhas_detalhe_dep: st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
         
         with tab_geral:
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
