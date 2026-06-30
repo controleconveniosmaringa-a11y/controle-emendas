@@ -60,7 +60,7 @@ st.markdown("""<style>
 # 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=3600)
 def obter_base_dados_global():
-    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3) # Horário de Brasília
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
     try:
@@ -135,19 +135,28 @@ def obter_base_credito():
         else: return pd.DataFrame()
     if df_raw.empty: return pd.DataFrame()
     
-    # Padroniza cabeçalhos em caixa alta
-    df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
-    df = pd.DataFrame()
-    def ext_c(nome):
-        return [str(i).strip() for i in df_raw[nome]] if nome in df_raw.columns else [''] * len(df_raw)
+    # Dicionário de mapeamento flexível (Remove espaços, acentos e pontuação para comparar)
+    col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
+    
+    def ext_c(chave_exata, chave_parcial):
+        # 1. Tenta achar pela chave exata
+        c_real = next((orig for limpo, orig in col_orig.items() if chave_exata in limpo), None)
+        # 2. Tenta pela chave parcial (fallback inteligente)
+        if not c_real:
+            c_real = next((orig for limpo, orig in col_orig.items() if chave_parcial in limpo), None)
+            
+        if c_real:
+            return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[c_real]]
+        return [''] * len(df_raw)
         
-    df['EMPENHO'] = ext_c('EMPENHO')
-    df['FORNECEDOR'] = ext_c('FORNECEDOR')
-    df['TIPO DE DOCUMENTO'] = ext_c('TIPO DE DOCUMENTO')
-    df['Nº DOCUMENTO'] = ext_c('Nº DOCUMENTO')
-    df['DESCRIÇÃO'] = ext_c('DESCRIÇÃO')
-    df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('REF VALOR REPASSADO')]
-    df['LINK DOCUMENTO'] = ext_c('LINK DOCUMENTO')
+    df = pd.DataFrame()
+    df['EMPENHO'] = ext_c('empenho', 'empenho')
+    df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
+    df['TIPO DE DOCUMENTO'] = ext_c('tipo de documento', 'tipo')
+    df['Nº DOCUMENTO'] = ext_c('n documento', 'documento')
+    df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
+    df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('ref valor', 'ref')]
+    df['LINK DOCUMENTO'] = ext_c('link documento', 'link')
     
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
@@ -157,8 +166,9 @@ def obter_base_credito():
         try: return float(v_str)
         except ValueError: return 0.0
 
-    df['REPASSE'] = [limpar_moeda(v) for v in ext_c('REPASSE')]
-    df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('VALOR DESPESA')]
+    # Busca dupla garantida: primeiro procura a palavra exata, senão procura apenas 'repasse'/'despesa'
+    df['REPASSE'] = [limpar_moeda(v) for v in ext_c('repasse', 'repasse')]
+    df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valor despesa', 'despesa')]
     return df
 
 df, att_emendas = obter_base_dados_global()
@@ -219,6 +229,11 @@ elif st.session_state.pagina_atual == 'finisa':
             for i, aba_nome in enumerate(abas_disponiveis):
                 with tabs_cred[i]:
                     df_aba = df_cred[df_cred['REF VALOR REPASSADO'] == aba_nome]
+                    
+                    # Usa head(1) para não somar o repasse se ele se repetir em todas as linhas do mesmo lote, 
+                    # ou soma se for uma base onde o repasse entra picado. 
+                    # Como geralmente o 'valor repassado' é informado na linha da despesa ou topo:
+                    # Assumimos que a soma total dos repasses daquela ref. menos despesas dá o saldo.
                     total_repasse = df_aba['REPASSE'].sum()
                     total_despesa = df_aba['VALOR DESPESA'].sum()
                     saldo_disponivel = total_repasse - total_despesa
@@ -233,14 +248,21 @@ elif st.session_state.pagina_atual == 'finisa':
                     df_exibicao = pd.DataFrame({
                         'Empenho': df_aba['EMPENHO'],
                         'Fornecedor': df_aba['FORNECEDOR'],
-                        'Tipo de Documento': df_aba['TIPO DE DOCUMENTO'],
-                        'Nº Documento': df_aba['Nº DOCUMENTO'],
+                        'Tipo Doc': df_aba['TIPO DE DOCUMENTO'],
+                        'Nº Doc': df_aba['Nº DOCUMENTO'],
                         'Descrição': df_aba['DESCRIÇÃO'],
                         'Valor Despesa': df_aba['VALOR DESPESA'],
                         'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])],
                         'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])]
                     })
-                    st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+                    
+                    # Filtra apenas linhas que possuem alguma despesa registrada para exibir na tabela
+                    df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
+                    
+                    if not df_exibicao.empty:
+                        st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+                    else:
+                        st.info("ℹ️ Nenhuma despesa foi lançada para esta referência de repasse.")
     else: st.info("ℹ️ A base de dados de Crédito está vazia ou aguardando o envio do Sheets.")
 
 # --- TELA USINA FOTOVOLTAICA DINÂMICA ---
@@ -255,6 +277,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             for i, aba_nome in enumerate(abas_disponiveis):
                 with tabs_cred[i]:
                     df_aba = df_cred[df_cred['REF VALOR REPASSADO'] == aba_nome]
+                    
                     total_repasse = df_aba['REPASSE'].sum()
                     total_despesa = df_aba['VALOR DESPESA'].sum()
                     saldo_disponivel = total_repasse - total_despesa
@@ -269,16 +292,26 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
                     df_exibicao = pd.DataFrame({
                         'Empenho': df_aba['EMPENHO'],
                         'Fornecedor': df_aba['FORNECEDOR'],
-                        'Tipo de Documento': df_aba['TIPO DE DOCUMENTO'],
-                        'Nº Documento': df_aba['Nº DOCUMENTO'],
+                        'Tipo Doc': df_aba['TIPO DE DOCUMENTO'],
+                        'Nº Doc': df_aba['Nº DOCUMENTO'],
                         'Descrição': df_aba['DESCRIÇÃO'],
                         'Valor Despesa': df_aba['VALOR DESPESA'],
                         'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])],
                         'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_aba['LINK DOCUMENTO'], df_aba['EMPENHO'], df_aba['Nº DOCUMENTO'])]
                     })
-                    st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+                    
+                    df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
+                    
+                    if not df_exibicao.empty:
+                        st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+                    else:
+                        st.info("ℹ️ Nenhuma despesa foi lançada para esta referência de repasse.")
     else: st.info("ℹ️ A base de dados de Crédito está vazia ou aguardando o envio do Sheets.")
 
+
+# ==============================================================================
+# O RESTANTE DOS MÓDULOS (CONVÊNIOS E EMENDAS) CONTINUA INTACTO
+# ==============================================================================
 elif st.session_state.pagina_atual == 'convenios':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">Divisão Controle Convênios</div></div>', unsafe_allow_html=True)
