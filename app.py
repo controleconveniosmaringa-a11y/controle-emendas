@@ -141,6 +141,7 @@ def obter_base_credito():
             att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
         else: return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
+    
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     def ext_c(chave_exata, chave_parcial):
         for limpo, orig in list(col_orig.items()):
@@ -150,6 +151,7 @@ def obter_base_credito():
             if chave_parcial in limpo:
                 del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         return [''] * len(df_raw)
+        
     df = pd.DataFrame()
     if ext_c('programa', 'programa') == [''] * len(df_raw): df['PROGRAMA'] = ['NÃO ESPECIFICADO'] * len(df_raw)
     else: df['PROGRAMA'] = [str(i).upper().strip() if str(i).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for i in df_raw['PROGRAMA'] ] if 'PROGRAMA' in df_raw.columns else ['NÃO ESPECIFICADO'] * len(df_raw)
@@ -362,7 +364,10 @@ elif st.session_state.pagina_atual == 'convenios':
                         a_final = a_dig if a_dig in analistas else a_sel
                         if a_final:
                             df_filtro_a = df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final]
-                            st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div></div>''', unsafe_allow_html=True)
+                            st.markdown(f'''<div class='kpi-row-container'>
+                                <div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div>
+                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div>
+                            </div>''', unsafe_allow_html=True)
                             st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
                             st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
             with tab_conv_busca:
@@ -374,14 +379,78 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
     else: st.warning("A base de dados de convênios não foi localizada ou está vazia.")
 
-# --- MÓDULO: EMENDAS ORÇAMENTÁRIAS COM NOVOS GRÁFICOS ---
+# --- MÓDULO: EMENDAS ORÇAMENTÁRIAS COM ABA DE RESUMO EXECUTIVO ---
 elif st.session_state.pagina_atual == 'emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     if not df.empty:
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
-        tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs(["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"])
         
+        # INCLUSÃO DA NOVA ABA DE RESUMO
+        tab_resumo, tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
+            "🚀 Resumo Executivo", "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
+        ])
+        
+        # === 🚀 ABA 1: RESUMO EXECUTIVO ===
+        with tab_resumo:
+            st.markdown("<div class='section-title'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
+            
+            # Agrupa dados por fonte_clean
+            df_fontes = df.groupby('fonte_clean').agg({
+                'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum',
+                'deputado': 'first', 'secretaria': 'first'
+            }).reset_index()
+            
+            df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
+            df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
+            
+            # 1. Top 5 Fontes com Maior Saldo
+            df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
+            
+            # 2. Fontes Aguardando Recursos (Inativas)
+            df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
+            
+            # 3. Emendas Finalizadas (Movimentadas, mas saldo zerado)
+            df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
+            
+            st.markdown("### 🏆 Top 5 Fontes com Maior Saldo Disponível")
+            if not df_top5.empty:
+                fig_top5 = go.Figure(go.Bar(
+                    x=df_top5['fonte_clean'].str.upper(),
+                    y=df_top5['saldo'],
+                    text=[fmt(v) for v in df_top5['saldo']],
+                    textposition='auto',
+                    marker_color='#059669'
+                ))
+                fig_top5.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
+                st.plotly_chart(fig_top5, use_container_width=True)
+                
+                df_top_show = df_top5[['fonte_clean', 'deputado', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+                df_top_show['FONTE'] = df_top_show['FONTE'].str.upper()
+                st.dataframe(df_top_show.style.format({'SALDO DISPONÍVEL': fmt}), use_container_width=True, hide_index=True)
+            else:
+                st.info("Nenhuma fonte com saldo positivo disponível no momento.")
+                
+            c_ag, c_fin = st.columns(2, gap="large")
+            with c_ag:
+                st.markdown("<div class='section-title'>⏳ Aguardando Recursos (Sem Movimentação)</div>", unsafe_allow_html=True)
+                if not df_aguardando.empty:
+                    df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
+                    df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
+                    st.dataframe(df_ag_show, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Não há fontes aguardando recursos.")
+                    
+            with c_fin:
+                st.markdown("<div class='section-title'>✅ Fontes Finalizadas (100% Executadas)</div>", unsafe_allow_html=True)
+                if not df_finalizadas.empty:
+                    df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
+                    df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
+                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}), use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nenhuma fonte/emenda foi 100% finalizada ainda.")
+
+        # === 🎯 ABA 2: POR FONTE ===
         with tab_ativa:
             st.markdown("<div class='section-title'> 🎯 Painel Híbrido: Pesquisa e Seleção de Fonte</div>", unsafe_allow_html=True)
             if fontes:
@@ -451,6 +520,7 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("ℹ️ Nenhum lançamento no período.")
 
+        # === 📋 ABA 3: POR PLANO ===
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano</div>", unsafe_allow_html=True)
             planos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -502,6 +572,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum lançamento no período.")
 
+        # === 🏛️ ABA 4: POR SECRETARIA ===
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria</div>", unsafe_allow_html=True)
             secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
@@ -548,6 +619,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         })
                     if linhas_fontes_sec: st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre da Fonte': fmt}), use_container_width=True, hide_index=True)
         
+        # === 🔍 ABA 5: POR DEPUTADO ===
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar</div>", unsafe_allow_html=True)
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
@@ -594,6 +666,7 @@ elif st.session_state.pagina_atual == 'emendas':
                             'Fonte Vinculada': fi.upper(), 'Secretaria Contemplada': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())
                         })
                     if linhas_detalhe_dep: st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}), use_container_width=True, hide_index=True)
+        
         with tab_geral:
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
             df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
