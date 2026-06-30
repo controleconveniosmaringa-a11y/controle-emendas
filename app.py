@@ -5,6 +5,7 @@ import re
 import os
 import unicodedata
 import datetime
+import urllib.parse
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -235,7 +236,6 @@ def style_abertura_banco(row):
     elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: #e0f2fe; color: #0369a1; font-weight: 700;'] * len(row)
     return [''] * len(row)
 
-
 # ==============================================================================
 # ROTEAMENTO DAS TELAS
 # ==============================================================================
@@ -247,52 +247,20 @@ if st.session_state.pagina_atual == 'menu_principal':
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
-    # Renderização do Novo Banner Executivo e Colorido (RÁPIDO SEM API CLIMA)
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); padding: 60px 20px; border-radius: 20px; text-align: center; margin-top: 10px; margin-bottom: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); position: relative; overflow: hidden; border: 1px solid #7dd3fc;">
-        
-        <!-- WIDGET SUPERIOR DIREITO RÁPIDO -->
-        <div style="position: absolute; top: 15px; right: 20px; font-size: 13px; color: #ffffff; font-weight: 600; display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.25); padding: 8px 18px; border-radius: 30px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);">
-            <span style="display:flex; align-items:center; gap:5px;">📍 Maringá, PR</span>
-            <span style="display:flex; align-items:center; gap:5px;">📅 {data_str}</span>
-            <span style="display:flex; align-items:center; gap:5px;">🕒 {hora_str}</span>
-        </div>
-        
-        <h1 style="font-size: 52px; font-weight: 900; color: #ffffff; margin: 0; margin-top: 20px; letter-spacing: -1.5px; text-transform: uppercase; text-shadow: 2px 4px 8px rgba(0,0,0,0.2);">Portal Gestão Pública</h1>
-        <p style="color: #e0f2fe; font-size: 18px; font-weight: 500; margin-top: 10px; letter-spacing: 0.5px;">Monitoramento Inteligente de Convênios, Créditos e Emendas</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Renderização do Novo Banner (Achatei o HTML para evitar conflito com Markdown)
+    st.markdown(f"<div style='background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); padding: 60px 20px; border-radius: 20px; text-align: center; margin-top: 10px; margin-bottom: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); position: relative; overflow: hidden; border: 1px solid #7dd3fc;'><div style='position: absolute; top: 15px; right: 20px; font-size: 13px; color: #ffffff; font-weight: 600; display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.25); padding: 8px 18px; border-radius: 30px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div><h1 style='font-size: 52px; font-weight: 900; color: #ffffff; margin: 0; margin-top: 20px; letter-spacing: -1.5px; text-transform: uppercase; text-shadow: 2px 4px 8px rgba(0,0,0,0.2);'>Portal Gestão Pública</h1><p style='color: #e0f2fe; font-size: 18px; font-weight: 500; margin-top: 10px; letter-spacing: 0.5px;'>Monitoramento Inteligente de Convênios, Créditos e Emendas</p></div>", unsafe_allow_html=True)
     
-    # 3. Os 3 Módulos com Cores Independentes e Modernas
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
-        st.markdown(f"""
-        <div class='home-card' style='background: linear-gradient(135deg, #fdf4ff 0%, #f3e8ff 100%); border-color: #e9d5ff;'>
-            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>📊</span>
-            <div class='home-title' style='color: #6b21a8;'>Emendas Orçamentárias</div>
-            <div class='home-subtitle' style='color: #9333ea;'>🔄 Última Atualização: {att_emendas}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='home-card' style='background: linear-gradient(135deg, #fdf4ff 0%, #f3e8ff 100%); border-color: #e9d5ff;'><span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>📊</span><div class='home-title' style='color: #6b21a8;'>Emendas Orçamentárias</div><div class='home-subtitle' style='color: #9333ea;'>🔄 Última Atualização: {att_emendas}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Emendas", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
         
     with c2:
-        st.markdown(f"""
-        <div class='home-card' style='background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-color: #bbf7d0;'>
-            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🏦</span>
-            <div class='home-title' style='color: #065f46;'>Operações de Crédito</div>
-            <div class='home-subtitle' style='color: #059669;'>🔄 Status: Monitoramento Ativo</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='home-card' style='background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-color: #bbf7d0;'><span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🏦</span><div class='home-title' style='color: #065f46;'>Operações de Crédito</div><div class='home-subtitle' style='color: #059669;'>🔄 Status: Monitoramento Ativo</div></div>", unsafe_allow_html=True)
         st.button("Acessar Crédito", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
         
     with c3:
-        st.markdown(f"""
-        <div class='home-card' style='background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a;'>
-            <span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🤝</span>
-            <div class='home-title' style='color: #92400e;'>Divisão Convênios</div>
-            <div class='home-subtitle' style='color: #d97706;'>🔄 Última Atualização: {att_convenios}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='home-card' style='background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a;'><span style='font-size: 60px; display:block; margin-bottom:10px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.1));'>🤝</span><div class='home-title' style='color: #92400e;'>Divisão Convênios</div><div class='home-subtitle' style='color: #d97706;'>🔄 Última Atualização: {att_convenios}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Convênios", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
 elif st.session_state.pagina_atual == 'credito':
@@ -318,12 +286,7 @@ elif st.session_state.pagina_atual == 'finisa':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'>
-                    <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#475569; margin-top:4px;'><b>Aporte Atual:</b> {fmt(info['repasse_atual'])}<br><b>Saldo Anterior Remanescente:</b> {fmt(info['saldo_anterior'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div>
-                    <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#2563eb; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_gasta:.2f}%</div></div>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#475569; margin-top:4px;'><b>Aporte Atual:</b> {fmt(info['repasse_atual'])}<br><b>Saldo Anterior Remanescente:</b> {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#2563eb; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DE UTILIZAÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -356,12 +319,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'>
-                    <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#475569; margin-top:4px;'><b>Aporte Atual:</b> {fmt(info['repasse_atual'])}<br><b>Saldo Anterior Remanescente:</b> {fmt(info['saldo_anterior'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div>
-                    <div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#2563eb; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div>
-                    <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_gasta:.2f}%</div></div>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:#475569; margin-top:4px;'><b>Aporte Atual:</b> {fmt(info['repasse_atual'])}<br><b>Saldo Anterior Remanescente:</b> {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 6px solid #dc2626;'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:#dc2626;'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:#2563eb; margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DE UTILIZAÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -445,12 +403,8 @@ elif st.session_state.pagina_atual == 'emendas':
             "🚀 Resumo Executivo", "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        # ==============================================================================
-        # 🚀 ABA 1: RESUMO EXECUTIVO DASHBOARD
-        # ==============================================================================
         with tab_resumo:
             st.markdown("<div class='section-title' style='font-size:18px;'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
-            
             df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
             df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
             df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
@@ -461,10 +415,7 @@ elif st.session_state.pagina_atual == 'emendas':
             
             c_ag, c_fin = st.columns(2, gap="large")
             with c_ag:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #f59e0b; margin-bottom: 15px;'>
-                    <div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div>
-                    <div class='kpi-value' style='color:#f59e0b;'>{len(df_aguardando)} Emenda(s)</div>
-                </div>''', unsafe_allow_html=True)
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #f59e0b; margin-bottom: 15px;'><div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div><div class='kpi-value' style='color:#f59e0b;'>{len(df_aguardando)} Emenda(s)</div></div>''', unsafe_allow_html=True)
                 if not df_aguardando.empty:
                     df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
                     df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
@@ -472,10 +423,7 @@ elif st.session_state.pagina_atual == 'emendas':
                 else: st.info("Nenhuma fonte aguardando recursos.")
 
             with c_fin:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #3b82f6; margin-bottom: 15px;'>
-                    <div class='kpi-label'>✅ Emendas Finalizadas</div>
-                    <div class='kpi-value' style='color:#3b82f6;'>{len(df_finalizadas)} Emenda(s)</div>
-                </div>''', unsafe_allow_html=True)
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #3b82f6; margin-bottom: 15px;'><div class='kpi-label'>✅ Emendas Finalizadas</div><div class='kpi-value' style='color:#3b82f6;'>{len(df_finalizadas)} Emenda(s)</div></div>''', unsafe_allow_html=True)
                 if not df_finalizadas.empty:
                     df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                     df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
@@ -484,43 +432,24 @@ elif st.session_state.pagina_atual == 'emendas':
             
             st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
             st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 20px;'>Comparativo entre Gasto Liquidado e Saldo Restante para as 5 fontes com mais recursos em caixa.</p>", unsafe_allow_html=True)
-            
             if not df_top5.empty:
                 cols = st.columns(len(df_top5))
                 for i, (_, row) in enumerate(df_top5.iterrows()):
                     with cols[i]:
-                        fig = go.Figure(data=[go.Pie(
-                            labels=['Gasto Liquidado', 'Saldo Disponível'],
-                            values=[row['bruto'], max(0, row['saldo'])],
-                            hole=0.6,
-                            marker=dict(colors=['#ef4444', '#10b981']),
-                            textinfo='none' 
-                        )])
+                        fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
                         fig.update_traces(hovertemplate='%{label}: <br>%{value:$,.2f}')
-                        fig.update_layout(
-                            title_text=f"Fonte: {str(row['fonte_clean']).upper()}",
-                            title_x=0.5,
-                            title_font_size=15,
-                            height=240,
-                            margin=dict(l=10, r=10, t=40, b=10),
-                            showlegend=False,
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            annotations=[dict(text=f"<b style='color:#065f46;'>{fmt(row['saldo'])}</b><br><span style='font-size:11px; color:#64748b;'>Disponível</span>", x=0.5, y=0.5, showarrow=False, font=dict(size=14))]
-                        )
+                        fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=15, height=240, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#065f46;'>{fmt(row['saldo'])}</b><br><span style='font-size:11px; color:#64748b;'>Disponível</span>", x=0.5, y=0.5, showarrow=False, font=dict(size=14))])
                         st.plotly_chart(fig, use_container_width=True)
             else: st.info("Nenhuma fonte com saldo positivo disponível no momento.")
 
             st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
             st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>Role para baixo para visualizar todas as fontes ativas, organizadas do maior para o menor saldo.</p>", unsafe_allow_html=True)
-            
             df_todas = df_fontes.sort_values(by='saldo', ascending=False)
             df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
             df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
             tabela_todas_colorida = df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL'])
             st.dataframe(tabela_todas_colorida, use_container_width=True, hide_index=True, height=450)
                     
-        # === 🎯 ABA 2: POR FONTE ===
         with tab_ativa:
             st.markdown("<div class='section-title'> 🎯 Painel Híbrido: Pesquisa e Seleção de Fonte</div>", unsafe_allow_html=True)
             if fontes:
@@ -547,11 +476,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         sal_banco = float(d_bc_saldo['repasse'].sum() + d_bc_saldo['rendimento'].sum()) - float(d_bc_saldo['bruto'].sum()) if not d_bc_saldo.empty else sal_fonte
                         lbl = "Histórico Total" if ano_sel == anos[0] else f"Exercício {ano_sel}"
                         
-                        st.markdown(f'''<div class='kpi-row-container'>
-                            <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>🎯 Saldo Fonte ({lbl})</div><div class='kpi-value'>{fmt(sal_fonte)}</div></div>
-                            <div class='kpi-card-head-blue'><div class='kpi-label' style='color:#1e40af;'>🏦 Saldo Conta: {conta}</div><div class='kpi-value' style='color:#2563eb;'>{fmt(sal_banco)}</div></div>
-                            <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível na Fonte</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp:.2f}%</div></div>
-                        </div>''', unsafe_allow_html=True)
+                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>🎯 Saldo Fonte ({lbl})</div><div class='kpi-value'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label' style='color:#1e40af;'>🏦 Saldo Conta: {conta}</div><div class='kpi-value' style='color:#2563eb;'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível na Fonte</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp:.2f}%</div></div></div>''', unsafe_allow_html=True)
                         st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {d_fin['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {d_fin['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {d_fin['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
                         
                         c_graf, c_tab = st.columns([1, 1])
@@ -591,7 +516,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("ℹ️ Nenhum lançamento no período.")
 
-        # === 📋 ABA 3: POR PLANO ===
         with tab_planos:
             st.markdown("<div class='section-title'> 📋 Painel Híbrido: Pesquisa e Seleção de Plano</div>", unsafe_allow_html=True)
             planos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
@@ -612,11 +536,7 @@ elif st.session_state.pagina_atual == 'emendas':
                     sal_p = tot_ent_p - tot_sai_p
                     pct_disp_p = (sal_p / tot_ent_p * 100) if tot_ent_p > 0 else 0.0
 
-                    st.markdown(f'''<div class='kpi-row-container'>
-                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value'>{p_fin}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_p})</div><div class='kpi-value'>{fmt(sal_p)}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_p:.2f}%</div></div>
-                    </div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value'>{p_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_p})</div><div class='kpi-value'>{fmt(sal_p)}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_p:.2f}%</div></div></div>''', unsafe_allow_html=True)
                     st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(dp['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {dp['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {dp['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🏦 Conta: {dp['conta corrente'].iloc[0]}</div></div>''', unsafe_allow_html=True)
                     
                     c_graf_p, c_tab_p = st.columns([1, 1])
@@ -643,7 +563,6 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                     else: st.info("ℹ️ Nenhum lançamento no período.")
 
-        # === 🏛️ ABA 4: POR SECRETARIA ===
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Painel Gestor: Investigação por Secretaria</div>", unsafe_allow_html=True)
             secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
@@ -664,11 +583,7 @@ elif st.session_state.pagina_atual == 'emendas':
                     sal_s = tot_ent_s - tot_sai_s
                     pct_disp_s = (sal_s / tot_ent_s * 100) if tot_ent_s > 0 else 0.0
                     
-                    st.markdown(f'''<div class='kpi-row-container'>
-                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value'>{s_fin}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_s})</div><div class='kpi-value'>{fmt(sal_s)}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_s:.2f}%</div></div>
-                    </div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value'>{s_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo ({lbl_s})</div><div class='kpi-value'>{fmt(sal_s)}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_s:.2f}%</div></div></div>''', unsafe_allow_html=True)
 
                     c_graf_s, c_tab_s = st.columns([1, 1])
                     with c_graf_s:
@@ -685,13 +600,10 @@ elif st.session_state.pagina_atual == 'emendas':
                     fontes_da_secretaria = sorted([f for f in ds_s['fonte_clean'].unique() if f != '']); linhas_fontes_sec = []
                     for fi in fontes_da_secretaria:
                         df_i_fluxo = ds_f[ds_f['fonte_clean'] == fi]; df_i_saldo = ds_s[ds_s['fonte_clean'] == fi]
-                        linhas_fontes_sec.append({
-                            'Fonte Vinculada': fi.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre da Fonte': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())
-                        })
+                        linhas_fontes_sec.append({'Fonte Vinculada': fi.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre da Fonte': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())})
                     if linhas_fontes_sec:
                         st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre da Fonte': fmt}).apply(highlight_saldo_verde, subset=['Saldo Livre da Fonte']), use_container_width=True, hide_index=True)
         
-        # === 🔍 ABA 5: POR DEPUTADO ===
         with tab_deputados:
             st.markdown("<div class='section-title'>🔍 Painel Parlamentar</div>", unsafe_allow_html=True)
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
@@ -712,11 +624,7 @@ elif st.session_state.pagina_atual == 'emendas':
                     sal_d = tot_ent_d - tot_sai_d
                     pct_disp_d = (sal_d / tot_ent_d * 100) if tot_ent_d > 0 else 0.0
 
-                    st.markdown(f'''<div class='kpi-row-container'>
-                        <div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value'>{d_fin}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo Consolidado ({lbl_d})</div><div class='kpi-value'>{fmt(sal_d)}</div></div>
-                        <div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_d:.2f}%</div></div>
-                    </div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 6px solid #2563eb;'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value'>{d_fin}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>💰 Saldo Consolidado ({lbl_d})</div><div class='kpi-value'>{fmt(sal_d)}</div></div><div class='kpi-card-head' style='border-left: 6px solid #8b5cf6;'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:#8b5cf6;'>{pct_disp_d:.2f}%</div></div></div>''', unsafe_allow_html=True)
                     
                     c_graf_d, c_tab_d = st.columns([1, 1])
                     with c_graf_d:
@@ -734,11 +642,8 @@ elif st.session_state.pagina_atual == 'emendas':
                     for (fi, sec), df_grupo_saldo in grupo_deputado:
                         if fi == '': continue
                         df_grupo_fluxo = dd_f[(dd_f['fonte_clean'] == fi) & (dd_f['secretaria'] == sec)]
-                        linhas_detalhe_dep.append({
-                            'Fonte Vinculada': fi.upper(), 'Secretaria Contemplada': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())
-                        })
-                    if linhas_detalhe_dep: 
-                        st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
+                        linhas_detalhe_dep.append({'Fonte Vinculada': fi.upper(), 'Secretaria Contemplada': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())})
+                    if linhas_detalhe_dep: st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
         
         with tab_geral:
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
