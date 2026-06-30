@@ -364,10 +364,7 @@ elif st.session_state.pagina_atual == 'convenios':
                         a_final = a_dig if a_dig in analistas else a_sel
                         if a_final:
                             df_filtro_a = df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final]
-                            st.markdown(f'''<div class='kpi-row-container'>
-                                <div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div>
-                                <div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div>
-                            </div>''', unsafe_allow_html=True)
+                            st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Analista Selecionado</div><div class='kpi-value' style='color: #0f172a; font-size: 26px;'>{a_final}</div></div><div class='kpi-card-head' style='border-left: 6px solid #059669;'><div class='kpi-label'>📋 Total de Convênios</div><div class='kpi-value'>{len(df_filtro_a)}</div></div></div>''', unsafe_allow_html=True)
                             st.markdown("<div class='section-title'>📋 Convênios sob responsabilidade do Analista</div>", unsafe_allow_html=True)
                             st.dataframe(df_filtro_a, use_container_width=True, hide_index=True)
             with tab_conv_busca:
@@ -385,7 +382,6 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        # INCLUSÃO DA NOVA ABA DE RESUMO
         tab_resumo, tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
             "🚀 Resumo Executivo", "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
@@ -396,70 +392,78 @@ elif st.session_state.pagina_atual == 'emendas':
         with tab_resumo:
             st.markdown("<div class='section-title' style='font-size:18px;'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
             
-            # Agrupa dados por fonte_clean para gerar o painel inteligente
             df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
             df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
             df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
             
-            # 1. Top 5 Fontes com Maior Saldo
             df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
-            # 2. Fontes Aguardando Recursos (Inativas)
             df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
-            # 3. Emendas Finalizadas (Movimentadas, mas saldo zerado)
             df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
             
-            # LAYOUT SUPERIOR: Gráfico Rosca Top 5 + Tabela Aguardando Recursos
-            c_chart, c_await = st.columns([1, 1], gap="large")
-            
-            with c_chart:
-                st.markdown("### 🍩 Top 5 Fontes (Maior Saldo)")
-                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>As 5 fontes com o maior volume de recursos em caixa.</p>", unsafe_allow_html=True)
-                if not df_top5.empty:
-                    fig_top5 = go.Figure(data=[go.Pie(
-                        labels=df_top5['fonte_clean'].str.upper(),
-                        values=df_top5['saldo'],
-                        hole=.5,
-                        textinfo='label+percent',
-                        hoverinfo='label+value',
-                        marker=dict(colors=['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'])
-                    )])
-                    fig_top5.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), showlegend=False)
-                    st.plotly_chart(fig_top5, use_container_width=True)
-                else:
-                    st.info("Nenhuma fonte com saldo positivo disponível no momento.")
-                    
-            with c_await:
-                st.markdown("### ⏳ Aguardando Recursos")
-                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Fontes cadastradas sem movimentação financeira de entrada ou saída.</p>", unsafe_allow_html=True)
+            # LAYOUT SUPERIOR: Aguardando Recursos e Finalizadas
+            c_ag, c_fin = st.columns(2, gap="large")
+            with c_ag:
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #f59e0b; margin-bottom: 10px;'>
+                    <div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div>
+                    <div class='kpi-value' style='color:#f59e0b;'>{len(df_aguardando)} Emenda(s)</div>
+                </div>''', unsafe_allow_html=True)
                 if not df_aguardando.empty:
                     df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
                     df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
-                    st.dataframe(df_ag_show, use_container_width=True, hide_index=True, height=320)
-                else:
-                    st.info("Excelente! Não há fontes aguardando recursos.")
+                    st.dataframe(df_ag_show, use_container_width=True, hide_index=True, height=200)
+                else: st.info("Nenhuma fonte aguardando recursos.")
 
-            st.markdown("---")
-            
-            # LAYOUT INFERIOR: Lista completa crescente + Lista Finalizadas
-            c_all, c_fin = st.columns([1.5, 1], gap="large")
-            
-            with c_all:
-                st.markdown("### 📋 Todas as Fontes (Ordem Crescente de Saldo)")
-                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Role para baixo para visualizar todas as fontes ativas, organizadas do menor para o maior saldo.</p>", unsafe_allow_html=True)
-                df_todas = df_fontes.sort_values(by='saldo', ascending=True)
-                df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
-                df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
-                st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}), use_container_width=True, hide_index=True, height=400)
-                
             with c_fin:
-                st.markdown("### ✅ Emendas Finalizadas")
-                st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Fontes com repasse utilizado integralmente (Saldo exato de R$ 0,00).</p>", unsafe_allow_html=True)
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 6px solid #3b82f6; margin-bottom: 10px;'>
+                    <div class='kpi-label'>✅ Emendas Finalizadas</div>
+                    <div class='kpi-value' style='color:#3b82f6;'>{len(df_finalizadas)} Emenda(s)</div>
+                </div>''', unsafe_allow_html=True)
                 if not df_finalizadas.empty:
                     df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                     df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
-                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}), use_container_width=True, hide_index=True, height=400)
-                else:
-                    st.info("Nenhuma fonte/emenda foi 100% finalizada ainda.")
+                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}), use_container_width=True, hide_index=True, height=200)
+                else: st.info("Nenhuma fonte 100% executada no momento.")
+
+            st.markdown("---")
+            
+            # LAYOUT MEIO: 5 Gráficos de Rosca
+            st.markdown("### 🍩 Top 5 Fontes (Maior Saldo Disponível)")
+            st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Comparativo entre Gasto Liquidado e Saldo Restante para as 5 fontes com mais recursos em caixa.</p>", unsafe_allow_html=True)
+            
+            if not df_top5.empty:
+                cols = st.columns(len(df_top5))
+                for i, (_, row) in enumerate(df_top5.iterrows()):
+                    with cols[i]:
+                        fig = go.Figure(data=[go.Pie(
+                            labels=['Gasto Liquidado', 'Saldo Disponível'],
+                            values=[row['bruto'], max(0, row['saldo'])],
+                            hole=0.6,
+                            marker=dict(colors=['#dc2626', '#059669']),
+                            textinfo='none' 
+                        )])
+                        fig.update_traces(hovertemplate='%{label}: <br>%{value:$,.2f}')
+                        fig.update_layout(
+                            title_text=f"Fonte: {str(row['fonte_clean']).upper()}",
+                            title_x=0.5,
+                            title_font_size=14,
+                            height=220,
+                            margin=dict(l=10, r=10, t=40, b=10),
+                            showlegend=False,
+                            annotations=[dict(text=f"<b>{fmt(row['saldo'])}</b><br><span style='font-size:10px;'>Disponível</span>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))]
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+            else: st.info("Nenhuma fonte com saldo positivo disponível no momento.")
+            
+            st.markdown("---")
+
+            # LAYOUT INFERIOR: Tabela em ordem decrescente
+            st.markdown("### 📋 Todas as Fontes (Ordem Decrescente de Saldo)")
+            st.markdown("<p style='color: #64748b; font-size: 13px; margin-top: -10px;'>Role para baixo para visualizar todas as fontes ativas, organizadas do maior para o menor saldo.</p>", unsafe_allow_html=True)
+            
+            df_todas = df_fontes.sort_values(by='saldo', ascending=False)
+            df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+            df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
+            st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}), use_container_width=True, hide_index=True, height=400)
                     
         # === 🎯 ABA 2: POR FONTE ===
         with tab_ativa:
