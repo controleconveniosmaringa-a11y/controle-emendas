@@ -308,13 +308,14 @@ def processar_saldos_acumulados(df_programa):
         return dados_finais, abas
     return {}, []
 
-# --- FUNÇÕES PANDAS STYLER (CORES NAS TABELAS COMPATÍVEIS COM DARK MODE) ---
-def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.1); color: var(--success-val); font-weight: 800;' if v != '' else '' for v in col]
-def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.1); color: var(--blue-val); font-weight: 800;' if v != '' else '' for v in col]
-def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.1); color: var(--warning-val); font-weight: 600;'] * len(row)
+# --- FUNÇÕES PANDAS STYLER (CORREÇÃO DE TEXTO PARA DARK/LIGHT MODE) ---
+# Retiramos a trava de cor do texto, mantendo apenas a opacidade do fundo e o peso da fonte (negrito)
+def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.25); font-weight: 800;' if v != '' else '' for v in col]
+def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.25); font-weight: 800;' if v != '' else '' for v in col]
+def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.25); font-weight: 600;'] * len(row)
 def style_abertura_banco(row):
-    if 'TOTAL' in str(row['Fonte Orçamentária']): return ['background-color: var(--table-th-bg); color: var(--table-th-text); font-weight: 800;'] * len(row)
-    elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: rgba(37, 99, 235, 0.15); color: var(--blue-val); font-weight: 700;'] * len(row)
+    if 'TOTAL' in str(row['Fonte Orçamentária']): return ['background-color: rgba(148, 163, 184, 0.3); font-weight: 800;'] * len(row)
+    elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: rgba(37, 99, 235, 0.2); font-weight: 700;'] * len(row)
     return [''] * len(row)
 
 # ==============================================================================
@@ -384,7 +385,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
                 st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
@@ -402,7 +403,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
                 st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--success-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma despesa de crédito registrada.")
         else: st.info("Base de crédito vazia.")
@@ -430,7 +431,7 @@ elif st.session_state.pagina_atual == 'finisa':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -463,7 +464,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Recurso Disponível</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Aporte Atual: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Saldo Remanescente Atual</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
