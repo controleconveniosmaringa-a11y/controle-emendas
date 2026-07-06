@@ -147,8 +147,8 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS
-@st.cache_data(ttl=3600)
+# 3. CARREGAMENTO DOS BANCOS DE DADOS (CACHE REDUZIDO PARA 60s)
+@st.cache_data(ttl=60)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -197,7 +197,7 @@ def obter_base_dados_global():
     for c in ['repasse', 'rendimento', 'bruto']: df[c] = [limpar_moeda(v) for v in ext(c)]
     return df, att
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)
 def obter_base_convenios():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -215,7 +215,7 @@ def obter_base_convenios():
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)
 def obter_base_credito():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -308,8 +308,7 @@ def processar_saldos_acumulados(df_programa):
         return dados_finais, abas
     return {}, []
 
-# --- FUNÇÕES PANDAS STYLER (CORREÇÃO DE TEXTO PARA DARK/LIGHT MODE) ---
-# Retiramos a trava de cor do texto, mantendo apenas a opacidade do fundo e o peso da fonte (negrito)
+# --- FUNÇÕES PANDAS STYLER (CORES NAS TABELAS COMPATÍVEIS COM DARK MODE) ---
 def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.25); font-weight: 600;'] * len(row)
@@ -368,7 +367,15 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-title'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
+    # CABEÇALHO COM BOTÃO DE REFRESH
+    col_t_ult, col_btn_ult = st.columns([5, 1])
+    with col_t_ult:
+        st.markdown("<div class='section-title' style='margin-top:0;'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
+    with col_btn_ult:
+        if st.button("🔄 Atualizar Painel", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
     c_ult_1, c_ult_2 = st.columns(2, gap="large")
     
     with c_ult_1:
@@ -376,16 +383,20 @@ if st.session_state.pagina_atual == 'menu_principal':
         if not df.empty:
             df_em_mov = df[(df['bruto'] > 0) | (df['repasse'] > 0)].copy()
             if not df_em_mov.empty:
-                ultimas_emendas = df_em_mov.tail(5)[::-1]
+                # Ordenação Inteligente por Data (Decrescente) e Linha Original (Decrescente)
+                df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], format='%d/%m/%Y', errors='coerce')
+                df_em_mov['idx'] = df_em_mov.index
+                ultimas_emendas = df_em_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
+                
                 disp_emendas = pd.DataFrame({
                     'Data': ultimas_emendas['DATA_LANCAMENTO'],
+                    'Emenda': ultimas_emendas['emenda_clean'],
                     'Fonte': ultimas_emendas['fonte_clean'].str.upper(),
                     'Doc/Empenho': [f"NF: {n}" if n != '-' else (f"Emp: {e}" if e != '-' else "-") for e, n in zip(ultimas_emendas['EMPENHO_COL'], ultimas_emendas['NOTA_COL'])],
-                    'Tipo': ['Despesa' if b > 0 else 'Repasse' for b in ultimas_emendas['bruto']],
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
                 st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
@@ -403,7 +414,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
                 st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', 'var(--success-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma despesa de crédito registrada.")
         else: st.info("Base de crédito vazia.")
