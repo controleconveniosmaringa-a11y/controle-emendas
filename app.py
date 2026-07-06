@@ -6,6 +6,7 @@ import os
 import unicodedata
 import datetime
 import urllib.parse
+import time
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -147,12 +148,13 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS (CACHE REDUZIDO PARA 60s)
+# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE
 @st.cache_data(ttl=60)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
-    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv"
+    cache_buster = int(time.time())
+    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv?v={cache_buster}"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
@@ -201,7 +203,8 @@ def obter_base_dados_global():
 def obter_base_convenios():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
-    url = "https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
+    cache_buster = int(time.time())
+    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv?v={cache_buster}"
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
@@ -220,7 +223,8 @@ def obter_base_credito():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
     nome_arquivo = "operacoes_credito.csv"
-    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/{nome_arquivo}"
+    cache_buster = int(time.time())
+    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/{nome_arquivo}?v={cache_buster}"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
     except Exception:
@@ -308,7 +312,7 @@ def processar_saldos_acumulados(df_programa):
         return dados_finais, abas
     return {}, []
 
-# --- FUNÇÕES PANDAS STYLER (CORES NAS TABELAS COMPATÍVEIS COM DARK MODE) ---
+# --- FUNÇÕES PANDAS STYLER ---
 def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.25); font-weight: 600;'] * len(row)
@@ -367,7 +371,7 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # CABEÇALHO COM BOTÃO DE REFRESH
+    # BOTÃO PARA FORÇAR ATUALIZAÇÃO (QUEBRA O CACHE DO GITHUB)
     col_t_ult, col_btn_ult = st.columns([5, 1])
     with col_t_ult:
         st.markdown("<div class='section-title' style='margin-top:0;'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
@@ -383,7 +387,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         if not df.empty:
             df_em_mov = df[(df['bruto'] > 0) | (df['repasse'] > 0)].copy()
             if not df_em_mov.empty:
-                # Ordenação Inteligente por Data (Decrescente) e Linha Original (Decrescente)
+                # Agora o sistema pega as 5 mais RECENTES independente da posição na planilha
                 df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], format='%d/%m/%Y', errors='coerce')
                 df_em_mov['idx'] = df_em_mov.index
                 ultimas_emendas = df_em_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
@@ -406,7 +410,9 @@ if st.session_state.pagina_atual == 'menu_principal':
         if not df_cred_completo.empty:
             df_cr_mov = df_cred_completo[df_cred_completo['VALOR DESPESA'] > 0].copy()
             if not df_cr_mov.empty:
-                ultimas_cred = df_cr_mov.tail(5)[::-1]
+                # O mesmo para operações de crédito
+                df_cr_mov['idx'] = df_cr_mov.index
+                ultimas_cred = df_cr_mov.sort_values(by='idx', ascending=False).head(5)
                 disp_cred = pd.DataFrame({
                     'Programa': ultimas_cred['PROGRAMA'],
                     'Empenho/Doc': ultimas_cred['EMPENHO'] + " / " + ultimas_cred['Nº DOCUMENTO'],
@@ -475,7 +481,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
