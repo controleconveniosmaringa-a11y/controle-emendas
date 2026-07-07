@@ -334,16 +334,22 @@ if st.session_state.pagina_atual == 'menu_principal':
     
     st.markdown(f"<div style='background: var(--header-bg); padding: 45px 20px; border-radius: 12px; text-align: center; margin-top: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; border-bottom: 4px solid var(--blue-val);'><div style='position: absolute; top: 15px; right: 20px; font-size: 12px; color: var(--text-muted); font-weight: 600; display: flex; gap: 15px; align-items: center; background: var(--card-bg); padding: 6px 14px; border-radius: 6px; border: 1px solid var(--card-border);'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div><h1 style='font-size: 42px; font-weight: 800; color: var(--header-text); margin: 0; margin-top: 15px; letter-spacing: -1px; text-transform: uppercase;'>Controle Convênios</h1><p style='color: var(--text-muted); font-size: 16px; font-weight: 500; margin-top: 5px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p></div>", unsafe_allow_html=True)
     
-    c1, c2, c3 = st.columns(3, gap="large")
+    # --- NOVO LAYOUT DE BOTÕES 2x2 ---
+    c1, c2 = st.columns(2, gap="large")
     with c1:
-        st.markdown(f"<div class='home-card' style='border-top-color: var(--blue-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>Última Atualização: {att_emendas}</div></div>", unsafe_allow_html=True)
-        st.button("Acessar Emendas", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
+        st.markdown(f"<div class='home-card' style='border-top-color: var(--purple-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>📈</span><div class='home-title'>Resumo Emendas</div><div class='home-subtitle'>Dashboard Executivo Global</div></div>", unsafe_allow_html=True)
+        st.button("Acessar Resumo", key="btn_resumo", use_container_width=True, type="primary", on_click=mudar_pagina, args=('resumo_emendas',))
         
     with c2:
+        st.markdown(f"<div class='home-card' style='border-top-color: var(--blue-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>📊</span><div class='home-title'>Emendas Orçamentárias</div><div class='home-subtitle'>Última Atualização: {att_emendas}</div></div>", unsafe_allow_html=True)
+        st.button("Acessar Emendas", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
+
+    c3, c4 = st.columns(2, gap="large")
+    with c3:
         st.markdown(f"<div class='home-card' style='border-top-color: var(--success-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>🏦</span><div class='home-title'>Operações de Crédito</div><div class='home-subtitle'>Status: Monitoramento Ativo</div></div>", unsafe_allow_html=True)
         st.button("Acessar Crédito", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
         
-    with c3:
+    with c4:
         st.markdown(f"<div class='home-card' style='border-top-color: var(--warning-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>🤝</span><div class='home-title'>Divisão Convênios</div><div class='home-subtitle'>Última Atualização: {att_convenios}</div></div>", unsafe_allow_html=True)
         st.button("Acessar Convênios", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
 
@@ -398,7 +404,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
                 st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
@@ -417,10 +423,59 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
                 st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', 'var(--success-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma despesa de crédito registrada.")
         else: st.info("Base de crédito vazia.")
+
+# --- NOVA TELA: RESUMO EMENDAS (DASHBOARD EXECUTIVO) ---
+elif st.session_state.pagina_atual == 'resumo_emendas':
+    st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
+    st.markdown('<div class="header-container"><div class="main-title">🚀 Dashboard Executivo de Emendas</div></div>', unsafe_allow_html=True)
+    
+    if not df.empty:
+        df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
+        df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
+        df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
+        
+        df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
+        df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
+        df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
+        
+        c_ag, c_fin = st.columns(2, gap="large")
+        with c_ag:
+            st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--warning-val); margin-bottom: 15px;'><div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div><div class='kpi-value' style='color:var(--warning-val);'>{len(df_aguardando)} Emenda(s)</div></div>''', unsafe_allow_html=True)
+            if not df_aguardando.empty:
+                df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
+                df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
+                st.dataframe(df_ag_show.style.apply(style_row_warning, axis=1), use_container_width=True, hide_index=True, height=250)
+            else: st.info("Nenhuma fonte aguardando recursos.")
+
+        with c_fin:
+            st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--blue-val); margin-bottom: 15px;'><div class='kpi-label'>✅ Emendas Finalizadas</div><div class='kpi-value' style='color:var(--blue-val);'>{len(df_finalizadas)} Emenda(s)</div></div>''', unsafe_allow_html=True)
+            if not df_finalizadas.empty:
+                df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
+                df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
+                st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
+            else: st.info("Nenhuma fonte 100% executada no momento.")
+        
+        st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
+        if not df_top5.empty:
+            cols = st.columns(len(df_top5))
+            for i, (_, row) in enumerate(df_top5.iterrows()):
+                with cols[i]:
+                    fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
+                    fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
+                    st.plotly_chart(fig, use_container_width=True)
+        else: st.info("Nenhuma fonte disponível.")
+
+        st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
+        df_todas = df_fontes.sort_values(by='saldo', ascending=False)
+        df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+        df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
+        st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
+    else: st.warning("A base de dados de emendas não foi localizada ou está vazia.")
+
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -549,9 +604,8 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        # O PULO DO GATO: A ordem das abas foi corrigida aqui!
-        tab_ativa, tab_resumo, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
-            "🎯 Por Fonte", "🚀 Resumo Executivo", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
+        tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
+            "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
         with tab_ativa:
@@ -616,49 +670,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             df_rnd = pd.DataFrame({'Data': d_val['DATA_LANCAMENTO'], 'Empenho': d_val['EMPENHO_COL'], 'NF': d_val['NOTA_COL'], 'Valor NF': d_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])]})
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
-
-        with tab_resumo:
-            st.markdown("<div class='section-title'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
-            df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
-            df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
-            df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
-            
-            df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
-            df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
-            df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
-            
-            c_ag, c_fin = st.columns(2, gap="large")
-            with c_ag:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--warning-val); margin-bottom: 15px;'><div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div><div class='kpi-value' style='color:var(--warning-val);'>{len(df_aguardando)} Emenda(s)</div></div>''', unsafe_allow_html=True)
-                if not df_aguardando.empty:
-                    df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
-                    df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
-                    st.dataframe(df_ag_show.style.apply(style_row_warning, axis=1), use_container_width=True, hide_index=True, height=250)
-                else: st.info("Nenhuma fonte aguardando recursos.")
-
-            with c_fin:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--blue-val); margin-bottom: 15px;'><div class='kpi-label'>✅ Emendas Finalizadas</div><div class='kpi-value' style='color:var(--blue-val);'>{len(df_finalizadas)} Emenda(s)</div></div>''', unsafe_allow_html=True)
-                if not df_finalizadas.empty:
-                    df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
-                    df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
-                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
-                else: st.info("Nenhuma fonte 100% executada no momento.")
-            
-            st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
-            if not df_top5.empty:
-                cols = st.columns(len(df_top5))
-                for i, (_, row) in enumerate(df_top5.iterrows()):
-                    with cols[i]:
-                        fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                        fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
-                        st.plotly_chart(fig, use_container_width=True)
-            else: st.info("Nenhuma fonte disponível.")
-
-            st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
-            df_todas = df_fontes.sort_values(by='saldo', ascending=False)
-            df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
-            df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
-            st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
 
         with tab_planos:
             st.markdown("<div class='section-title'>📋 Seleção Unificada de Plano</div>", unsafe_allow_html=True)
