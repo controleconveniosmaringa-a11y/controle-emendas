@@ -312,7 +312,7 @@ def processar_saldos_acumulados(df_programa):
         return dados_finais, abas
     return {}, []
 
-# --- FUNÇÕES PANDAS STYLER ---
+# --- FUNÇÕES PANDAS STYLER (CORES NAS TABELAS COMPATÍVEIS COM DARK MODE) ---
 def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.25); font-weight: 600;'] * len(row)
@@ -371,7 +371,6 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # BOTÃO PARA FORÇAR ATUALIZAÇÃO (QUEBRA O CACHE DO GITHUB)
     col_t_ult, col_btn_ult = st.columns([5, 1])
     with col_t_ult:
         st.markdown("<div class='section-title' style='margin-top:0;'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
@@ -387,7 +386,6 @@ if st.session_state.pagina_atual == 'menu_principal':
         if not df.empty:
             df_em_mov = df[(df['bruto'] > 0) | (df['repasse'] > 0)].copy()
             if not df_em_mov.empty:
-                # Agora o sistema pega as 5 mais RECENTES independente da posição na planilha
                 df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], format='%d/%m/%Y', errors='coerce')
                 df_em_mov['idx'] = df_em_mov.index
                 ultimas_emendas = df_em_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
@@ -400,7 +398,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
                 st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma movimentação financeira encontrada.")
         else: st.info("Base de emendas vazia.")
@@ -410,7 +408,6 @@ if st.session_state.pagina_atual == 'menu_principal':
         if not df_cred_completo.empty:
             df_cr_mov = df_cred_completo[df_cred_completo['VALOR DESPESA'] > 0].copy()
             if not df_cr_mov.empty:
-                # O mesmo para operações de crédito
                 df_cr_mov['idx'] = df_cr_mov.index
                 ultimas_cred = df_cr_mov.sort_values(by='idx', ascending=False).head(5)
                 disp_cred = pd.DataFrame({
@@ -420,7 +417,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
                 st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--success-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
             else: st.info("Nenhuma despesa de crédito registrada.")
         else: st.info("Base de crédito vazia.")
@@ -552,53 +549,11 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        tab_resumo, tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
-            "🚀 Resumo Executivo", "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
+        # O PULO DO GATO: A ordem das abas foi corrigida aqui!
+        tab_ativa, tab_resumo, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
+            "🎯 Por Fonte", "🚀 Resumo Executivo", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
         
-        with tab_resumo:
-            st.markdown("<div class='section-title'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
-            df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
-            df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
-            df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
-            
-            df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
-            df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
-            df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
-            
-            c_ag, c_fin = st.columns(2, gap="large")
-            with c_ag:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--warning-val); margin-bottom: 15px;'><div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div><div class='kpi-value' style='color:var(--warning-val);'>{len(df_aguardando)} Emenda(s)</div></div>''', unsafe_allow_html=True)
-                if not df_aguardando.empty:
-                    df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
-                    df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
-                    st.dataframe(df_ag_show.style.apply(style_row_warning, axis=1), use_container_width=True, hide_index=True, height=250)
-                else: st.info("Nenhuma fonte aguardando recursos.")
-
-            with c_fin:
-                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--blue-val); margin-bottom: 15px;'><div class='kpi-label'>✅ Emendas Finalizadas</div><div class='kpi-value' style='color:var(--blue-val);'>{len(df_finalizadas)} Emenda(s)</div></div>''', unsafe_allow_html=True)
-                if not df_finalizadas.empty:
-                    df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
-                    df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
-                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
-                else: st.info("Nenhuma fonte 100% executada no momento.")
-            
-            st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
-            if not df_top5.empty:
-                cols = st.columns(len(df_top5))
-                for i, (_, row) in enumerate(df_top5.iterrows()):
-                    with cols[i]:
-                        fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                        fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
-                        st.plotly_chart(fig, use_container_width=True)
-            else: st.info("Nenhuma fonte disponível.")
-
-            st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
-            df_todas = df_fontes.sort_values(by='saldo', ascending=False)
-            df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
-            df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
-            st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
-                    
         with tab_ativa:
             st.markdown("<div class='section-title'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
             if fontes:
@@ -661,6 +616,49 @@ elif st.session_state.pagina_atual == 'emendas':
                             df_rnd = pd.DataFrame({'Data': d_val['DATA_LANCAMENTO'], 'Empenho': d_val['EMPENHO_COL'], 'NF': d_val['NOTA_COL'], 'Valor NF': d_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])]})
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
+
+        with tab_resumo:
+            st.markdown("<div class='section-title'>🚀 Painel de Desempenho das Emendas</div>", unsafe_allow_html=True)
+            df_fontes = df.groupby('fonte_clean').agg({'repasse': 'sum', 'rendimento': 'sum', 'bruto': 'sum', 'deputado': 'first', 'secretaria': 'first'}).reset_index()
+            df_fontes['saldo'] = df_fontes['repasse'] + df_fontes['rendimento'] - df_fontes['bruto']
+            df_fontes['saldo_round'] = df_fontes['saldo'].round(2)
+            
+            df_top5 = df_fontes[df_fontes['saldo_round'] > 0].sort_values(by='saldo', ascending=False).head(5)
+            df_aguardando = df_fontes[(df_fontes['repasse'] == 0) & (df_fontes['bruto'] == 0)]
+            df_finalizadas = df_fontes[(df_fontes['saldo_round'] == 0) & ((df_fontes['repasse'] > 0) | (df_fontes['bruto'] > 0))]
+            
+            c_ag, c_fin = st.columns(2, gap="large")
+            with c_ag:
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--warning-val); margin-bottom: 15px;'><div class='kpi-label'>⏳ Aguardando Recursos (Zeradas)</div><div class='kpi-value' style='color:var(--warning-val);'>{len(df_aguardando)} Emenda(s)</div></div>''', unsafe_allow_html=True)
+                if not df_aguardando.empty:
+                    df_ag_show = df_aguardando[['fonte_clean', 'deputado', 'secretaria']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'secretaria': 'SECRETARIA'})
+                    df_ag_show['FONTE'] = df_ag_show['FONTE'].str.upper()
+                    st.dataframe(df_ag_show.style.apply(style_row_warning, axis=1), use_container_width=True, hide_index=True, height=250)
+                else: st.info("Nenhuma fonte aguardando recursos.")
+
+            with c_fin:
+                st.markdown(f'''<div class='kpi-card-head' style='border-left: 5px solid var(--blue-val); margin-bottom: 15px;'><div class='kpi-label'>✅ Emendas Finalizadas</div><div class='kpi-value' style='color:var(--blue-val);'>{len(df_finalizadas)} Emenda(s)</div></div>''', unsafe_allow_html=True)
+                if not df_finalizadas.empty:
+                    df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
+                    df_fin_show['FONTE'] = df_fin_show['FONTE'].str.upper()
+                    st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
+                else: st.info("Nenhuma fonte 100% executada no momento.")
+            
+            st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
+            if not df_top5.empty:
+                cols = st.columns(len(df_top5))
+                for i, (_, row) in enumerate(df_top5.iterrows()):
+                    with cols[i]:
+                        fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
+                        fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
+                        st.plotly_chart(fig, use_container_width=True)
+            else: st.info("Nenhuma fonte disponível.")
+
+            st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
+            df_todas = df_fontes.sort_values(by='saldo', ascending=False)
+            df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+            df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
+            st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
 
         with tab_planos:
             st.markdown("<div class='section-title'>📋 Seleção Unificada de Plano</div>", unsafe_allow_html=True)
