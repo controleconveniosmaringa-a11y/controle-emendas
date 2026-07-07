@@ -483,11 +483,42 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
                     st.plotly_chart(fig, use_container_width=True)
         else: st.info("Nenhuma fonte disponível.")
 
+        st.markdown("<div class='section-title'>📊 Panorama de Saldos por Secretaria e Deputado</div>", unsafe_allow_html=True)
+        df_g_sec = df[df['secretaria'] != 'Não Especificada'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+        df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
+        
+        df_g_dep = df[df['deputado'] != 'Não Informado'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+        df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
+        
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
+            fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
+            fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+            st.plotly_chart(fig1, use_container_width=True)
+        with col_g2:
+            st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
+            fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
+            fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+            st.plotly_chart(fig2, use_container_width=True)
+
         st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas (Ordem Decrescente de Saldo)</div>", unsafe_allow_html=True)
         df_todas = df_fontes.sort_values(by='saldo', ascending=False)
-        df_todas_show = df_todas[['fonte_clean', 'secretaria', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'saldo': 'SALDO DISPONÍVEL'})
+        df_todas_show = df_todas[['fonte_clean', 'secretaria', 'repasse', 'rendimento', 'bruto', 'saldo']].rename(columns={
+            'fonte_clean': 'FONTE', 
+            'secretaria': 'SECRETARIA',
+            'repasse': 'REPASSES (+)',
+            'rendimento': 'RENDIMENTOS (+)',
+            'bruto': 'DESPESAS (-)',
+            'saldo': 'SALDO DISPONÍVEL (=)'
+        })
         df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
-        st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
+        st.dataframe(df_todas_show.style.format({
+            'REPASSES (+)': fmt,
+            'RENDIMENTOS (+)': fmt,
+            'DESPESAS (-)': fmt,
+            'SALDO DISPONÍVEL (=)': fmt
+        }).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL (=)']), use_container_width=True, hide_index=True, height=450)
     else: st.warning("A base de dados de emendas não foi localizada ou está vazia.")
 
 elif st.session_state.pagina_atual == 'credito':
@@ -622,7 +653,7 @@ elif st.session_state.pagina_atual == 'emendas':
         # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
-            options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"],
+            options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -828,23 +859,3 @@ elif st.session_state.pagina_atual == 'emendas':
                         
                         if linhas_detalhe_dep: 
                             st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
-        
-        elif aba_selecionada == "🌐 Panorama Geral":
-            st.markdown("<div class='section-title' style='margin-top:0;'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
-            df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-            df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
-            
-            df_g_dep = df[df['deputado'] != 'NÃO INFORMADO'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-            df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
-            
-            col_g1, col_g2 = st.columns(2)
-            with col_g1:
-                st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
-                fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
-                fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                st.plotly_chart(fig1, use_container_width=True)
-            with col_g2:
-                st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
-                fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
-                fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                st.plotly_chart(fig2, use_container_width=True)
