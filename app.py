@@ -248,7 +248,7 @@ def obter_base_credito():
     df = pd.DataFrame()
     if ext_c('programa', 'programa') == [''] * len(df_raw): df['PROGRAMA'] = ['NÃO ESPECIFICADO'] * len(df_raw)
     else: df['PROGRAMA'] = [str(i).upper().strip() if str(i).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for i in df_raw['PROGRAMA'] ] if 'PROGRAMA' in df_raw.columns else ['NÃO ESPECIFICADO'] * len(df_raw)
-    df['DATA'] = ext_c('data', 'data') # Correção extraída para usar no painel de crédito
+    df['DATA'] = ext_c('data', 'data')
     df['EMPENHO'] = ext_c('empenho', 'empenho')
     df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
     df['TIPO DE DOCUMENTO'] = ext_c('tipodedoc', 'tipo')
@@ -269,6 +269,44 @@ def obter_base_credito():
     df['REPASSE'] = [limpar_moeda(v) for v in ext_c('repasse', 'repass')]
     df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
+
+# --- NOVO CARREGADOR: BASE MARINGÁ/TESOURO DIRETO DO GITHUB ---
+@st.cache_data(ttl=60)
+def obter_base_maringa_csv():
+    cache_buster = int(time.time())
+    # O sistema busca diretamente no novo repositório emendas-maringa
+    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/emendas-maringa/main/maringa.csv?v={cache_buster}"
+    try:
+        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        if not df.empty:
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            def limpar_moeda(val):
+                v_str = str(val).upper().replace('R$', '').strip()
+                v_str = re.sub(r'[^\d.,-]', '', v_str)
+                if not v_str or v_str == '-': return 0.0
+                if ',' in v_str and '.' in v_str:
+                    if v_str.rfind(',') > v_str.rfind('.'): v_str = v_str.replace('.', '').replace(',', '.')
+                    else: v_str = v_str.replace(',', '')
+                elif ',' in v_str: v_str = v_str.replace(',', '.')
+                try: return float(v_str)
+                except ValueError: return 0.0
+                
+            # Mapeia dinamicamente as colunas importantes
+            col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
+            if col_data:
+                df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
+            else:
+                df['Data_Parse'] = pd.Timestamp('1900-01-01')
+                
+            col_valor = next((c for c in df.columns if 'VALOR' in c.upper()), None)
+            if col_valor:
+                df['Valor_Num'] = df[col_valor].apply(limpar_moeda)
+            else:
+                df['Valor_Num'] = 0.0
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
@@ -377,62 +415,39 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- NOVO MÓDULO: TESOURO NACIONAL VIA GITHUB DIRECT ---
     col_t_ult, col_btn_ult = st.columns([5, 1])
     with col_t_ult:
-        st.markdown("<div class='section-title' style='margin-top:0;'>🕒 Últimas Movimentações Registradas</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title' style='margin-top:0;'>🏛️ Monitoramento de Repasses Públicos - Fonte Tesouro Nacional</div>", unsafe_allow_html=True)
     with col_btn_ult:
         if st.button("🔄 Atualizar Painel", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    c_ult_1, c_ult_2 = st.columns(2, gap="large")
-    
-    with c_ult_1:
-        st.markdown("<p style='font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;'>📉 Emendas Orçamentárias</p>", unsafe_allow_html=True)
-        if not df.empty:
-            # Pegar TODAS as emendas com fontes válidas (Mesmo que o R$ esteja zerado)
-            df_em_mov = df[df['fonte_clean'] != ''].copy()
-            if not df_em_mov.empty:
-                # O Pulo do Gato: Forçar o Pandas a ler as datas da forma correta e organizar do mais novo pro mais velho
-                df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
-                df_em_mov['idx'] = df_em_mov.index
-                ultimas_emendas = df_em_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
-                
-                disp_emendas = pd.DataFrame({
-                    'Data': ultimas_emendas['DATA_LANCAMENTO'].replace('', '-'),
-                    'Emenda': ultimas_emendas['emenda_clean'].str.upper(),
-                    'Fonte': ultimas_emendas['fonte_clean'].str.upper(),
-                    'Doc': [f"NF: {n}" if n not in ['-', ''] else (f"Emp: {e}" if e not in ['-', ''] else "-") for e, n in zip(ultimas_emendas['EMPENHO_COL'], ultimas_emendas['NOTA_COL'])],
-                    'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
-                })
-                st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
-                ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
-            else: st.info("Nenhuma movimentação encontrada.")
-        else: st.info("Base de emendas vazia.")
-            
-    with c_ult_2:
-        st.markdown("<p style='font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;'>📉 Operações de Crédito</p>", unsafe_allow_html=True)
-        if not df_cred_completo.empty:
-            df_cr_mov = df_cred_completo[df_cred_completo['PROGRAMA'] != 'NÃO ESPECIFICADO'].copy()
-            if not df_cr_mov.empty:
-                if 'DATA' not in df_cr_mov.columns: df_cr_mov['DATA'] = ''
-                df_cr_mov['Data_Parse'] = pd.to_datetime(df_cr_mov['DATA'], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
-                df_cr_mov['idx'] = df_cr_mov.index
-                ultimas_cred = df_cr_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
-                
-                disp_cred = pd.DataFrame({
-                    'Data': ultimas_cred['DATA'].replace('', '-'),
-                    'Programa': ultimas_cred['PROGRAMA'],
-                    'Empenho/Doc': ultimas_cred['EMPENHO'] + " / " + ultimas_cred['Nº DOCUMENTO'],
-                    'Valor Gasto': ultimas_cred['VALOR DESPESA']
-                })
-                st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
-                ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
-            else: st.info("Nenhuma operação registrada.")
-        else: st.info("Base de crédito vazia.")
+    df_tesouro = obter_base_maringa_csv()
+    if not df_tesouro.empty:
+        df_tesouro_sorted = df_tesouro.sort_values(by='Data_Parse', ascending=False).head(5)
+        
+        # Mapeia colunas dinamicamente baseado nos dados que você informou
+        col_data = next((c for c in df_tesouro_sorted.columns if 'DATA' in c.upper()), df_tesouro_sorted.columns[0])
+        col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), df_tesouro_sorted.columns[10] if len(df_tesouro_sorted.columns) > 10 else df_tesouro_sorted.columns[0])
+        col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), df_tesouro_sorted.columns[11] if len(df_tesouro_sorted.columns) > 11 else df_tesouro_sorted.columns[0])
+        
+        disp_tesouro = pd.DataFrame({
+            'Data': df_tesouro_sorted[col_data],
+            'Favorecido': df_tesouro_sorted[col_favorecido],
+            'Emenda': df_tesouro_sorted[col_emenda],
+            'Valor (R$)': df_tesouro_sorted['Valor_Num']
+        })
+        
+        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>Últimas 5 emendas registradas na base do Tesouro Nacional (via emendas-maringa).</p>", unsafe_allow_html=True)
+        st.dataframe(disp_tesouro.style.set_table_styles([
+            {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+        ]).format({'Valor (R$)': fmt}), use_container_width=True, hide_index=True)
+    else: 
+        st.info("ℹ️ Não foi possível carregar a base maringa.csv no momento. Verifique se o arquivo existe no repositório emendas-maringa do GitHub.")
 
+# --- TELA: RESUMO EMENDAS (DASHBOARD EXECUTIVO) ---
 elif st.session_state.pagina_atual == 'resumo_emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">🚀 Dashboard Executivo de Emendas</div></div>', unsafe_allow_html=True)
@@ -479,6 +494,7 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
         df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
         st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
     else: st.warning("A base de dados de emendas não foi localizada ou está vazia.")
+
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
