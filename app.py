@@ -274,7 +274,6 @@ def obter_base_credito():
 @st.cache_data(ttl=60)
 def obter_base_maringa_csv():
     cache_buster = int(time.time())
-    # O sistema busca diretamente no novo repositório emendas-maringa
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/emendas-maringa/main/maringa.csv?v={cache_buster}"
     try:
         df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
@@ -292,9 +291,9 @@ def obter_base_maringa_csv():
                 try: return float(v_str)
                 except ValueError: return 0.0
                 
-            # Mapeia dinamicamente as colunas importantes
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
             if col_data:
+                # Tratamento robusto da data para organizar corretamente
                 df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
             else:
                 df['Data_Parse'] = pd.Timestamp('1900-01-01')
@@ -428,15 +427,21 @@ if st.session_state.pagina_atual == 'menu_principal':
     if not df_tesouro.empty:
         df_tesouro_sorted = df_tesouro.sort_values(by='Data_Parse', ascending=False).head(5)
         
-        # Mapeia colunas dinamicamente baseado nos dados que você informou
-        col_data = next((c for c in df_tesouro_sorted.columns if 'DATA' in c.upper()), df_tesouro_sorted.columns[0])
-        col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), df_tesouro_sorted.columns[10] if len(df_tesouro_sorted.columns) > 10 else df_tesouro_sorted.columns[0])
-        col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), df_tesouro_sorted.columns[11] if len(df_tesouro_sorted.columns) > 11 else df_tesouro_sorted.columns[0])
+        # Mapeamento Dinâmico Inteligente
+        col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
+        col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
+        col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
+        col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
+        
+        # Formata a Data_Parse gerada de volta para texto, deixando vazias as que não têm data válida
+        data_formatada = df_tesouro_sorted['Data_Parse'].dt.strftime('%d/%m/%Y').replace('01/01/1900', '-')
         
         disp_tesouro = pd.DataFrame({
-            'Data': df_tesouro_sorted[col_data],
-            'Favorecido': df_tesouro_sorted[col_favorecido],
-            'Emenda': df_tesouro_sorted[col_emenda],
+            'Data': data_formatada,
+            'Mês': df_tesouro_sorted[col_mes] if col_mes else '-',
+            'Favorecido': df_tesouro_sorted[col_favorecido] if col_favorecido else '-',
+            'Emenda': df_tesouro_sorted[col_emenda] if col_emenda else '-',
+            'Categoria Econômica': df_tesouro_sorted[col_categoria] if col_categoria else '-',
             'Valor (R$)': df_tesouro_sorted['Valor_Num']
         })
         
