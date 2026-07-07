@@ -248,6 +248,7 @@ def obter_base_credito():
     df = pd.DataFrame()
     if ext_c('programa', 'programa') == [''] * len(df_raw): df['PROGRAMA'] = ['NÃO ESPECIFICADO'] * len(df_raw)
     else: df['PROGRAMA'] = [str(i).upper().strip() if str(i).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for i in df_raw['PROGRAMA'] ] if 'PROGRAMA' in df_raw.columns else ['NÃO ESPECIFICADO'] * len(df_raw)
+    df['DATA'] = ext_c('data', 'data') # Correção extraída para usar no painel de crédito
     df['EMPENHO'] = ext_c('empenho', 'empenho')
     df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
     df['TIPO DE DOCUMENTO'] = ext_c('tipodedoc', 'tipo')
@@ -334,7 +335,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     
     st.markdown(f"<div style='background: var(--header-bg); padding: 45px 20px; border-radius: 12px; text-align: center; margin-top: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; border-bottom: 4px solid var(--blue-val);'><div style='position: absolute; top: 15px; right: 20px; font-size: 12px; color: var(--text-muted); font-weight: 600; display: flex; gap: 15px; align-items: center; background: var(--card-bg); padding: 6px 14px; border-radius: 6px; border: 1px solid var(--card-border);'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div><h1 style='font-size: 42px; font-weight: 800; color: var(--header-text); margin: 0; margin-top: 15px; letter-spacing: -1px; text-transform: uppercase;'>Controle Convênios</h1><p style='color: var(--text-muted); font-size: 16px; font-weight: 500; margin-top: 5px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p></div>", unsafe_allow_html=True)
     
-    # --- NOVO LAYOUT DE BOTÕES 2x2 ---
     c1, c2 = st.columns(2, gap="large")
     with c1:
         st.markdown(f"<div class='home-card' style='border-top-color: var(--purple-val);'><span style='font-size: 48px; display:block; margin-bottom:10px;'>📈</span><div class='home-title'>Resumo Emendas</div><div class='home-subtitle'>Dashboard Executivo Global</div></div>", unsafe_allow_html=True)
@@ -390,45 +390,49 @@ if st.session_state.pagina_atual == 'menu_principal':
     with c_ult_1:
         st.markdown("<p style='font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;'>📉 Emendas Orçamentárias</p>", unsafe_allow_html=True)
         if not df.empty:
-            df_em_mov = df[(df['bruto'] > 0) | (df['repasse'] > 0)].copy()
+            # Pegar TODAS as emendas com fontes válidas (Mesmo que o R$ esteja zerado)
+            df_em_mov = df[df['fonte_clean'] != ''].copy()
             if not df_em_mov.empty:
-                df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], format='%d/%m/%Y', errors='coerce')
+                # O Pulo do Gato: Forçar o Pandas a ler as datas da forma correta e organizar do mais novo pro mais velho
+                df_em_mov['Data_Parse'] = pd.to_datetime(df_em_mov['DATA_LANCAMENTO'], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
                 df_em_mov['idx'] = df_em_mov.index
                 ultimas_emendas = df_em_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
                 
                 disp_emendas = pd.DataFrame({
-                    'Data': ultimas_emendas['DATA_LANCAMENTO'],
-                    'Emenda': ultimas_emendas['emenda_clean'],
+                    'Data': ultimas_emendas['DATA_LANCAMENTO'].replace('', '-'),
+                    'Emenda': ultimas_emendas['emenda_clean'].str.upper(),
                     'Fonte': ultimas_emendas['fonte_clean'].str.upper(),
-                    'Doc/Empenho': [f"NF: {n}" if n != '-' else (f"Emp: {e}" if e != '-' else "-") for e, n in zip(ultimas_emendas['EMPENHO_COL'], ultimas_emendas['NOTA_COL'])],
+                    'Doc': [f"NF: {n}" if n not in ['-', ''] else (f"Emp: {e}" if e not in ['-', ''] else "-") for e, n in zip(ultimas_emendas['EMPENHO_COL'], ultimas_emendas['NOTA_COL'])],
                     'Valor': [b if b > 0 else r for b, r in zip(ultimas_emendas['bruto'], ultimas_emendas['repasse'])]
                 })
                 st.dataframe(disp_emendas.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#1e40af'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor': fmt}), use_container_width=True, hide_index=True)
-            else: st.info("Nenhuma movimentação financeira encontrada.")
+            else: st.info("Nenhuma movimentação encontrada.")
         else: st.info("Base de emendas vazia.")
             
     with c_ult_2:
         st.markdown("<p style='font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;'>📉 Operações de Crédito</p>", unsafe_allow_html=True)
         if not df_cred_completo.empty:
-            df_cr_mov = df_cred_completo[df_cred_completo['VALOR DESPESA'] > 0].copy()
+            df_cr_mov = df_cred_completo[df_cred_completo['PROGRAMA'] != 'NÃO ESPECIFICADO'].copy()
             if not df_cr_mov.empty:
+                if 'DATA' not in df_cr_mov.columns: df_cr_mov['DATA'] = ''
+                df_cr_mov['Data_Parse'] = pd.to_datetime(df_cr_mov['DATA'], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
                 df_cr_mov['idx'] = df_cr_mov.index
-                ultimas_cred = df_cr_mov.sort_values(by='idx', ascending=False).head(5)
+                ultimas_cred = df_cr_mov.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
+                
                 disp_cred = pd.DataFrame({
+                    'Data': ultimas_cred['DATA'].replace('', '-'),
                     'Programa': ultimas_cred['PROGRAMA'],
                     'Empenho/Doc': ultimas_cred['EMPENHO'] + " / " + ultimas_cred['Nº DOCUMENTO'],
-                    'Fornecedor': ultimas_cred['FORNECEDOR'],
                     'Valor Gasto': ultimas_cred['VALOR DESPESA']
                 })
                 st.dataframe(disp_cred.style.set_table_styles([
-                    {'selector': 'th', 'props': [('background-color', 'var(--success-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
+                    {'selector': 'th', 'props': [('background-color', '#065f46'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
                 ]).format({'Valor Gasto': fmt}), use_container_width=True, hide_index=True)
-            else: st.info("Nenhuma despesa de crédito registrada.")
+            else: st.info("Nenhuma operação registrada.")
         else: st.info("Base de crédito vazia.")
 
-# --- NOVA TELA: RESUMO EMENDAS (DASHBOARD EXECUTIVO) ---
 elif st.session_state.pagina_atual == 'resumo_emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">🚀 Dashboard Executivo de Emendas</div></div>', unsafe_allow_html=True)
@@ -475,7 +479,6 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
         df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
         st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
     else: st.warning("A base de dados de emendas não foi localizada ou está vazia.")
-
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
@@ -607,7 +610,7 @@ elif st.session_state.pagina_atual == 'emendas':
         tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
             "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
         ])
-        
+                    
         with tab_ativa:
             st.markdown("<div class='section-title'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
             if fontes:
