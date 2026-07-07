@@ -148,7 +148,7 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE E INDEXAÇÃO
+# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE
 @st.cache_data(ttl=60)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -270,7 +270,6 @@ def obter_base_credito():
     df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
-# --- NOVO CARREGADOR: BASE MARINGÁ/TESOURO DIRETO DO GITHUB ---
 @st.cache_data(ttl=60)
 def obter_base_maringa_csv():
     cache_buster = int(time.time())
@@ -279,7 +278,7 @@ def obter_base_maringa_csv():
         df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
         if not df.empty:
             df.columns = [str(c).strip() for c in df.columns]
-            df['idx'] = df.index # GUARDA A LINHA ORIGINAL DA PLANILHA PARA DESEMPATE
+            df['idx'] = df.index 
             
             def limpar_moeda(val):
                 v_str = str(val).upper().replace('R$', '').strip()
@@ -294,7 +293,6 @@ def obter_base_maringa_csv():
                 
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
             if col_data:
-                # Tratamento robusto da data para organizar corretamente (Dia/Mes/Ano)
                 df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
             else:
                 df['Data_Parse'] = pd.Timestamp('1900-01-01')
@@ -351,7 +349,6 @@ def processar_saldos_acumulados(df_programa):
         return dados_finais, abas
     return {}, []
 
-# --- FUNÇÕES PANDAS STYLER (CORES NAS TABELAS COMPATÍVEIS COM DARK MODE) ---
 def highlight_saldo_verde(col): return ['background-color: rgba(16, 185, 129, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def highlight_total_azul(col): return ['background-color: rgba(37, 99, 235, 0.25); font-weight: 800;' if v != '' else '' for v in col]
 def style_row_warning(row): return ['background-color: rgba(245, 158, 11, 0.25); font-weight: 600;'] * len(row)
@@ -415,7 +412,6 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- NOVO MÓDULO: TESOURO NACIONAL VIA GITHUB DIRECT ---
     col_t_ult, col_btn_ult = st.columns([5, 1])
     with col_t_ult:
         st.markdown("<div class='section-title' style='margin-top:0;'>🏛️ Monitoramento de Repasses Públicos - Fonte Tesouro Nacional</div>", unsafe_allow_html=True)
@@ -426,24 +422,17 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     df_tesouro = obter_base_maringa_csv()
     if not df_tesouro.empty:
-        # AQUI É O PULO DO GATO: Usa a Data como critério 1, e a Linha da Planilha (idx) como desempate absoluto
         df_tesouro_sorted = df_tesouro.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
-        
-        # Mapeamento Dinâmico Inteligente
         col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
         col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
         col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
         col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
         
-        # Formata a Data_Parse gerada de volta para texto (ou exibe vazio se não houver data)
-        data_formatada = df_tesouro_sorted['Data_Parse'].dt.strftime('%d/%m/%Y').replace('01/01/1900', '-')
-        
         disp_tesouro = pd.DataFrame({
-            'Data': data_formatada,
             'Mês': df_tesouro_sorted[col_mes] if col_mes else '-',
+            'Categoria Econômica': df_tesouro_sorted[col_categoria] if col_categoria else '-',
             'Favorecido': df_tesouro_sorted[col_favorecido] if col_favorecido else '-',
             'Emenda': df_tesouro_sorted[col_emenda] if col_emenda else '-',
-            'Categoria Econômica': df_tesouro_sorted[col_categoria] if col_categoria else '-',
             'Valor (R$)': df_tesouro_sorted['Valor_Num']
         })
         
@@ -454,7 +443,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     else: 
         st.info("ℹ️ Não foi possível carregar a base maringa.csv no momento. Verifique se o arquivo existe no repositório emendas-maringa do GitHub.")
 
-# --- TELA: RESUMO EMENDAS (DASHBOARD EXECUTIVO) ---
 elif st.session_state.pagina_atual == 'resumo_emendas':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
     st.markdown('<div class="header-container"><div class="main-title">🚀 Dashboard Executivo de Emendas</div></div>', unsafe_allow_html=True)
@@ -501,7 +489,6 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
         df_todas_show['FONTE'] = df_todas_show['FONTE'].str.upper()
         st.dataframe(df_todas_show.style.format({'SALDO DISPONÍVEL': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL']), use_container_width=True, hide_index=True, height=450)
     else: st.warning("A base de dados de emendas não foi localizada ou está vazia.")
-
 
 elif st.session_state.pagina_atual == 'credito':
     st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
