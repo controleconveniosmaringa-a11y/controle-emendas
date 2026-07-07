@@ -148,7 +148,7 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE
+# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE E INDEXAÇÃO
 @st.cache_data(ttl=60)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -279,6 +279,7 @@ def obter_base_maringa_csv():
         df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
         if not df.empty:
             df.columns = [str(c).strip() for c in df.columns]
+            df['idx'] = df.index # GUARDA A LINHA ORIGINAL DA PLANILHA PARA DESEMPATE
             
             def limpar_moeda(val):
                 v_str = str(val).upper().replace('R$', '').strip()
@@ -293,7 +294,7 @@ def obter_base_maringa_csv():
                 
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
             if col_data:
-                # Tratamento robusto da data para organizar corretamente
+                # Tratamento robusto da data para organizar corretamente (Dia/Mes/Ano)
                 df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
             else:
                 df['Data_Parse'] = pd.Timestamp('1900-01-01')
@@ -425,7 +426,8 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     df_tesouro = obter_base_maringa_csv()
     if not df_tesouro.empty:
-        df_tesouro_sorted = df_tesouro.sort_values(by='Data_Parse', ascending=False).head(5)
+        # AQUI É O PULO DO GATO: Usa a Data como critério 1, e a Linha da Planilha (idx) como desempate absoluto
+        df_tesouro_sorted = df_tesouro.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
         
         # Mapeamento Dinâmico Inteligente
         col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
@@ -433,7 +435,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
         col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
         
-        # Formata a Data_Parse gerada de volta para texto, deixando vazias as que não têm data válida
+        # Formata a Data_Parse gerada de volta para texto (ou exibe vazio se não houver data)
         data_formatada = df_tesouro_sorted['Data_Parse'].dt.strftime('%d/%m/%Y').replace('01/01/1900', '-')
         
         disp_tesouro = pd.DataFrame({
