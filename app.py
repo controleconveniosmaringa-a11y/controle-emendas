@@ -617,12 +617,20 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        tab_ativa, tab_planos, tab_secretarias, tab_deputados, tab_geral = st.tabs([
-            "🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"
-        ])
+        # --- SOLUÇÃO DEFINITIVA ---
+        # Trocamos o st.tabs() por um st.radio() horizontal. 
+        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
+        aba_selecionada = st.radio(
+            "Navegação:",
+            options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado", "🌐 Panorama Geral"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
                     
-        with tab_ativa:
-            st.markdown("<div class='section-title'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
+        if aba_selecionada == "🎯 Por Fonte":
+            st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
             if fontes:
                 fonte_final = st.selectbox("🎯 Selecione ou Digite o Número da Fonte Orçamentária:", options=fontes, key="sel_f")
                 if fonte_final:
@@ -689,8 +697,8 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
 
-        with tab_planos:
-            st.markdown("<div class='section-title'>📋 Seleção Unificada de Plano</div>", unsafe_allow_html=True)
+        elif aba_selecionada == "📋 Por Plano":
+            st.markdown("<div class='section-title' style='margin-top:0;'>📋 Seleção Unificada de Plano</div>", unsafe_allow_html=True)
             planos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
             if planos:
                 p_fin = st.selectbox("📋 Selecione ou Digite o Número do Plano:", options=planos, key="sel_p")
@@ -735,8 +743,8 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
 
-        with tab_secretarias:
-            st.markdown("<div class='section-title'>🏛️ Seleção Unificada de Secretaria</div>", unsafe_allow_html=True)
+        elif aba_selecionada == "🏛️ Por Secretaria":
+            st.markdown("<div class='section-title' style='margin-top:0;'>🏛️ Seleção Unificada de Secretaria</div>", unsafe_allow_html=True)
             secs_totais = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
             if secs_totais:
                 s_fin = st.selectbox("🏛️ Selecione ou Digite o Nome da Secretaria Executiva:", options=secs_totais, key="sel_s")
@@ -778,8 +786,8 @@ elif st.session_state.pagina_atual == 'emendas':
                         if linhas_fontes_sec:
                             st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre': fmt}).apply(highlight_saldo_verde, subset=['Saldo Livre']), use_container_width=True, hide_index=True)
         
-        with tab_deputados:
-            st.markdown("<div class='section-title'>🔍 Seleção Unificada de Parlamentar</div>", unsafe_allow_html=True)
+        elif aba_selecionada == "🔍 Por Deputado":
+            st.markdown("<div class='section-title' style='margin-top:0;'>🔍 Seleção Unificada de Parlamentar</div>", unsafe_allow_html=True)
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
             if deps:
                 deputado_selecionado = st.selectbox("👤 Selecione ou Digite o Nome do Deputado/Parlamentar:", options=deps, key="sel_d")
@@ -821,8 +829,8 @@ elif st.session_state.pagina_atual == 'emendas':
                         if linhas_detalhe_dep: 
                             st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
         
-        with tab_geral:
-            st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
+        elif aba_selecionada == "🌐 Panorama Geral":
+            st.markdown("<div class='section-title' style='margin-top:0;'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
             df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
             
