@@ -626,61 +626,66 @@ elif st.session_state.pagina_atual == 'emendas':
             if fontes:
                 fonte_final = st.selectbox("🎯 Selecione ou Digite o Número da Fonte Orçamentária:", options=fontes, key="sel_f")
                 if fonte_final:
-                    d_fin = df[df['fonte_clean'] == fonte_final]
-                    anos = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in d_fin['ano_mov'].unique() if a not in ['', 'nan']])))
-                    ano_sel = st.selectbox("📅 Exercício Fiscal:", options=anos, key="ano_f")
-                    if not d_fin.empty:
-                        d_fluxo = d_fin if ano_sel == anos[0] else d_fin[d_fin['ano_mov'] == ano_sel]
-                        d_saldo = d_fin if ano_sel == anos[0] else d_fin[d_fin['ano_mov'].astype(int) <= int(ano_sel)]
-                        conta = d_fin['conta corrente'].iloc[0]
-                        d_bc = df[df['conta corrente'] == conta] if conta != "Não Informada" else pd.DataFrame()
-                        d_bc_fluxo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'] == ano_sel] if not d_bc.empty else pd.DataFrame())
-                        d_bc_saldo = d_bc if ano_sel == anos[0] else (d_bc[d_bc['ano_mov'].astype(int) <= int(ano_sel)] if not d_bc.empty else pd.DataFrame())
+                    df_fonte = df[df['fonte_clean'] == fonte_final]
+                    anos_f = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_fonte['ano_mov'].unique() if a not in ['', 'nan']])))
+                    ano_f_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_f, key="ano_f")
+                    if not df_fonte.empty:
+                        fluxo_f = df_fonte if ano_f_sel == anos_f[0] else df_fonte[df_fonte['ano_mov'] == ano_f_sel]
+                        saldo_f = df_fonte if ano_f_sel == anos_f[0] else df_fonte[df_fonte['ano_mov'].astype(int) <= int(ano_f_sel)]
+                        conta_f = df_fonte['conta corrente'].iloc[0]
                         
-                        tot_ent = float(d_saldo['repasse'].sum() + d_saldo['rendimento'].sum())
-                        tot_sai = float(d_saldo['bruto'].sum())
-                        sal_fonte = tot_ent - tot_sai
-                        pct_disp = (sal_fonte / tot_ent * 100) if tot_ent > 0 else 0.0
-                        sal_banco = float(d_bc_saldo['repasse'].sum() + d_bc_saldo['rendimento'].sum()) - float(d_bc_saldo['bruto'].sum()) if not d_bc_saldo.empty else sal_fonte
-                        lbl = "Histórico Total" if ano_sel == anos[0] else f"Exercício {ano_sel}"
+                        df_bc = df[df['conta corrente'] == conta_f] if conta_f != "Não Informada" else pd.DataFrame()
+                        df_bc_fluxo = df_bc if ano_f_sel == anos_f[0] else (df_bc[df_bc['ano_mov'] == ano_f_sel] if not df_bc.empty else pd.DataFrame())
+                        df_bc_saldo = df_bc if ano_f_sel == anos_f[0] else (df_bc[df_bc['ano_mov'].astype(int) <= int(ano_f_sel)] if not df_bc.empty else pd.DataFrame())
                         
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {d_fin['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {d_fin['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {d_fin['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
+                        tot_ent_f = float(saldo_f['repasse'].sum() + saldo_f['rendimento'].sum())
+                        tot_sai_f = float(saldo_f['bruto'].sum())
+                        sal_fonte = tot_ent_f - tot_sai_f
+                        pct_disp_f = (sal_fonte / tot_ent_f * 100) if tot_ent_f > 0 else 0.0
+                        sal_banco = float(df_bc_saldo['repasse'].sum() + df_bc_saldo['rendimento'].sum()) - float(df_bc_saldo['bruto'].sum()) if not df_bc_saldo.empty else sal_fonte
+                        lbl_f = "Histórico Total" if ano_f_sel == anos_f[0] else f"Exercício {ano_f_sel}"
                         
-                        c_graf, c_tab = st.columns([1, 1])
-                        with c_graf:
+                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
+                        st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {df_fonte['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {df_fonte['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {df_fonte['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
+                        
+                        c_graf_f, c_tab_f = st.columns([1, 1])
+                        with c_graf_f:
                             st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS VS SALDO</div>", unsafe_allow_html=True)
-                            fig_rosca_f = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai, max(0.0, sal_fonte)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
+                            fig_rosca_f = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai_f, max(0.0, sal_fonte)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
                             fig_rosca_f.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
                             st.plotly_chart(fig_rosca_f, use_container_width=True)
                         
-                        with c_tab:
-                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(d_fluxo['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(d_fluxo['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(d_fluxo['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL</td><td class='extrato-cell-val'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
+                        with c_tab_f:
+                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_f})</div>", unsafe_allow_html=True)
+                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL</td><td class='extrato-cell-val'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
                         
-                        secs = [s for s in d_fin['secretaria'].unique() if s != '']
-                        if len(secs) > 1:
+                        secs_f = [s for s in df_fonte['secretaria'].unique() if s != '']
+                        if len(secs_f) > 1:
                             st.markdown(f"<div class='section-title'>🏢 Divisão por Secretaria</div>", unsafe_allow_html=True)
-                            for sec in secs:
-                                ds_f, ds_s = d_fluxo[d_fluxo['secretaria'] == sec], d_saldo[d_saldo['secretaria'] == sec]
-                                st.markdown(f"<div class='secretaria-header'>🏛️ {sec}</div>", unsafe_allow_html=True)
-                                st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE</td><td class='extrato-cell-val'>{fmt(float(ds_s['repasse'].sum() + ds_s['rendimento'].sum()) - float(ds_s['bruto'].sum()))}</td></tr></table>''', unsafe_allow_html=True)
+                            for sec_f in secs_f:
+                                df_sec_fluxo, df_sec_saldo = fluxo_f[fluxo_f['secretaria'] == sec_f], saldo_f[saldo_f['secretaria'] == sec_f]
+                                st.markdown(f"<div class='secretaria-header'>🏛️ {sec_f}</div>", unsafe_allow_html=True)
+                                st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(df_sec_fluxo['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(df_sec_fluxo['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(df_sec_fluxo['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE</td><td class='extrato-cell-val'>{fmt(float(df_sec_saldo['repasse'].sum() + df_sec_saldo['rendimento'].sum()) - float(df_sec_saldo['bruto'].sum()))}</td></tr></table>''', unsafe_allow_html=True)
 
-                        if conta != "Não Informada" and not d_bc_saldo.empty:
-                            st.markdown(f"<div class='section-title'>⚖️ ABERTURA DE SALDOS — CONTA: {conta}</div>", unsafe_allow_html=True)
-                            f_comp = sorted([fc for fc in d_bc_saldo['fonte_clean'].unique() if fc != '']); l_bc = []; tr, trn, tg, ts = 0.0, 0.0, 0.0, 0.0
-                            for fi in f_comp:
-                                di_f = d_bc_fluxo[d_bc_fluxo['fonte_clean'] == fi] if not d_bc_fluxo.empty else pd.DataFrame()
+                        if conta_f != "Não Informada" and not df_bc_saldo.empty:
+                            st.markdown(f"<div class='section-title'>⚖️ ABERTURA DE SALDOS — CONTA: {conta_f}</div>", unsafe_allow_html=True)
+                            f_comp = sorted([fc for fc in df_bc_saldo['fonte_clean'].unique() if fc != ''])
+                            l_bc = []
+                            tr, trn, tg, ts = 0.0, 0.0, 0.0, 0.0
+                            for fi_f in f_comp:
+                                di_f = df_bc_fluxo[df_bc_fluxo['fonte_clean'] == fi_f] if not df_bc_fluxo.empty else pd.DataFrame()
                                 fr, frn, fd = float(di_f['repasse'].sum() if not di_f.empty else 0), float(di_f['rendimento'].sum() if not di_f.empty else 0), float(di_f['bruto'].sum() if not di_f.empty else 0)
-                                di_s = d_bc_saldo[d_bc_saldo['fonte_clean'] == fi]; fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum()); tr += fr; trn += frn; tg += fd; ts += fs
-                                l_bc.append({'Fonte Orçamentária': fi.upper() + (" (Ativa)" if fi == fonte_final else ""), 'Repasses': fr, 'Rendimentos': frn, 'Despesas': fd, 'Saldo Real': fs})
+                                di_s = df_bc_saldo[df_bc_saldo['fonte_clean'] == fi_f]
+                                fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum())
+                                tr += fr; trn += frn; tg += fd; ts += fs
+                                l_bc.append({'Fonte Orçamentária': fi_f.upper() + (" (Ativa)" if fi_f == fonte_final else ""), 'Repasses': fr, 'Rendimentos': frn, 'Despesas': fd, 'Saldo Real': fs})
                             l_bc.append({'Fonte Orçamentária': 'TOTAL CONTA 🏦', 'Repasses': tr, 'Rendimentos': trn, 'Despesas': tg, 'Saldo Real': ts})
                             st.dataframe(pd.DataFrame(l_bc).style.apply(style_abertura_banco, axis=1).format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Real': fmt}), use_container_width=True, hide_index=True)
                         
                         st.markdown(f"<div class='section-title'>📋 Lançamentos do Período</div>", unsafe_allow_html=True)
-                        d_val = d_fluxo[d_fluxo['EMPENHO_COL'] != '-']
-                        if not d_val.empty:
-                            df_rnd = pd.DataFrame({'Data': d_val['DATA_LANCAMENTO'], 'Empenho': d_val['EMPENHO_COL'], 'NF': d_val['NOTA_COL'], 'Valor NF': d_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(d_val['URL_REAL_LINK'], d_val['EMPENHO_COL'], d_val['NOTA_COL'])]})
+                        df_val_f = fluxo_f[fluxo_f['EMPENHO_COL'] != '-']
+                        if not df_val_f.empty:
+                            df_rnd = pd.DataFrame({'Data': df_val_f['DATA_LANCAMENTO'], 'Empenho': df_val_f['EMPENHO_COL'], 'NF': df_val_f['NOTA_COL'], 'Valor NF': df_val_f['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])]})
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
 
@@ -690,17 +695,21 @@ elif st.session_state.pagina_atual == 'emendas':
             if planos:
                 p_fin = st.selectbox("📋 Selecione ou Digite o Número do Plano:", options=planos, key="sel_p")
                 if p_fin:
-                    dp = df[df['plano_clean'].str.upper() == p_fin]
-                    anos_p = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in dp['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_p = st.selectbox("📅 Exercício Fiscal:", options=anos_p, key="ano_p")
-                    if not dp.empty:
-                        lbl_p = "Histórico Total" if ano_p == anos_p[0] else f"Exercício {ano_p}"
-                        dp_f = dp if ano_p == anos_p[0] else dp[dp['ano_mov'] == ano_p]; dp_s = dp if ano_p == anos_p[0] else dp[dp['ano_mov'].astype(int) <= int(ano_p)]
-                        tot_ent_p = float(dp_s['repasse'].sum() + dp_s['rendimento'].sum()); tot_sai_p = float(dp_s['bruto'].sum()); sal_p = tot_ent_p - tot_sai_p
+                    df_plano = df[df['plano_clean'].str.upper() == p_fin]
+                    anos_p = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_plano['ano_mov'].unique() if a not in ['', 'nan'] ])))
+                    ano_p_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_p, key="ano_p")
+                    if not df_plano.empty:
+                        lbl_p = "Histórico Total" if ano_p_sel == anos_p[0] else f"Exercício {ano_p_sel}"
+                        fluxo_p = df_plano if ano_p_sel == anos_p[0] else df_plano[df_plano['ano_mov'] == ano_p_sel]
+                        saldo_p = df_plano if ano_p_sel == anos_p[0] else df_plano[df_plano['ano_mov'].astype(int) <= int(ano_p_sel)]
+                        
+                        tot_ent_p = float(saldo_p['repasse'].sum() + saldo_p['rendimento'].sum())
+                        tot_sai_p = float(saldo_p['bruto'].sum())
+                        sal_p = tot_ent_p - tot_sai_p
                         pct_disp_p = (sal_p / tot_ent_p * 100) if tot_ent_p > 0 else 0.0
 
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value' style='color:var(--blue-val);'>{p_fin}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_p)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_p:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(dp['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {dp['deputado'].unique()[0]}</div><div class='meta-tag'>🏦 Conta: {dp['conta corrente'].iloc[0]}</div></div>''', unsafe_allow_html=True)
+                        st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(df_plano['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {df_plano['deputado'].unique()[0]}</div><div class='meta-tag'>🏦 Conta: {df_plano['conta corrente'].iloc[0]}</div></div>''', unsafe_allow_html=True)
                         
                         c_graf_p, c_tab_p = st.columns([1, 1])
                         with c_graf_p:
@@ -711,16 +720,16 @@ elif st.session_state.pagina_atual == 'emendas':
 
                         with c_tab_p:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_p})</div>", unsafe_allow_html=True)
-                            secs_p = sorted([str(s) for s in dp['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']]) or ['NÃO ESPECIFICADA']
+                            secs_p = sorted([str(s) for s in df_plano['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']]) or ['NÃO ESPECIFICADA']
                             html_p = f"<table class='extrato-table'><thead><tr><th>DESCRIÇÃO</th>" + "".join([f"<th style='text-align: right;'>{s}</th>" for s in secs_p]) + "<th style='text-align: right;'>TOTAL</th></tr></thead><tbody>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(dp_f[dp_f['secretaria'] == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(dp_f['repasse'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(dp_f[dp_f['secretaria'] == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(dp_f['rendimento'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(dp_f[dp_f['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(dp_f['bruto'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val'>{fmt(float(dp_s[dp_s['secretaria'] == s]['repasse'].sum() + dp_s[dp_s['secretaria'] == s]['rendimento'].sum() - dp_s[dp_s['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_p)}</td></tr></tbody></table>"
+                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_p['repasse'].sum()))}</td></tr>"
+                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_p['rendimento'].sum()))}</td></tr>"
+                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_p['bruto'].sum()))}</td></tr>"
+                            html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val'>{fmt(float(saldo_p[saldo_p['secretaria'] == s]['repasse'].sum() + saldo_p[saldo_p['secretaria'] == s]['rendimento'].sum() - saldo_p[saldo_p['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_p)}</td></tr></tbody></table>"
                             st.markdown(html_p, unsafe_allow_html=True)
                         
                         st.markdown(f"<div class='section-title'>📋 Lançamentos do Plano</div>", unsafe_allow_html=True)
-                        dp_val = dp_f[dp_f['EMPENHO_COL'] != '-']
+                        dp_val = fluxo_p[fluxo_p['EMPENHO_COL'] != '-']
                         if not dp_val.empty:
                             df_rp = pd.DataFrame({'Data': dp_val['DATA_LANCAMENTO'], 'Empenho': dp_val['EMPENHO_COL'], 'NF': dp_val['NOTA_COL'], 'Secretaria': dp_val['secretaria'], 'Valor NF': dp_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])]})
                             st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
@@ -728,17 +737,21 @@ elif st.session_state.pagina_atual == 'emendas':
 
         with tab_secretarias:
             st.markdown("<div class='section-title'>🏛️ Seleção Unificada de Secretaria</div>", unsafe_allow_html=True)
-            secs = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
-            if secs:
-                s_fin = st.selectbox("🏛️ Selecione ou Digite o Nome da Secretaria Executiva:", options=secs, key="sel_s")
+            secs_totais = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
+            if secs_totais:
+                s_fin = st.selectbox("🏛️ Selecione ou Digite o Nome da Secretaria Executiva:", options=secs_totais, key="sel_s")
                 if s_fin:
-                    ds = df[df['secretaria'] == s_fin]
-                    anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in ds['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_s = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
-                    if not ds.empty:
-                        lbl_s = "Histórico Total" if ano_s == anos_s[0] else f"Exercício {ano_s}"
-                        ds_f = ds if ano_s == anos_s[0] else ds[ds['ano_mov'] == ano_s]; ds_s = ds if ano_s == anos_s[0] else ds[ds['ano_mov'].astype(int) <= int(ano_s)]
-                        tot_ent_s = float(ds_s['repasse'].sum() + ds_s['rendimento'].sum()); tot_sai_s = float(ds_s['bruto'].sum()); sal_s = tot_ent_s - tot_sai_s
+                    df_sec = df[df['secretaria'] == s_fin]
+                    anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_sec['ano_mov'].unique() if a not in ['', 'nan'] ])))
+                    ano_s_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
+                    if not df_sec.empty:
+                        lbl_s = "Histórico Total" if ano_s_sel == anos_s[0] else f"Exercício {ano_s_sel}"
+                        fluxo_s = df_sec if ano_s_sel == anos_s[0] else df_sec[df_sec['ano_mov'] == ano_s_sel]
+                        saldo_s = df_sec if ano_s_sel == anos_s[0] else df_sec[df_sec['ano_mov'].astype(int) <= int(ano_s_sel)]
+                        
+                        tot_ent_s = float(saldo_s['repasse'].sum() + saldo_s['rendimento'].sum())
+                        tot_sai_s = float(saldo_s['bruto'].sum())
+                        sal_s = tot_ent_s - tot_sai_s
                         pct_disp_s = (sal_s / tot_ent_s * 100) if tot_ent_s > 0 else 0.0
                         
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value' style='color:var(--blue-val);'>{s_fin}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_s)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_s:.2f}%</div></div></div>''', unsafe_allow_html=True)
@@ -752,13 +765,16 @@ elif st.session_state.pagina_atual == 'emendas':
 
                         with c_tab_s:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 EXTRATO DA PASTA ({lbl_s})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(ds_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(ds_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(ds_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE DA PASTA</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
+                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_s['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_s['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_s['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE DA PASTA</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
 
                         st.markdown(f"<div class='section-title'>⚖️ Detalhamento por Fonte de Recurso</div>", unsafe_allow_html=True)
-                        fontes_da_secretaria = sorted([f for f in ds_s['fonte_clean'].unique() if f != '']); linhas_fontes_sec = []
-                        for fi in fontes_da_secretaria:
-                            df_i_fluxo = ds_f[ds_f['fonte_clean'] == fi]; df_i_saldo = ds_s[ds_s['fonte_clean'] == fi]
-                            linhas_fontes_sec.append({'Fonte Vinculada': fi.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())})
+                        fontes_da_secretaria = sorted([f for f in saldo_s['fonte_clean'].unique() if f != ''])
+                        linhas_fontes_sec = []
+                        for fi_s in fontes_da_secretaria:
+                            df_i_fluxo = fluxo_s[fluxo_s['fonte_clean'] == fi_s]
+                            df_i_saldo = saldo_s[saldo_s['fonte_clean'] == fi_s]
+                            linhas_fontes_sec.append({'Fonte Vinculada': fi_s.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())})
+                        
                         if linhas_fontes_sec:
                             st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre': fmt}).apply(highlight_saldo_verde, subset=['Saldo Livre']), use_container_width=True, hide_index=True)
         
@@ -766,18 +782,22 @@ elif st.session_state.pagina_atual == 'emendas':
             st.markdown("<div class='section-title'>🔍 Seleção Unificada de Parlamentar</div>", unsafe_allow_html=True)
             deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
             if deps:
-                d_fin = st.selectbox("👤 Selecione ou Digite o Nome do Deputado/Parlamentar:", options=deps, key="sel_d")
-                if d_fin:
-                    dd = df[df['deputado'] == d_fin]
-                    anos_d = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in dd['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_d = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
-                    if not dd.empty:
-                        lbl_d = "Histórico Total" if  ano_d == anos_d[0] else f"Exercício {ano_d}"
-                        dd_f = dd if  ano_d == anos_d[0] else dd[dd['ano_mov'] ==  ano_d]; dd_s = dd if  ano_d == anos_d[0] else dd[dd['ano_mov'].astype(int) <= int( ano_d)]
-                        tot_ent_d = float(dd_s['repasse'].sum() + dd_s['rendimento'].sum()); tot_sai_d = float(dd_s['bruto'].sum()); sal_d = tot_ent_d - tot_sai_d
+                deputado_selecionado = st.selectbox("👤 Selecione ou Digite o Nome do Deputado/Parlamentar:", options=deps, key="sel_d")
+                if deputado_selecionado:
+                    df_dep = df[df['deputado'] == deputado_selecionado]
+                    anos_d = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_dep['ano_mov'].unique() if a not in ['', 'nan'] ])))
+                    ano_d_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
+                    if not df_dep.empty:
+                        lbl_d = "Histórico Total" if ano_d_sel == anos_d[0] else f"Exercício {ano_d_sel}"
+                        fluxo_d = df_dep if ano_d_sel == anos_d[0] else df_dep[df_dep['ano_mov'] == ano_d_sel]
+                        saldo_d = df_dep if ano_d_sel == anos_d[0] else df_dep[df_dep['ano_mov'].astype(int) <= int(ano_d_sel)]
+                        
+                        tot_ent_d = float(saldo_d['repasse'].sum() + saldo_d['rendimento'].sum())
+                        tot_sai_d = float(saldo_d['bruto'].sum())
+                        sal_d = tot_ent_d - tot_sai_d
                         pct_disp_d = (sal_d / tot_ent_d * 100) if tot_ent_d > 0 else 0.0
 
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value' style='color:var(--blue-val);'>{d_fin}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo Consolidado</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_d)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_d:.2f}%</div></div></div>''', unsafe_allow_html=True)
+                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value' style='color:var(--blue-val);'>{deputado_selecionado}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo Consolidado</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_d)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_d:.2f}%</div></div></div>''', unsafe_allow_html=True)
                         
                         c_graf_d, c_tab_d = st.columns([1, 1])
                         with c_graf_d:
@@ -788,14 +808,16 @@ elif st.session_state.pagina_atual == 'emendas':
 
                         with c_tab_d:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 EXTRATO CONSOLIDADO</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(dd_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(dd_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(dd_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LÍQUIDO GERAL</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_d)}</td></tr></table>''', unsafe_allow_html=True)
+                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_d['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_d['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_d['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LÍQUIDO GERAL</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_d)}</td></tr></table>''', unsafe_allow_html=True)
                         
                         st.markdown(f"<div class='section-title'>⚖️ Onde o recurso foi aplicado</div>", unsafe_allow_html=True)
-                        grupo_deputado = dd_s.groupby(['fonte_clean', 'secretaria']); linhas_detalhe_dep = []
-                        for (fi, sec), df_grupo_saldo in grupo_deputado:
-                            if fi == '': continue
-                            df_grupo_fluxo = dd_f[(dd_f['fonte_clean'] == fi) & (dd_f['secretaria'] == sec)]
-                            linhas_detalhe_dep.append({'Fonte Vinculada': fi.upper(), 'Secretaria': sec.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())})
+                        grupo_deputado = saldo_d.groupby(['fonte_clean', 'secretaria'])
+                        linhas_detalhe_dep = []
+                        for (fi_dep, sec_dep), df_grupo_saldo in grupo_deputado:
+                            if fi_dep == '': continue
+                            df_grupo_fluxo = fluxo_d[(fluxo_d['fonte_clean'] == fi_dep) & (fluxo_d['secretaria'] == sec_dep)]
+                            linhas_detalhe_dep.append({'Fonte Vinculada': fi_dep.upper(), 'Secretaria': sec_dep.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())})
+                        
                         if linhas_detalhe_dep: 
                             st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
         
@@ -803,15 +825,17 @@ elif st.session_state.pagina_atual == 'emendas':
             st.markdown("<div class='section-title'>📊 BALANÇOS CONSOLIDADOS</div>", unsafe_allow_html=True)
             df_g_sec = df[df['secretaria'] != 'NÃO ESPECIFICADA'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
+            
             df_g_dep = df[df['deputado'] != 'NÃO INFORMADO'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
             df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
-            c1, c2 = st.columns(2)
-            with c1:
+            
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
                 st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
                 fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
                 fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
                 st.plotly_chart(fig1, use_container_width=True)
-            with c2:
+            with col_g2:
                 st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
                 fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
                 fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
