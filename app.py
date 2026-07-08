@@ -485,10 +485,14 @@ if st.session_state.pagina_atual == 'menu_principal':
         
     df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))] if not df_bancos.empty and contas_validas else pd.DataFrame()
     
-    if not df_receitas.empty:
-        min_date = df_receitas['Data_Parse'].min().strftime('%d/%m/%Y')
-        max_date = df_receitas['Data_Parse'].max().strftime('%d/%m/%Y')
-        titulo_bancos = f"🏦 Últimas Receitas Bancárias (Contas de Convênios) | De {min_date} a {max_date}"
+    if not df_bancos.empty:
+        df_datas_validas = df_bancos[df_bancos['Data_Parse'] > pd.Timestamp('1900-01-01')]
+        if not df_datas_validas.empty:
+            min_date = df_datas_validas['Data_Parse'].min().strftime('%d/%m/%Y')
+            max_date = df_datas_validas['Data_Parse'].max().strftime('%d/%m/%Y')
+            titulo_bancos = f"🏦 Últimas Receitas Bancárias (Contas de Convênios) | Extrato de {min_date} a {max_date}"
+        else:
+            titulo_bancos = "🏦 Últimas Receitas Bancárias (Contas de Convênios)"
     else:
         titulo_bancos = "🏦 Últimas Receitas Bancárias (Contas de Convênios)"
         
@@ -518,7 +522,6 @@ if st.session_state.pagina_atual == 'menu_principal':
         else:
             st.info("Aguardando novas receitas na Caixa Econômica vinculadas a contas de convênios.")
         st.markdown("</div>", unsafe_allow_html=True)
-
     # --- FIM DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
 
     col_t_ult, col_btn_ult = st.columns([5, 1])
@@ -758,6 +761,9 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
+        # --- SOLUÇÃO DEFINITIVA ---
+        # Trocamos o st.tabs() por um st.radio() horizontal. 
+        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
             options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
@@ -765,7 +771,7 @@ elif st.session_state.pagina_atual == 'emendas':
             label_visibility="collapsed"
         )
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
                     
         if aba_selecionada == "🎯 Por Fonte":
             st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
