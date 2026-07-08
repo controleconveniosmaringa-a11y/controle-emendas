@@ -28,6 +28,11 @@ def normalizar_texto(texto):
 def clean_conta(val):
     return re.sub(r'[^A-Z0-9]', '', str(val).upper().strip())
 
+def fmt(v): 
+    val = float(v)
+    if round(val, 2) == 0: val = 0.0
+    return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
 # 2. INTERFACE VISUAL (CSS RESPONSIVO DARK/LIGHT MODE)
 st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -320,7 +325,6 @@ def obter_base_bancos():
             df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
             if df_b.empty: return pd.DataFrame()
             
-            # Encontrar colunas chaves baseadas em nomes comuns de extrato
             cols = {str(c).strip().lower(): c for c in df_b.columns}
             col_data = next((v for k, v in cols.items() if 'data' in k), None)
             col_conta = next((v for k, v in cols.items() if 'conta' in k), None)
@@ -331,7 +335,10 @@ def obter_base_bancos():
             
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
-            df_b['Data_Exibicao'] = df_b[col_data] if col_data else '-'
+            
+            # FORMATANDO A DATA PARA NÃO MOSTRAR "00:00:00"
+            df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
+            
             df_b['Conta_Exibicao'] = df_b[col_conta]
             df_b['Conta_Clean'] = df_b[col_conta].apply(clean_conta)
             df_b['Descricao'] = df_b[col_desc] if col_desc else '-'
@@ -365,22 +372,6 @@ def obter_base_bancos():
         return df_caixa
     else:
         return pd.DataFrame()
-
-df, att_emendas = obter_base_dados_global()
-df_conv, att_convenios = obter_base_convenios()
-df_cred_completo, att_cred = obter_base_credito()
-
-if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
-    df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA']
-    df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA']
-else:
-    df_finisa = pd.DataFrame()
-    df_usina = pd.DataFrame()
-
-def fmt(v): 
-    val = float(v)
-    if round(val, 2) == 0: val = 0.0
-    return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if not url or url == '': return '-'
@@ -416,6 +407,18 @@ def style_abertura_banco(row):
     if 'TOTAL' in str(row['Fonte Orçamentária']): return ['background-color: rgba(148, 163, 184, 0.3); font-weight: 800;'] * len(row)
     elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: rgba(37, 99, 235, 0.2); font-weight: 700;'] * len(row)
     return [''] * len(row)
+
+# CARREGAMENTO GLOBAL
+df, att_emendas = obter_base_dados_global()
+df_conv, att_convenios = obter_base_convenios()
+df_cred_completo, att_cred = obter_base_credito()
+
+if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
+    df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA']
+    df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA']
+else:
+    df_finisa = pd.DataFrame()
+    df_usina = pd.DataFrame()
 
 # ==============================================================================
 # ROTEAMENTO DAS TELAS
@@ -472,12 +475,8 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS (CRUZAMENTO COM CONVÊNIOS) ---
+    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
     df_bancos = obter_base_bancos()
-    
-    st.markdown("<div class='section-title' style='margin-top:0;'>🏦 Últimas Receitas Bancárias (Contas de Convênios)</div>", unsafe_allow_html=True)
-    
-    c_bb, c_cx = st.columns(2, gap="large")
     
     contas_validas = []
     if not df_conv.empty and 'CONTA CORRENTE' in df_conv.columns:
@@ -485,6 +484,17 @@ if st.session_state.pagina_atual == 'menu_principal':
         contas_validas = [c for c in contas_validas if c != '']
         
     df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))] if not df_bancos.empty and contas_validas else pd.DataFrame()
+    
+    if not df_receitas.empty:
+        min_date = df_receitas['Data_Parse'].min().strftime('%d/%m/%Y')
+        max_date = df_receitas['Data_Parse'].max().strftime('%d/%m/%Y')
+        titulo_bancos = f"🏦 Últimas Receitas Bancárias (Contas de Convênios) | De {min_date} a {max_date}"
+    else:
+        titulo_bancos = "🏦 Últimas Receitas Bancárias (Contas de Convênios)"
+        
+    st.markdown(f"<div class='section-title' style='margin-top:0;'>{titulo_bancos}</div>", unsafe_allow_html=True)
+    
+    c_bb, c_cx = st.columns(2, gap="large")
     
     df_bb_top5 = df_receitas[df_receitas['Banco'] == 'Banco do Brasil'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
     df_cx_top5 = df_receitas[df_receitas['Banco'] == 'Caixa Econômica'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
@@ -508,6 +518,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         else:
             st.info("Aguardando novas receitas na Caixa Econômica vinculadas a contas de convênios.")
         st.markdown("</div>", unsafe_allow_html=True)
+
     # --- FIM DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
 
     col_t_ult, col_btn_ult = st.columns([5, 1])
@@ -747,9 +758,6 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        # --- SOLUÇÃO DEFINITIVA ---
-        # Trocamos o st.tabs() por um st.radio() horizontal. 
-        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
             options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
@@ -757,7 +765,7 @@ elif st.session_state.pagina_atual == 'emendas':
             label_visibility="collapsed"
         )
         
-        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
+        st.markdown("<br>", unsafe_allow_html=True)
                     
         if aba_selecionada == "🎯 Por Fonte":
             st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
