@@ -5,7 +5,6 @@ import re
 import os
 import unicodedata
 import datetime
-import urllib.parse
 import time
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
@@ -24,6 +23,10 @@ def normalizar_texto(texto):
     texto_limpo = str(texto).strip().upper()
     nfkd_form = unicodedata.normalize('NFKD', texto_limpo)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+# Função para higienizar números de contas para cruzamento exato
+def clean_conta(val):
+    return re.sub(r'[^A-Z0-9]', '', str(val).upper().strip())
 
 # 2. INTERFACE VISUAL (CSS RESPONSIVO DARK/LIGHT MODE)
 st.markdown("""<style>
@@ -306,6 +309,63 @@ def obter_base_maringa_csv():
     except Exception:
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)
+def obter_base_bancos():
+    cache_buster = int(time.time())
+    url_bb = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/banco_do_brasil.csv?v={cache_buster}"
+    url_cx = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/caixa.csv?v={cache_buster}"
+    
+    def processar_extrato(url, banco_nome):
+        try:
+            df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            if df_b.empty: return pd.DataFrame()
+            
+            # Encontrar colunas chaves baseadas em nomes comuns de extrato
+            cols = {str(c).strip().lower(): c for c in df_b.columns}
+            col_data = next((v for k, v in cols.items() if 'data' in k), None)
+            col_conta = next((v for k, v in cols.items() if 'conta' in k), None)
+            col_valor = next((v for k, v in cols.items() if 'valor' in k or 'credito' in k or 'lançamento' in k), None)
+            col_desc = next((v for k, v in cols.items() if 'historico' in k or 'descrição' in k or 'histórico' in k), None)
+            
+            if not col_valor or not col_conta: return pd.DataFrame()
+            
+            df_b['Banco'] = banco_nome
+            df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
+            df_b['Data_Exibicao'] = df_b[col_data] if col_data else '-'
+            df_b['Conta_Exibicao'] = df_b[col_conta]
+            df_b['Conta_Clean'] = df_b[col_conta].apply(clean_conta)
+            df_b['Descricao'] = df_b[col_desc] if col_desc else '-'
+            
+            def converter_valor(val):
+                v = str(val).upper().replace('R$', '').replace('C', '').strip()
+                is_deb = 'D' in v or '-' in v
+                v = re.sub(r'[^\d.,]', '', v)
+                if not v: return 0.0
+                if ',' in v and '.' in v:
+                    if v.rfind(',') > v.rfind('.'): v = v.replace('.', '').replace(',', '.')
+                    else: v = v.replace(',', '')
+                elif ',' in v: v = v.replace(',', '.')
+                try: 
+                    num = float(v)
+                    return -num if is_deb else num
+                except: return 0.0
+            
+            df_b['Valor_Num'] = df_b[col_valor].apply(converter_valor)
+            return df_b[['Banco', 'Data_Parse', 'Data_Exibicao', 'Conta_Clean', 'Conta_Exibicao', 'Descricao', 'Valor_Num']]
+        except: return pd.DataFrame()
+
+    df_bb = processar_extrato(url_bb, 'Banco do Brasil')
+    df_caixa = processar_extrato(url_cx, 'Caixa Econômica')
+    
+    if not df_bb.empty and not df_caixa.empty:
+        return pd.concat([df_bb, df_caixa], ignore_index=True)
+    elif not df_bb.empty:
+        return df_bb
+    elif not df_caixa.empty:
+        return df_caixa
+    else:
+        return pd.DataFrame()
+
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 df_cred_completo, att_cred = obter_base_credito()
@@ -412,10 +472,49 @@ if st.session_state.pagina_atual == 'menu_principal':
             else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS (CRUZAMENTO COM CONVÊNIOS) ---
+    df_bancos = obter_base_bancos()
+    
+    st.markdown("<div class='section-title' style='margin-top:0;'>🏦 Últimas Receitas Bancárias (Contas de Convênios)</div>", unsafe_allow_html=True)
+    
+    c_bb, c_cx = st.columns(2, gap="large")
+    
+    contas_validas = []
+    if not df_conv.empty and 'CONTA CORRENTE' in df_conv.columns:
+        contas_validas = df_conv['CONTA CORRENTE'].apply(clean_conta).unique().tolist()
+        contas_validas = [c for c in contas_validas if c != '']
+        
+    df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))] if not df_bancos.empty and contas_validas else pd.DataFrame()
+    
+    df_bb_top5 = df_receitas[df_receitas['Banco'] == 'Banco do Brasil'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
+    df_cx_top5 = df_receitas[df_receitas['Banco'] == 'Caixa Econômica'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
+    
+    with c_bb:
+        st.markdown("<div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-top: 4px solid #facc15; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-top:0; color:var(--text-main); font-size:16px; margin-bottom: 15px;'>🟡 Banco do Brasil (Top 5)</h4>", unsafe_allow_html=True)
+        if not df_bb_top5.empty:
+            for _, r in df_bb_top5.iterrows():
+                st.markdown(f"<div style='border-bottom: 1px dashed var(--card-border); padding: 10px 0;'><div style='display:flex; justify-content:space-between; margin-bottom:4px;'><span style='font-size:11px; color:var(--text-muted); font-weight:600;'>📅 {r['Data_Exibicao']} | C/C: {r['Conta_Exibicao']}</span><span style='font-weight:800; font-size:14px; color:var(--success-val);'>{fmt(r['Valor_Num'])}</span></div><div style='font-size:12px; color:var(--text-main); line-height:1.3;'>{r['Descricao']}</div></div>", unsafe_allow_html=True)
+        else:
+            st.info("Aguardando novas receitas no Banco do Brasil vinculadas a contas de convênios.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    with c_cx:
+        st.markdown("<div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-top: 4px solid #0284c7; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-top:0; color:var(--text-main); font-size:16px; margin-bottom: 15px;'>🔵 Caixa Econômica (Top 5)</h4>", unsafe_allow_html=True)
+        if not df_cx_top5.empty:
+            for _, r in df_cx_top5.iterrows():
+                st.markdown(f"<div style='border-bottom: 1px dashed var(--card-border); padding: 10px 0;'><div style='display:flex; justify-content:space-between; margin-bottom:4px;'><span style='font-size:11px; color:var(--text-muted); font-weight:600;'>📅 {r['Data_Exibicao']} | C/C: {r['Conta_Exibicao']}</span><span style='font-weight:800; font-size:14px; color:var(--success-val);'>{fmt(r['Valor_Num'])}</span></div><div style='font-size:12px; color:var(--text-main); line-height:1.3;'>{r['Descricao']}</div></div>", unsafe_allow_html=True)
+        else:
+            st.info("Aguardando novas receitas na Caixa Econômica vinculadas a contas de convênios.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    # --- FIM DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
+
     col_t_ult, col_btn_ult = st.columns([5, 1])
     with col_t_ult:
-        st.markdown("<div class='section-title' style='margin-top:0;'>🏛️ Monitoramento de Repasses Públicos - Fonte Tesouro Nacional</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title'>🏛️ Monitoramento de Repasses Públicos - Fonte Tesouro Nacional</div>", unsafe_allow_html=True)
     with col_btn_ult:
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔄 Atualizar Painel", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
