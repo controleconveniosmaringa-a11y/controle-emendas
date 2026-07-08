@@ -508,7 +508,21 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown("<h4 style='margin-top:0; color:var(--text-main); font-size:16px; margin-bottom: 15px;'>🟡 Banco do Brasil (Top 5)</h4>", unsafe_allow_html=True)
         if not df_bb_top5.empty:
             for _, r in df_bb_top5.iterrows():
-                st.markdown(f"<div style='border-bottom: 1px dashed var(--card-border); padding: 10px 0;'><div style='display:flex; justify-content:space-between; margin-bottom:4px;'><span style='font-size:11px; color:var(--text-muted); font-weight:600;'>📅 {r['Data_Exibicao']} | C/C: {r['Conta_Exibicao']}</span><span style='font-weight:800; font-size:14px; color:var(--success-val);'>{fmt(r['Valor_Num'])}</span></div><div style='font-size:12px; color:var(--text-main); line-height:1.3;'>{r['Descricao']}</div></div>", unsafe_allow_html=True)
+                desc = str(r['Descricao'])
+                desc = desc if desc.strip() not in ['-', ''] else 'Receita Identificada'
+                st.markdown(f"""
+                <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
+                    <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
+                        <div style='flex: 1; min-width: 0;'>
+                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']}</div>
+                            <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
+                        </div>
+                        <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
+                            {fmt(r['Valor_Num'])}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("Aguardando novas receitas no Banco do Brasil vinculadas a contas de convênios.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -518,10 +532,25 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown("<h4 style='margin-top:0; color:var(--text-main); font-size:16px; margin-bottom: 15px;'>🔵 Caixa Econômica (Top 5)</h4>", unsafe_allow_html=True)
         if not df_cx_top5.empty:
             for _, r in df_cx_top5.iterrows():
-                st.markdown(f"<div style='border-bottom: 1px dashed var(--card-border); padding: 10px 0;'><div style='display:flex; justify-content:space-between; margin-bottom:4px;'><span style='font-size:11px; color:var(--text-muted); font-weight:600;'>📅 {r['Data_Exibicao']} | C/C: {r['Conta_Exibicao']}</span><span style='font-weight:800; font-size:14px; color:var(--success-val);'>{fmt(r['Valor_Num'])}</span></div><div style='font-size:12px; color:var(--text-main); line-height:1.3;'>{r['Descricao']}</div></div>", unsafe_allow_html=True)
+                desc = str(r['Descricao'])
+                desc = desc if desc.strip() not in ['-', ''] else 'Receita Identificada'
+                st.markdown(f"""
+                <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
+                    <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
+                        <div style='flex: 1; min-width: 0;'>
+                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']}</div>
+                            <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
+                        </div>
+                        <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
+                            {fmt(r['Valor_Num'])}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("Aguardando novas receitas na Caixa Econômica vinculadas a contas de convênios.")
         st.markdown("</div>", unsafe_allow_html=True)
+
     # --- FIM DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
 
     col_t_ult, col_btn_ult = st.columns([5, 1])
@@ -761,9 +790,6 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
-        # --- SOLUÇÃO DEFINITIVA ---
-        # Trocamos o st.tabs() por um st.radio() horizontal. 
-        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
             options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
@@ -771,7 +797,7 @@ elif st.session_state.pagina_atual == 'emendas':
             label_visibility="collapsed"
         )
         
-        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
+        st.markdown("<br>", unsafe_allow_html=True)
                     
         if aba_selecionada == "🎯 Por Fonte":
             st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
