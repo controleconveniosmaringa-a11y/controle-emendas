@@ -281,6 +281,8 @@ def obter_base_credito():
 
 @st.cache_data(ttl=60)
 def obter_base_maringa_csv():
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
+    att = agora.strftime("%d/%m/%Y às %H:%M")
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/emendas-maringa/main/maringa.csv?v={cache_buster}"
     try:
@@ -311,9 +313,9 @@ def obter_base_maringa_csv():
                 df['Valor_Num'] = df[col_valor].apply(limpar_moeda)
             else:
                 df['Valor_Num'] = 0.0
-        return df
+        return df, att
     except Exception:
-        return pd.DataFrame()
+        return pd.DataFrame(), "Falha na consulta"
 
 @st.cache_data(ttl=60)
 def obter_base_bancos():
@@ -337,7 +339,6 @@ def obter_base_bancos():
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
             
-            # FORMATANDO A DATA PARA NÃO MOSTRAR "00:00:00"
             df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
             
             df_b['Conta_Exibicao'] = df_b[col_conta]
@@ -618,7 +619,7 @@ if st.session_state.pagina_atual == 'menu_principal':
     st.markdown("---")
     
     # --- SEÇÃO REFORMULADA: IDENTIFICAÇÃO DE ANALISTA ---
-    st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 Identificação Pronta de Responsável</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
         st.markdown("<p style='font-size:13px; color:var(--text-muted); font-weight:500; margin-top:0;'>Digite a fonte, emenda ou convênio para localizar o analista responsável.</p>", unsafe_allow_html=True)
@@ -661,18 +662,11 @@ if st.session_state.pagina_atual == 'menu_principal':
     st.markdown("---")
 
     # --- SEÇÃO REFORMULADA: TESOURO NACIONAL ---
-    df_tesouro = obter_base_maringa_csv()
+    df_tesouro, att_tesouro = obter_base_maringa_csv()
     
     if not df_tesouro.empty:
-        df_datas_validas_tesouro = df_tesouro[df_tesouro['Data_Parse'] > pd.Timestamp('1900-01-01')]
-        if not df_datas_validas_tesouro.empty:
-            max_dt_tesouro = df_datas_validas_tesouro['Data_Parse'].max()
-            str_max_dt = max_dt_tesouro.strftime('%d/%m/%Y')
-        else:
-            str_max_dt = "Desconhecida"
-            
-        st.markdown(f"<div class='section-title'>🏛️ Monitoramento de Repasses - Tesouro Nacional <span style='font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: none;'>(Último registro na base: {str_max_dt})</span></div>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>⚠️ <b>Por que não atualiza diariamente?</b> O painel lê a base de dados em tempo real. Se a data acima estiver desatualizada, significa que a automação governamental externa (que extrai e salva o arquivo <code>maringa.csv</code> no repositório) não publicou dados novos hoje.</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='section-title'>🏛️ Monitoramento de Repasses - Tesouro Nacional <span style='font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: none;'>(Última consulta: {att_tesouro})</span></div>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>⚠️ <b>Por que não atualiza diariamente?</b> O painel lê a base de dados em tempo real. Se a data acima não é de hoje, significa que a automação governamental externa (que extrai e salva o arquivo <code>maringa.csv</code> no repositório) não publicou dados novos hoje.</p>", unsafe_allow_html=True)
         
         df_tesouro_sorted = df_tesouro.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
         
@@ -684,17 +678,19 @@ if st.session_state.pagina_atual == 'menu_principal':
             col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
             col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
             col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
+            col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
             
             categoria = str(r[col_categoria]) if col_categoria else '-'
             favorecido = str(r[col_favorecido]) if col_favorecido else '-'
             emenda = str(r[col_emenda]) if col_emenda else '-'
+            mes_t = str(r[col_mes]) if col_mes else '-'
             valor_fmt = fmt(r['Valor_Num'])
             
             st.markdown(f"""
             <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
                 <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
                     <div style='flex: 1; min-width: 0;'>
-                        <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {data_t} &nbsp;|&nbsp; Emenda: {emenda} &nbsp;|&nbsp; Categoria: {categoria}</div>
+                        <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {data_t} &nbsp;|&nbsp; Mês: {mes_t} &nbsp;|&nbsp; Emenda: {emenda} &nbsp;|&nbsp; Categoria: {categoria}</div>
                         <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'><b>Favorecido:</b> {favorecido}</div>
                     </div>
                     <div style='font-size: 14px; font-weight: 800; color: var(--purple-val); white-space: nowrap; padding-top: 2px;'>
