@@ -337,6 +337,7 @@ def obter_base_bancos():
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
             
+            # FORMATANDO A DATA PARA NÃO MOSTRAR "00:00:00"
             df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
             
             df_b['Conta_Exibicao'] = df_b[col_conta]
@@ -498,7 +499,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         <div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #facc15; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'>
             <div style='background-color: rgba(250, 204, 21, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'>
                 <h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>
-                    🟡 Banco do Brasil <span style='font-size:10px; background:#facc15; color:#451a03; padding:2px 8px; border-radius:12px;'>Top 5</span>
+                    🟡 Banco do Brasil
                 </h4>
             </div>
             <div style='padding: 10px 20px;'>
@@ -530,7 +531,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         <div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #0284c7; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'>
             <div style='background-color: rgba(2, 132, 199, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'>
                 <h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>
-                    🔵 Caixa Econômica <span style='font-size:10px; background:#0284c7; color:#ffffff; padding:2px 8px; border-radius:12px;'>Top 5</span>
+                    🔵 Caixa Econômica
                 </h4>
             </div>
             <div style='padding: 10px 20px;'>
@@ -616,57 +617,94 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     st.markdown("---")
     
-    st.markdown("<div class='search-box-highlight'>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 14px; font-weight: 800; color: var(--blue-val); margin-top:0; margin-bottom:10px; text-transform: uppercase; letter-spacing:0.5px;'>🔍 Identificação Pronta de Analista</p>", unsafe_allow_html=True)
-    busca_conv_home = st.text_input("Busque por número da fonte, do convênio ou da emenda:", key="busca_conv_home", placeholder="Digite o termo ou código da pesquisa aqui...")
+    # --- SEÇÃO REFORMULADA: IDENTIFICAÇÃO DE ANALISTA ---
+    st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 Identificação Pronta de Responsável</div>", unsafe_allow_html=True)
+    c_search, c_res = st.columns([1, 2], gap="large")
+    with c_search:
+        st.markdown("<p style='font-size:13px; color:var(--text-muted); font-weight:500; margin-top:0;'>Digite a fonte, emenda ou convênio para localizar o analista responsável.</p>", unsafe_allow_html=True)
+        busca_conv_home = st.text_input("Busca:", key="busca_conv_home", placeholder="Ex: SEI 1234, Saúde, 1000...", label_visibility="collapsed")
     
-    if busca_conv_home:
-        if not df_conv.empty:
-            mask_home = pd.Series(False, index=df_conv.index)
-            for col in df_conv.columns:
-                mask_home |= df_conv[col].astype(str).str.contains(busca_conv_home, case=False, na=False)
-            df_encontrado_home = df_conv[mask_home]
-            
-            if not df_encontrado_home.empty:
-                if 'RESPONSÁVEL' in df_encontrado_home.columns:
-                    analistas_unicos = [a for a in df_encontrado_home['RESPONSÁVEL'].unique() if str(a).strip() != ""]
-                    if analistas_unicos:
-                        for analista in analistas_unicos:
-                            st.markdown(f"<div style='background-color:var(--card-bg); border-left:4px solid var(--success-val); padding:12px 18px; border-radius:4px; margin-top:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-size:14px; color:var(--text-main);'><b>Analista responsável:</b> <span style='color:var(--success-val); font-weight:700;'>{analista}</span></div>", unsafe_allow_html=True)
-                    else: st.markdown("<p style='font-size:13px; color:var(--text-muted); margin-top:5px;'>⚠️ Registro localizado, mas sem analista associado.</p>", unsafe_allow_html=True)
-                else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>⚠️ Coluna de responsabilidade ausente.</p>", unsafe_allow_html=True)
-            else: st.markdown("<p style='font-size:13px; color:var(--danger-val); margin-top:5px;'>❌ Nenhum registro de convênio localizado com esse termo.</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    with c_res:
+        if busca_conv_home:
+            if not df_conv.empty:
+                mask_home = pd.Series(False, index=df_conv.index)
+                for col in df_conv.columns:
+                    mask_home |= df_conv[col].astype(str).str.contains(busca_conv_home, case=False, na=False)
+                df_encontrado_home = df_conv[mask_home]
+                
+                if not df_encontrado_home.empty:
+                    if 'RESPONSÁVEL' in df_encontrado_home.columns:
+                        analistas_unicos = [a for a in df_encontrado_home['RESPONSÁVEL'].unique() if str(a).strip() != ""]
+                        if analistas_unicos:
+                            for analista in analistas_unicos:
+                                st.markdown(f'''
+                                <div style='background: var(--link-bg); border: 1px solid var(--blue-val); border-left: 4px solid var(--blue-val); border-radius: 6px; padding: 12px 16px; margin-bottom: 8px;'>
+                                    <div style='font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;'>Analista Encontrado</div>
+                                    <div style='font-size: 15px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;'>
+                                        👤 {analista}
+                                    </div>
+                                </div>
+                                ''', unsafe_allow_html=True)
+                        else: 
+                            st.warning("⚠️ Registro localizado, mas sem analista associado na coluna.")
+                    else: 
+                        st.error("⚠️ Coluna 'RESPONSÁVEL' não encontrada na planilha de convênios.")
+                else: 
+                    st.error(f"❌ Nenhum registro encontrado para o termo '{busca_conv_home}'.")
+        else:
+            st.markdown("""
+            <div style='border: 1px dashed var(--card-border); border-radius: 6px; padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;'>
+                Os resultados da sua busca aparecerão aqui.
+            </div>
+            """, unsafe_allow_html=True)
 
-    col_t_ult, col_btn_ult = st.columns([5, 1])
-    with col_t_ult:
-        st.markdown("<div class='section-title'>🏛️ Monitoramento de Repasses Públicos - Fonte Tesouro Nacional</div>", unsafe_allow_html=True)
-    with col_btn_ult:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Atualizar Painel", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+    st.markdown("---")
 
+    # --- SEÇÃO REFORMULADA: TESOURO NACIONAL ---
     df_tesouro = obter_base_maringa_csv()
+    
     if not df_tesouro.empty:
+        df_datas_validas_tesouro = df_tesouro[df_tesouro['Data_Parse'] > pd.Timestamp('1900-01-01')]
+        if not df_datas_validas_tesouro.empty:
+            max_dt_tesouro = df_datas_validas_tesouro['Data_Parse'].max()
+            str_max_dt = max_dt_tesouro.strftime('%d/%m/%Y')
+        else:
+            str_max_dt = "Desconhecida"
+            
+        st.markdown(f"<div class='section-title'>🏛️ Monitoramento de Repasses - Tesouro Nacional <span style='font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: none;'>(Último registro na base: {str_max_dt})</span></div>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>⚠️ <b>Por que não atualiza diariamente?</b> O painel lê a base de dados em tempo real. Se a data acima estiver desatualizada, significa que a automação governamental externa (que extrai e salva o arquivo <code>maringa.csv</code> no repositório) não publicou dados novos hoje.</p>", unsafe_allow_html=True)
+        
         df_tesouro_sorted = df_tesouro.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
-        col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
-        col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
-        col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
-        col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
         
-        disp_tesouro = pd.DataFrame({
-            'Mês': df_tesouro_sorted[col_mes] if col_mes else '-',
-            'Categoria Econômica': df_tesouro_sorted[col_categoria] if col_categoria else '-',
-            'Favorecido': df_tesouro_sorted[col_favorecido] if col_favorecido else '-',
-            'Emenda': df_tesouro_sorted[col_emenda] if col_emenda else '-',
-            'Valor (R$)': df_tesouro_sorted['Valor_Num']
-        })
+        st.markdown("<div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid var(--purple-val); border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-top:0; color:var(--text-main); font-size:16px; margin-bottom: 15px;'>🏛️ Últimos Repasses Federais Identificados</h4>", unsafe_allow_html=True)
         
-        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>Últimas 5 emendas registradas na base do Tesouro Nacional (via emendas-maringa).</p>", unsafe_allow_html=True)
-        st.dataframe(disp_tesouro.style.set_table_styles([
-            {'selector': 'th', 'props': [('background-color', 'var(--blue-val)'), ('color', '#ffffff'), ('font-weight', 'bold'), ('text-transform', 'uppercase'), ('font-size', '11px')]}
-        ]).format({'Valor (R$)': fmt}), use_container_width=True, hide_index=True)
+        for _, r in df_tesouro_sorted.iterrows():
+            data_t = pd.to_datetime(r['Data_Parse']).strftime('%d/%m/%Y') if pd.notnull(r['Data_Parse']) and r['Data_Parse'] > pd.Timestamp('1900-01-01') else '-'
+            col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
+            col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
+            col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
+            
+            categoria = str(r[col_categoria]) if col_categoria else '-'
+            favorecido = str(r[col_favorecido]) if col_favorecido else '-'
+            emenda = str(r[col_emenda]) if col_emenda else '-'
+            valor_fmt = fmt(r['Valor_Num'])
+            
+            st.markdown(f"""
+            <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
+                <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
+                    <div style='flex: 1; min-width: 0;'>
+                        <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {data_t} &nbsp;|&nbsp; Emenda: {emenda} &nbsp;|&nbsp; Categoria: {categoria}</div>
+                        <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'><b>Favorecido:</b> {favorecido}</div>
+                    </div>
+                    <div style='font-size: 14px; font-weight: 800; color: var(--purple-val); white-space: nowrap; padding-top: 2px;'>
+                        {valor_fmt}
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     else: 
         st.info("ℹ️ Não foi possível carregar a base maringa.csv no momento. Verifique se o arquivo existe no repositório emendas-maringa do GitHub.")
 
@@ -875,6 +913,9 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
+        # --- SOLUÇÃO DEFINITIVA ---
+        # Trocamos o st.tabs() por um st.radio() horizontal. 
+        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
             options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
@@ -882,7 +923,7 @@ elif st.session_state.pagina_atual == 'emendas':
             label_visibility="collapsed"
         )
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
                     
         if aba_selecionada == "🎯 Por Fonte":
             st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
