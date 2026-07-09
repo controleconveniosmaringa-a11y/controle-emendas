@@ -479,12 +479,27 @@ if st.session_state.pagina_atual == 'menu_principal':
     df_bancos = obter_base_bancos()
     
     contas_validas = []
+    mapa_fontes = {}
+    
     if not df_conv.empty and 'CONTA CORRENTE' in df_conv.columns:
+        # Criando dicionário para mapear a Conta Corrente para a Fonte de Recurso
+        if 'FONTE DE RECURSO' in df_conv.columns:
+            for _, row in df_conv.iterrows():
+                c_clean = clean_conta(str(row['CONTA CORRENTE']))
+                f_rec = str(row['FONTE DE RECURSO']).strip()
+                if c_clean and f_rec and f_rec.lower() != 'nan':
+                    if c_clean not in mapa_fontes:
+                        mapa_fontes[c_clean] = f_rec
+                        
         contas_validas = df_conv['CONTA CORRENTE'].apply(clean_conta).unique().tolist()
         contas_validas = [c for c in contas_validas if c != '']
         
-    df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))] if not df_bancos.empty and contas_validas else pd.DataFrame()
+    df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))].copy() if not df_bancos.empty and contas_validas else pd.DataFrame()
     
+    if not df_receitas.empty:
+        # Adicionando a fonte cruzada no dataframe de receitas
+        df_receitas['Fonte_Conv'] = df_receitas['Conta_Clean'].map(mapa_fontes).fillna('-')
+        
     if not df_bancos.empty:
         df_datas_validas = df_bancos[df_bancos['Data_Parse'] > pd.Timestamp('1900-01-01')]
         if not df_datas_validas.empty:
@@ -514,7 +529,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                 <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
                     <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
                         <div style='flex: 1; min-width: 0;'>
-                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']}</div>
+                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div>
                             <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
                         </div>
                         <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
@@ -538,7 +553,7 @@ if st.session_state.pagina_atual == 'menu_principal':
                 <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
                     <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
                         <div style='flex: 1; min-width: 0;'>
-                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']}</div>
+                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div>
                             <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
                         </div>
                         <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
@@ -790,6 +805,9 @@ elif st.session_state.pagina_atual == 'emendas':
         fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
         st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
         
+        # --- SOLUÇÃO DEFINITIVA ---
+        # Trocamos o st.tabs() por um st.radio() horizontal. 
+        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
         aba_selecionada = st.radio(
             "Navegação:",
             options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
@@ -797,7 +815,7 @@ elif st.session_state.pagina_atual == 'emendas':
             label_visibility="collapsed"
         )
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
                     
         if aba_selecionada == "🎯 Por Fonte":
             st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
