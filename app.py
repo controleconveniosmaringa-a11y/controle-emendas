@@ -255,8 +255,8 @@ def obter_base_credito():
         return [''] * len(df_raw)
         
     df = pd.DataFrame()
-    if ext_c('programa', 'programa') == [''] * len(df_raw): df['PROGRAMA'] = ['NÃO ESPECIFICADO'] * len(df_raw)
-    else: df['PROGRAMA'] = [str(i).upper().strip() if str(i).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for i in df_raw['PROGRAMA'] ] if 'PROGRAMA' in df_raw.columns else ['NÃO ESPECIFICADO'] * len(df_raw)
+    prog_vals = ext_c('programa', 'programa')
+    df['PROGRAMA'] = [str(x).upper().strip() if str(x).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for x in prog_vals]
     df['DATA'] = ext_c('data', 'data')
     df['EMPENHO'] = ext_c('empenho', 'empenho')
     df['FORNECEDOR'] = ext_c('fornecedor', 'fornecedor')
@@ -265,6 +265,7 @@ def obter_base_credito():
     df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
+    
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
         v_str = re.sub(r'[^\d.,-]', '', v_str)
@@ -275,12 +276,17 @@ def obter_base_credito():
         elif ',' in v_str: v_str = v_str.replace(',', '.')
         try: return float(v_str)
         except ValueError: return 0.0
+        
     df['REPASSE'] = [limpar_moeda(v) for v in ext_c('repasse', 'repass')]
+    df['RENDIMENTO'] = [limpar_moeda(v) for v in ext_c('rendimento', 'rendim')]
     df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valordespesa', 'despesa')]
+    
     return df, att
 
 @st.cache_data(ttl=60)
 def obter_base_maringa_csv():
+    agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
+    att = agora.strftime("%d/%m/%Y às %H:%M")
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/emendas-maringa/main/maringa.csv?v={cache_buster}"
     try:
@@ -311,9 +317,9 @@ def obter_base_maringa_csv():
                 df['Valor_Num'] = df[col_valor].apply(limpar_moeda)
             else:
                 df['Valor_Num'] = 0.0
-        return df
+        return df, att
     except Exception:
-        return pd.DataFrame()
+        return pd.DataFrame(), "Falha na consulta"
 
 @st.cache_data(ttl=60)
 def obter_base_bancos():
@@ -337,7 +343,6 @@ def obter_base_bancos():
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
             
-            # FORMATANDO A DATA PARA NÃO MOSTRAR "00:00:00"
             df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
             
             df_b['Conta_Exibicao'] = df_b[col_conta]
@@ -389,13 +394,21 @@ def processar_saldos_acumulados(df_programa):
         dados_finais = {}
         for aba_nome in abas:
             df_aba = df_programa[df_programa['REF VALOR REPASSADO'] == aba_nome]
-            repasse_puro_atual = df_aba['REPASSE'].sum()
-            despesas_atuais = df_aba['VALOR DESPESA'].sum()
-            recurso_disponivel_total = repasse_puro_atual + saldo_anterior
+            repasse_puro_atual = df_aba['REPASSE'].sum() if 'REPASSE' in df_aba.columns else 0.0
+            rendimento_atual = df_aba['RENDIMENTO'].sum() if 'RENDIMENTO' in df_aba.columns else 0.0
+            despesas_atuais = df_aba['VALOR DESPESA'].sum() if 'VALOR DESPESA' in df_aba.columns else 0.0
+            
+            recurso_disponivel_total = repasse_puro_atual + rendimento_atual + saldo_anterior
             saldo_remanescente_final = recurso_disponivel_total - despesas_atuais
+            
             dados_finais[aba_nome] = {
-                'repasse_atual': repasse_puro_atual, 'saldo_anterior': saldo_anterior, 'total_disponivel': recurso_disponivel_total,
-                'total_despesa': despesas_atuais, 'saldo_final': saldo_remanescente_final, 'df_filtrado': df_aba
+                'repasse_atual': repasse_puro_atual,
+                'rendimento_atual': rendimento_atual,
+                'saldo_anterior': saldo_anterior, 
+                'total_disponivel': recurso_disponivel_total,
+                'total_despesa': despesas_atuais, 
+                'saldo_final': saldo_remanescente_final, 
+                'df_filtrado': df_aba
             }
             saldo_anterior = saldo_remanescente_final
         return dados_finais, abas
@@ -618,7 +631,7 @@ if st.session_state.pagina_atual == 'menu_principal':
     st.markdown("---")
     
     # --- SEÇÃO REFORMULADA: IDENTIFICAÇÃO DE ANALISTA ---
-    st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 Identificação Pronta de Responsável</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
         st.markdown("<p style='font-size:13px; color:var(--text-muted); font-weight:500; margin-top:0;'>Digite a fonte, emenda ou convênio para localizar o analista responsável.</p>", unsafe_allow_html=True)
@@ -661,18 +674,11 @@ if st.session_state.pagina_atual == 'menu_principal':
     st.markdown("---")
 
     # --- SEÇÃO REFORMULADA: TESOURO NACIONAL ---
-    df_tesouro = obter_base_maringa_csv()
+    df_tesouro, att_tesouro = obter_base_maringa_csv()
     
     if not df_tesouro.empty:
-        df_datas_validas_tesouro = df_tesouro[df_tesouro['Data_Parse'] > pd.Timestamp('1900-01-01')]
-        if not df_datas_validas_tesouro.empty:
-            max_dt_tesouro = df_datas_validas_tesouro['Data_Parse'].max()
-            str_max_dt = max_dt_tesouro.strftime('%d/%m/%Y')
-        else:
-            str_max_dt = "Desconhecida"
-            
-        st.markdown(f"<div class='section-title'>🏛️ Monitoramento de Repasses - Tesouro Nacional <span style='font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: none;'>(Último registro na base: {str_max_dt})</span></div>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>⚠️ <b>Por que não atualiza diariamente?</b> O painel lê a base de dados em tempo real. Se a data acima estiver desatualizada, significa que a automação governamental externa (que extrai e salva o arquivo <code>maringa.csv</code> no repositório) não publicou dados novos hoje.</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='section-title'>🏛️ Monitoramento de Repasses - Tesouro Nacional <span style='font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: none;'>(Última consulta: {att_tesouro})</span></div>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;'>⚠️ <b>Por que não atualiza diariamente?</b> O painel lê a base de dados em tempo real. Se a data acima não é de hoje, significa que a automação governamental externa (que extrai e salva o arquivo <code>maringa.csv</code> no repositório) não publicou dados novos hoje.</p>", unsafe_allow_html=True)
         
         df_tesouro_sorted = df_tesouro.sort_values(by=['Data_Parse', 'idx'], ascending=[False, False]).head(5)
         
@@ -684,17 +690,19 @@ if st.session_state.pagina_atual == 'menu_principal':
             col_categoria = next((c for c in df_tesouro_sorted.columns if 'CATEGORIA' in c.upper()), None)
             col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
             col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
+            col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
             
             categoria = str(r[col_categoria]) if col_categoria else '-'
             favorecido = str(r[col_favorecido]) if col_favorecido else '-'
             emenda = str(r[col_emenda]) if col_emenda else '-'
+            mes_t = str(r[col_mes]) if col_mes else '-'
             valor_fmt = fmt(r['Valor_Num'])
             
             st.markdown(f"""
             <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
                 <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
                     <div style='flex: 1; min-width: 0;'>
-                        <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {data_t} &nbsp;|&nbsp; Emenda: {emenda} &nbsp;|&nbsp; Categoria: {categoria}</div>
+                        <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {data_t} &nbsp;|&nbsp; Mês: {mes_t} &nbsp;|&nbsp; Emenda: {emenda} &nbsp;|&nbsp; Categoria: {categoria}</div>
                         <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'><b>Favorecido:</b> {favorecido}</div>
                     </div>
                     <div style='font-size: 14px; font-weight: 800; color: var(--purple-val); white-space: nowrap; padding-top: 2px;'>
@@ -809,7 +817,7 @@ elif st.session_state.pagina_atual == 'finisa':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -842,7 +850,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
