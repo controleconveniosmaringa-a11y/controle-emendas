@@ -157,7 +157,7 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE
+# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE E BLINDAGEM DE ERROS
 @st.cache_data(ttl=60)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -165,13 +165,17 @@ def obter_base_dados_global():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv?v={cache_buster}"
     try:
-        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         if os.path.exists("dados.csv"):
-            df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-            timestamp = os.path.getmtime("dados.csv")
-            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            try:
+                df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+                timestamp = os.path.getmtime("dados.csv")
+                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            except Exception:
+                return pd.DataFrame(), "Erro na leitura do arquivo local"
         else: return pd.DataFrame(), "Indisponível"
+        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -215,13 +219,17 @@ def obter_base_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv?v={cache_buster}"
     try:
-        d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         if os.path.exists("Divisão Convenios - Divisao.csv"):
-            d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-            timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
-            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            try:
+                d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+                timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
+                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            except Exception:
+                return pd.DataFrame(), "Erro na leitura do arquivo local"
         else: return pd.DataFrame(), "Indisponível"
+        
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
@@ -235,13 +243,17 @@ def obter_base_credito():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/{nome_arquivo}?v={cache_buster}"
     try:
-        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         if os.path.exists(nome_arquivo):
-            df_raw = pd.read_csv(nome_arquivo, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
-            timestamp = os.path.getmtime(nome_arquivo)
-            att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            try:
+                df_raw = pd.read_csv(nome_arquivo, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+                timestamp = os.path.getmtime(nome_arquivo)
+                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
+            except Exception:
+                return pd.DataFrame(), "Erro na leitura do arquivo local"
         else: return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
+        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -290,7 +302,7 @@ def obter_base_maringa_csv():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/emendas-maringa/main/maringa.csv?v={cache_buster}"
     try:
-        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
         if not df.empty:
             df.columns = [str(c).strip() for c in df.columns]
             df['idx'] = df.index 
@@ -329,7 +341,7 @@ def obter_base_bancos():
     
     def processar_extrato(url, banco_nome):
         try:
-            df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False)
+            df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
             if df_b.empty: return pd.DataFrame()
             
             cols = {str(c).strip().lower(): c for c in df_b.columns}
