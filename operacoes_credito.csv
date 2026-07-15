@@ -128,36 +128,36 @@ EMPENHO,REPASSE,FORNECEDOR,TIPO DE DOCUMENTO,Nº DOCUMENTO,VALOR DESPESA,DESCRI�
 3321/2025,,PORTO BLANCO CONSTRUCOES LTDA - EPP,Nota Fiscal,1121,"-45.350,79",UBS VILA OPERÁRIA,1° repasse,"338.493,91",,FINISA
 ,,,,,"-338493,91",SALDO DEVOLVIDO,1° repasse,"0,00",,FINISA
 ,"63.000.000,00",,,,,,2° repasse,"63.000.000,00",,FINISA
-5272/2025,,,,,"-117.500,00",Guarda Municipal (armamento calibre 38),2° repasse,"62.882.500,00",,FINISA
-5864/2025,,,,,"-294.140,00",Guarda Municipal (veículo),2° repasse,"62.588.360,00",,FINISA
-3321/2025,,,,,"-209.241,53",UBS Vila Operária,2° repasse,"62.379.118,47",,FINISA
-27956/2024,,,,,"-178.450,26",Eixo monumental,2° repasse,"62.200.668,21",,FINISA
-3320/2025,,,,,"-91.637,20",UBS Andréa,2° repasse,"62.109.031,01",,FINISA
-3320/2025,,,,,"-101.233,71",UBS Andréa,2° repasse,"62.007.797,30",,FINISA
+5272/2025,,PUMA ARTIGOS DE SEGURANÇA LTDA -ME,Nota Fiscal ,1750,"-117.500,00",Guarda Municipal (armamento calibre 38),2° repasse,"62.882.500,00",,FINISA
+5864/2025,,LOUREIRO E FIGUEIREDO COMERCIO DE VEICULOS LTDA,Nota Fiscal ,19351/19352,"-294.140,00",Guarda Municipal (veículo),2° repasse,"62.588.360,00",,FINISA
+3321/2025,,PORTO BLANCO CONSTRUCOES LTDA - EPP,Nota Fiscal ,1122,"-209.241,53",UBS Vila Operária,2° repasse,"62.379.118,47",,FINISA
+27956/2024,,SIAL CONSTRUCOES CIVIS LTDA,Nota Fiscal ,4063,"-178.450,26",Eixo monumental,2° repasse,"62.200.668,21",,FINISA
+3320/2025,,PAGLIA EMPREENDIMENTOS CONSTRUTORA LTDA,Nota Fiscal ,27,"-91.637,20",UBS Andréa,2° repasse,"62.109.031,01",,FINISA
+3320/2025,,PAGLIA EMPREENDIMENTOS CONSTRUTORA LTDA,Nota Fiscal ,29,"-101.233,71",UBS Andréa,2° repasse,"62.007.797,30",,FINISA
 contrapartida HMM,,,,,"-471.990,68",contrapartida HMM,2° repasse,"61.535.806,62",,FINISA
-27956/2024,,,,,"-60.031,04",Eixo monumental,2° repasse,"61.475.775,58",,FINISA
-33915/2024,,,,,"-48.186,99",Hospital Municipal,2° repasse,"61.427.588,59",,FINISA
-7766/2025,,,,,"-115.425,87",Oscar Niemeyer,2° repasse,"61.312.162,72",,FINISA
-7766/2025,,,,,"-592.567,09",Oscar Niemeyer,2° repasse,"60.719.595,63",,FINISA
-16280/2025,,,,,"-14.029,14",Guarda Municipal (armamento não letal),2° repasse,"60.705.566,49",,FINISA
-21464/2025,,,,,"-25.417.845,00",Desapropriação,2° repasse,"35.287.721,49",,FINISA
-21465/2025,,,,,"-28.011.888,40",Desapropriação,2° repasse,"7.275.833,09",,FINISA
-16835/2025,,,,,"-45.215,38",Hospital Municipal,2° repasse,"7.230.617,71",,FINISA
-contrapartida HMM,,,,,"-5.864,55",contrapartida HMM,2° repasse,"7.224.753,16",,FINISA
-3321/2025,,,,,"-103.234,26",UBS Vila Operária,2° repasse,"7.121.518,90",,FINISA
-21368/2025,,,,,"-3.767,31",Centro Esportivo Vila Operária,2° repasse,"7.117.751,59",,FINISA
-33915/2024,,,,,"-1.462,81",Hospital Municipal,2° repasse,"7.116.288,78",,FINISA
-21368/2025,,,,,"-63.738,01",Centro Esportivo Vila Operária,2° repasse,"7.052.550,77",,FINISA
-28358/2024,,,,,"-101.512,60",Centro Esportivo Três Lagoas,2° repasse,"6.951.038,17",,FINISA
-39093/2024,,,,,"-11.069,69",Centro Esportivo Três Lagoas,2° repasse,"6.939.968,48",,FINISA
-3320/2025,,,,,"-158.038,10",UBS Andréa,2° repasse,"6.781.930,38",,FINISA
-9865/2025,,,,,"-25.020,71",UBS Andréa,2° repasse,"6.756.909,67",,FINISA
-11508/2025,,,,,"-39.841,99",Centro Esportivo Vila Operária,2° repasse,"6.717.067,68",,FINISA
-39113/2024,,,,,"-115.327,39",Centro Esportivo Três Lagoas,2° repasse,"6.601.740,29",,FINISA
-7766/2025,,,,,"-1.210.653,95",Oscar Niemeyer,2° repasse,"5.391.086,34",,FINISA
-40604/2024,,,,,"-14.540,69",IPTU de desapropriação,2° repasse,"5.376.545,65",,FINISA
-40604/2024,,,,,"-501.146,88",Desapropriação,2° repasse,"4.875.398,77",,FINISA
-12409/2025,,,,,"-38.868,52",Hospital Municipal,2° repasse,"4.836.530,25",,FINISA
+27956/2024,,SIAL CONSTRUCOES CIVIS LTDA,Nota Fiscal ,4090,"-60.031,04",Eixo monumental,2° repasse,"61.475.775,58",,FINISA
+33915/2024,,"IMPLANTA CONSTRUÇÕES , INCORPORAÇÕES ",Nota Fiscal ,1320,"-48.186,99",Hospital Municipal,2° repasse,"61.427.588,59",,FINISA
+7766/2025,,TECON TECNOLOGIA EM CONSTRUÇÕES LTDA,Nota Fiscal ,674,"-115.425,87",Oscar Niemeyer,2° repasse,"61.312.162,72",,FINISA
+7766/2025,,TECON TECNOLOGIA EM CONSTRUÇÕES LTDA,Nota Fiscal ,663,"-592.567,09",Oscar Niemeyer,2° repasse,"60.719.595,63",,FINISA
+16280/2025,,CONDOR S/A INDUSTRIA QUIMICA,Nota Fiscal ,40355,"-14.029,14",Guarda Municipal (armamento não letal),2° repasse,"60.705.566,49",,FINISA
+21464/2025,,FRANCISCA FIGUEIREDO ZEQUINI,Escritura,,"-25.417.845,00",Desapropriação,2° repasse,"35.287.721,49",,FINISA
+21465/2025,,FRANCISCA FIGUEIREDO ZEQUINI,Escritura,,"-28.011.888,40",Desapropriação,2° repasse,"7.275.833,09",,FINISA
+16835/2025,,"IMPLANTA CONSTRUÇÕES , INCORPORAÇÕES ",Nota Fiscal ,1325,"-45.215,38",Hospital Municipal,2° repasse,"7.230.617,71",,FINISA
+contrapartida HMM,,"IMPLANTA CONSTRUÇÕES , INCORPORAÇÕES ",Nota Fiscal ,1327,"-5.864,55",contrapartida HMM,2° repasse,"7.224.753,16",,FINISA
+3321/2025,,PORTO BLANCO CONSTRUCOES LTDA - EPP,Nota Fiscal ,1123,"-103.234,26",UBS Vila Operária,2° repasse,"7.121.518,90",,FINISA
+21368/2025,,CS MAGON CONSTRUTORA LTDA,Nota Fiscal ,347,"-3.767,31",Centro Esportivo Vila Operária,2° repasse,"7.117.751,59",,FINISA
+33915/2024,,"IMPLANTA CONSTRUÇÕES , INCORPORAÇÕES ",Nota Fiscal ,1328,"-1.462,81",Hospital Municipal,2° repasse,"7.116.288,78",,FINISA
+21368/2025,,CS MAGON CONSTRUTORA LTDA,Nota Fiscal ,346,"-63.738,01",Centro Esportivo Vila Operária,2° repasse,"7.052.550,77",,FINISA
+28358/2024,,TRADIÇÃO CONSTRUÇÕES CIVIS ,Nota Fiscal ,490,"-101.512,60",Centro Esportivo Três Lagoas,2° repasse,"6.951.038,17",,FINISA
+39093/2024,,TRADIÇÃO CONSTRUÇÕES CIVIS ,Nota Fiscal ,492,"-11.069,69",Centro Esportivo Três Lagoas,2° repasse,"6.939.968,48",,FINISA
+3320/2025,,PAGLIA EMPREENDIMENTOS CONSTRUTORA LTDA,Nota Fiscal ,30,"-158.038,10",UBS Andréa,2° repasse,"6.781.930,38",,FINISA
+9865/2025,,PAGLIA EMPREENDIMENTOS CONSTRUTORA LTDA,Nota Fiscal ,31,"-25.020,71",UBS Andréa,2° repasse,"6.756.909,67",,FINISA
+11508/2025,,CS MAGON CONSTRUTORA LTDA,Nota Fiscal ,348,"-39.841,99",Centro Esportivo Vila Operária,2° repasse,"6.717.067,68",,FINISA
+39113/2024,,TRADICAO CONSTRUCOES CIVIS - EIRELI,Nota Fiscal ,493,"-115.327,39",Centro Esportivo Três Lagoas,2° repasse,"6.601.740,29",,FINISA
+7766/2025,,TECON TECNOLOGIA EM CONSTRUCOES LTDA,Nota Fiscal ,685,"-1.210.653,95",Oscar Niemeyer,2° repasse,"5.391.086,34",,FINISA
+40604/2024,,IPTU de desapropriação,,,"-14.540,69",IPTU de desapropriação,2° repasse,"5.376.545,65",,FINISA
+40604/2024,,KWP BR IMOVEIS SPE LTDA,Escritura,,"-501.146,88",Desapropriação,2° repasse,"4.875.398,77",,FINISA
+12409/2025,,"IMPLANTA CONSTRUCOES, INCORPORACOES E SERVICOS DE ENGENHARIA",Nota Fiscal,1335,"-38.868,52",Hospital Municipal,2° repasse,"4.836.530,25",,FINISA
 3320/2025,,,,,"-98.380,51",UBS Andréa,2° repasse,"4.738.149,74",,FINISA
 9865/2025,,,,,"-7.014,78",UBS Andréa,2° repasse,"4.731.134,96",,FINISA
 24724/2025,,,,,"-0,10",Centro Esportivo Três Lagoas,2° repasse,"4.731.134,86",,FINISA
