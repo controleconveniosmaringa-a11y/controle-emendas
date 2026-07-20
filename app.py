@@ -158,36 +158,40 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 # ==============================================================================
-# MOTOR MATEMÁTICO BLINDADO (NOVO)
+# MOTOR MATEMÁTICO BLINDADO ABSOLUTO (NOVO)
 # ==============================================================================
 def limpar_moeda_blindada(val):
-    v_str = str(val)
+    v_str = str(val).strip()
     if not v_str or v_str.lower() in ['nan', 'none', 'null', '']: return 0.0
     
-    # O regex abaixo pesquisa vírgula ou ponto no final, seguido de exatamente 1 ou 2 números.
-    # Ele ignora todos os parênteses e letras ou espaços em branco ao redor.
-    match = re.search(r'[.,](\d{1,2})(?:[^\d]*)$', v_str)
-    if match:
-        decimais = match.group(1)
-        inteiro_str = v_str[:match.start()]
-        # Removemos qualquer caractere que não seja número (destrói espaços, pontos, vírgulas de milhar)
-        inteiro_limpo = re.sub(r'\D', '', inteiro_str)
-        if not inteiro_limpo: inteiro_limpo = '0'
-        numero_final = f"{inteiro_limpo}.{decimais}"
-    else:
-        # Significa que o número é inteiro (ex: "1.350.000" sem decimais)
-        inteiro_limpo = re.sub(r'\D', '', v_str)
-        if not inteiro_limpo: inteiro_limpo = '0'
-        numero_final = f"{inteiro_limpo}.00"
+    # Remove TUDO que não for número, ponto ou vírgula (Mata parênteses, letras, traços invisíveis)
+    v_str = re.sub(r'[^\d.,]', '', v_str)
+    if not v_str: return 0.0
+    
+    # Encontra a posição do último ponto e da última vírgula
+    last_comma = v_str.rfind(',')
+    last_dot = v_str.rfind('.')
+    last_sep = max(last_comma, last_dot)
+    
+    if last_sep == -1:
+        try: return abs(float(v_str))
+        except: return 0.0
         
-    try:
-        # Devolve SEMPRE positivo (absoluto). O sistema cuida da matemática de subtração na interface!
-        return abs(float(numero_final))
-    except:
-        return 0.0
+    # Se os dígitos após o último separador forem no máximo 3, consideramos como decimal
+    if len(v_str) - last_sep <= 3:
+        inteiro = v_str[:last_sep].replace('.', '').replace(',', '')
+        decimal = v_str[last_sep+1:]
+        if not inteiro: inteiro = '0'
+        try: return abs(float(f"{inteiro}.{decimal}"))
+        except: return 0.0
+    else:
+        # Significa que é um separador de milhar (Ex: 1.350.000) sem decimais digitados
+        inteiro = v_str.replace('.', '').replace(',', '')
+        try: return abs(float(inteiro))
+        except: return 0.0
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE E BLINDAGEM DE ERROS
-@st.cache_data(ttl=60)
+# 3. CARREGAMENTO DOS BANCOS DE DADOS COM FURA-CACHE (MEMÓRIA REDUZIDA PARA ATUALIZAÇÃO RÁPIDA)
+@st.cache_data(ttl=15)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -229,14 +233,13 @@ def obter_base_dados_global():
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
     
-    # Motor cego e preciso para puxar os valores
     df['repasse'] = [limpar_moeda_blindada(v) for v in ext('repasse')]
     df['rendimento'] = [limpar_moeda_blindada(v) for v in ext('rendimento')]
     df['bruto'] = [limpar_moeda_blindada(v) for v in ext('bruto')]
     
     return df, att
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=15)
 def obter_base_convenios():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -259,7 +262,7 @@ def obter_base_convenios():
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
     return d, att
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=15)
 def obter_base_credito():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -302,14 +305,13 @@ def obter_base_credito():
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
     
-    # Motor cego e preciso para puxar os valores
     df['REPASSE'] = [limpar_moeda_blindada(v) for v in ext_c('repasse', 'repass')]
     df['RENDIMENTO'] = [limpar_moeda_blindada(v) for v in ext_c('rendimento', 'rendim')]
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     
     return df, att
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=15)
 def obter_base_maringa_csv():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     att = agora.strftime("%d/%m/%Y às %H:%M")
@@ -336,7 +338,7 @@ def obter_base_maringa_csv():
     except Exception:
         return pd.DataFrame(), "Falha na consulta"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=15)
 def obter_base_bancos():
     cache_buster = int(time.time())
     url_bb = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/banco_do_brasil.csv?v={cache_buster}"
@@ -444,8 +446,17 @@ df_conv, att_convenios = obter_base_convenios()
 df_cred_completo, att_cred = obter_base_credito()
 
 if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
-    df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA'].copy()
-    df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA'].copy()
+    # APLICADO O FILTRO FLEXÍVEL (Caso tenha erros de digitação no Excel original)
+    df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('FINISA', na=False)].copy()
+    df_usina = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('USINA', na=False)].copy()
+    
+    # APLICADA A BLINDAGEM DE SINAL EM AMBOS (Soma os valores positivos corretamente)
+    if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns:
+        df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
+    
+    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
+        df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
+        
 else:
     df_finisa = pd.DataFrame()
     df_usina = pd.DataFrame()
