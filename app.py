@@ -201,8 +201,8 @@ def obter_base_dados_global():
     df['DATA_LANCAMENTO'] = ext('data')
     def limpar_moeda(val):
         v_str = str(val).upper().replace('R$', '').strip()
-        v_str = re.sub(r'[^\d.,-]', '', v_str)
-        if not v_str or v_str == '-': return 0.0
+        v_str = re.sub(r'[^\d.,]', '', v_str) # Removido o sinal de menos para evitar erros
+        if not v_str: return 0.0
         if ',' in v_str and '.' in v_str:
             if v_str.rfind(',') > v_str.rfind('.'): v_str = v_str.replace('.', '').replace(',', '.')
             else: v_str = v_str.replace(',', '')
@@ -278,10 +278,12 @@ def obter_base_credito():
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
     
-    def limpar_moeda(val):
+    def limpar_moeda_absoluta(val):
         v_str = str(val).upper().replace('R$', '').strip()
-        v_str = re.sub(r'[^\d.,-]', '', v_str)
-        if not v_str or v_str == '-': return 0.0
+        # O Regex abaixo força a remoção de QUALQUER sinal negativo (-) ou parênteses ()
+        # Isso garante que a Despesa nunca anule a conta por causa de formatação errada
+        v_str = re.sub(r'[^\d.,]', '', v_str)
+        if not v_str: return 0.0
         if ',' in v_str and '.' in v_str:
             if v_str.rfind(',') > v_str.rfind('.'): v_str = v_str.replace('.', '').replace(',', '.')
             else: v_str = v_str.replace(',', '')
@@ -289,9 +291,9 @@ def obter_base_credito():
         try: return float(v_str)
         except ValueError: return 0.0
         
-    df['REPASSE'] = [limpar_moeda(v) for v in ext_c('repasse', 'repass')]
-    df['RENDIMENTO'] = [limpar_moeda(v) for v in ext_c('rendimento', 'rendim')]
-    df['VALOR DESPESA'] = [limpar_moeda(v) for v in ext_c('valordespesa', 'despesa')]
+    df['REPASSE'] = [limpar_moeda_absoluta(v) for v in ext_c('repasse', 'repass')]
+    df['RENDIMENTO'] = [limpar_moeda_absoluta(v) for v in ext_c('rendimento', 'rendim')]
+    df['VALOR DESPESA'] = [limpar_moeda_absoluta(v) for v in ext_c('valordespesa', 'despesa')]
     
     return df, att
 
@@ -309,7 +311,7 @@ def obter_base_maringa_csv():
             
             def limpar_moeda(val):
                 v_str = str(val).upper().replace('R$', '').strip()
-                v_str = re.sub(r'[^\d.,-]', '', v_str)
+                v_str = re.sub(r'[^\d.,]', '', v_str)
                 if not v_str or v_str == '-': return 0.0
                 if ',' in v_str and '.' in v_str:
                     if v_str.rfind(',') > v_str.rfind('.'): v_str = v_str.replace('.', '').replace(',', '.')
@@ -442,16 +444,6 @@ df_cred_completo, att_cred = obter_base_credito()
 if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA'].copy()
     df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA'].copy()
-    
-    # --- CORREÇÃO DE SINAL (FINISA E USINA) ---
-    # Torna as despesas estritamente positivas para que a soma fique correta, 
-    # a subtração ocorra da forma certa e apareça na tabela (que filtrava valores > 0)
-    if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns:
-        df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
-    
-    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
-        df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
-        
 else:
     df_finisa = pd.DataFrame()
     df_usina = pd.DataFrame()
