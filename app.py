@@ -443,11 +443,14 @@ if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'] == 'FINISA'].copy()
     df_usina = df_cred_completo[df_cred_completo['PROGRAMA'] == 'USINA FOTOVOLTAICA'].copy()
     
-    # --- CORREÇÃO SOLICITADA PARA O FINISA ---
+    # --- CORREÇÃO DE SINAL (FINISA E USINA) ---
     # Torna as despesas estritamente positivas para que a soma fique correta, 
     # a subtração ocorra da forma certa e apareça na tabela (que filtrava valores > 0)
     if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns:
         df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
+    
+    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
+        df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
         
 else:
     df_finisa = pd.DataFrame()
