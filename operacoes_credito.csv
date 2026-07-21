@@ -1,6 +1,6 @@
 EMPENHO,REPASSE,FORNECEDOR,TIPO DE DOCUMENTO,Nº DOCUMENTO,VALOR DESPESA,DESCRIÇÃO,REF VALOR REPASSADO,SALDO,LINK DOCUMENTO,PROGRAMA
 ,"20.000.000,00",,,,,Repasse,1° repasse,"20.000.000,00",,USINA FOTOVOLTAICA
-36052/2025,,SEMÍRAMIS DE CASTRO CARNELOSSI,ESCRITURA,,"(3.706.400,00)",Desapropriação,1° repasse,"16.293.600,00",https://drive.google.com/file/d/1XYGxR8AVGDH_2-skc7zM84FWBTo1hhRl/view?usp=drive_link,USINA FOTOVOLTAICA
+36052/2025,,SEMIRAMIS DE CASTRO CARNELOSSI,ESCRITURA,,"(3.706.400,00)",Desapropriação,1° repasse,"16.293.600,00",https://drive.google.com/file/d/1XYGxR8AVGDH_2-skc7zM84FWBTo1hhRl/view?usp=drive_link,USINA FOTOVOLTAICA
 36053/2025,,TRANSTODON LTDA EPP,ESCRITURA,,"(1.850.000,00)",Desapropriação,1° repasse,"14.443.600,00",https://drive.google.com/file/d/1BC5yXEyDVM4SLoQ9hHtloLSM4hvduwlt/view?usp=drive_link,USINA FOTOVOLTAICA
 41040/2025,,JOSE CAOVILLA FILHO,ESCRITURA,,"(1.350.000,00)",Desapropriação,1° repasse,"13.093.600,00",,USINA FOTOVOLTAICA
 41041/2025,,REINALDO CAOVILLA,ESCRITURA,,"(200.000,00)",Desapropriação,1° repasse,"12.893.600,00",,USINA FOTOVOLTAICA
@@ -289,3 +289,5 @@ sem emissão de empenho,,Deposito em juizo ,,,"-R$ 928.181,33",Deposito em juizo
 31947/2025,,,,,"-R$ 14.045,05",Eixo Monumental,5° repasse,"2.552.439,46",,FINISA
 Contrapartida - Honorato Vecchi - Transferegov 967927/2024,,,,,"-R$ 216.118,94",Centro Comunitário Honorato Vecchi,5° repasse,"2.336.320,52",,FINISA
 33915/2024,,,,,"-R$ 6.151,06",hospital municipal,5° repasse,"2.330.169,46",,FINISA
+,,,,,"-2330169,46",,5° repasse,"0,00",,FINISA
+,"18.000.000,00",,,,,,6° repasse,,,FINISA
