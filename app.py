@@ -307,19 +307,18 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO NOVA: CARREGA A PLANILHA "Gestão de Convênios.csv" APENAS PARA O FINISA
-@st.cache_data(ttl=15)
+# FUNÇÃO NOVA: CARREGA A PLANILHA "Gestão de Convênios.csv" COM ENCODING LATIN1
+@st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
-    # Link com formatação de caracteres especiais para evitar quebra no Github
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
     try:
-        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
         return df
     except Exception:
         if os.path.exists("Gestão de Convênios.csv"):
             try:
-                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
                 return df
             except Exception:
                 return pd.DataFrame()
@@ -504,6 +503,7 @@ if st.session_state.pagina_atual == 'menu_principal':
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
+    # CABEÇALHO PRINCIPAL REFORMULADO
     st.markdown(f"""
     <div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'>
         <div>
@@ -518,6 +518,7 @@ if st.session_state.pagina_atual == 'menu_principal':
     </div>
     """, unsafe_allow_html=True)
 
+    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS (AGORA NO TOPO) ---
     df_bancos = obter_base_bancos()
     
     contas_validas = []
@@ -863,14 +864,11 @@ elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
     
-    # Busca a base de Gestão de Convênios exclusiva para o Finisa
     df_gestao = obter_base_gestao_convenios()
-    
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
     
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
     
-    # Injeta a nova aba no início
     nomes_abas = ["📊 Controle Orçamento Finisa"] + [f"📥 {aba}" for aba in abas_exibicao]
     tabs_cred = st.tabs(nomes_abas)
     
