@@ -881,11 +881,14 @@ elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
     
+    # Busca a base de Gestão de Convênios exclusiva para o Finisa
     df_gestao = obter_base_gestao_convenios()
+    
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
     
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
     
+    # Injeta a nova aba no início
     nomes_abas = ["📊 Controle Orçamento Finisa"] + [f"📥 {aba}" for aba in abas_exibicao]
     tabs_cred = st.tabs(nomes_abas)
     
@@ -910,53 +913,46 @@ elif st.session_state.pagina_atual == 'finisa':
                 # RECONHECIMENTO INTELIGENTE: Se Dotação tá vazia e Projeto tem nome, é uma CATEGORIA (Subtítulo)
                 is_category = val_dot.strip() == '' and val_proj.strip() != ''
                 
-                # APLICAÇÃO DE CORES DA HIERARQUIA
-                if is_category:
-                    # Linha de Categoria (Azul Claro, Letras Azuis Forte)
-                    tr_style = "background-color: rgba(37, 99, 235, 0.12); border-bottom: 2px solid var(--blue-val);"
-                else:
-                    # Linha Normal (Fundo padrão da tabela)
-                    tr_style = "background-color: var(--table-bg);"
-                
                 td_html = ""
                 for c in valid_cols:
                     val = str(row.get(c, ''))
                     
                     if is_category:
-                        # Estilização exata das células de Agrupamento
+                        # SOLUÇÃO DEFINITIVA DA COR: Pinta a célula <td> diretamente (Não falha no Streamlit)
+                        base_td = "padding: 12px 15px; background-color: #e0f2fe !important; border-top: 1px solid #bfdbfe; border-bottom: 1px solid #bfdbfe;"
                         if c == col_proj:
-                            td_html += f"<td style='padding: 12px 15px; font-size: 13px; font-weight: 800; color: var(--blue-val); text-transform: uppercase;'>📂 {val}</td>"
+                            td_html += f"<td style='{base_td} font-size: 13px; font-weight: 800; color: #1e3a8a; text-transform: uppercase;'>📂 {val}</td>"
                         elif val.strip() != '':
-                            # Mantém as cores financeiras no grupo (Ex: Se tiver um Total)
                             if c == 'SALDO' or 'SALDO' in c:
-                                td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
+                                td_html += f"<td style='{base_td} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
                             elif c == 'PAGO' or 'PAGO' in c:
-                                td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--danger-val); text-align: right;'>{val}</td>"
+                                td_html += f"<td style='{base_td} font-weight: 800; color: var(--danger-val); text-align: right;'>{val}</td>"
                             elif 'APROVADO' in c:
-                                td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--blue-val); text-align: right;'>{val}</td>"
+                                td_html += f"<td style='{base_td} font-weight: 800; color: #1e3a8a; text-align: right;'>{val}</td>"
                             else:
-                                td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--blue-val); text-align: right;'>{val}</td>"
+                                td_html += f"<td style='{base_td} font-weight: 800; color: #1e3a8a; text-align: right;'>{val}</td>"
                         else:
-                            td_html += f"<td style='padding: 12px 15px;'></td>"
+                            td_html += f"<td style='{base_td}'></td>"
                             
                     else:
                         # Estilização das Linhas Normais
+                        base_td_normal = "padding: 12px 15px; border-bottom: 1px dashed var(--card-border);"
                         if c == 'SALDO' or 'SALDO' in c:
-                            td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
+                            td_html += f"<td style='{base_td_normal} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
                         elif c == 'PAGO' or 'PAGO' in c:
-                            td_html += f"<td style='padding: 12px 15px; font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
+                            td_html += f"<td style='{base_td_normal} font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
                         elif 'APROVADO' in c:
-                            td_html += f"<td style='padding: 12px 15px; font-weight: 700; color: var(--text-main); text-align: right;'>{val}</td>"
+                            td_html += f"<td style='{base_td_normal} font-weight: 700; color: var(--text-main); text-align: right;'>{val}</td>"
                         elif '%' in c or 'EXECU' in c:
                             bg_color = "rgba(99, 102, 241, 0.1)" if val.strip() != '' else "transparent"
-                            td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
+                            td_html += f"<td style='{base_td_normal} font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
                         elif c == col_dot:
                             # A dotação ganha uma fonte visualmente distinta e uma marcação verde
-                            td_html += f"<td style='padding: 12px 15px; font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace; border-left: 4px solid var(--success-val);'>{val}</td>"
+                            td_html += f"<td style='{base_td_normal} font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace; border-left: 4px solid var(--success-val);'>{val}</td>"
                         else:
-                            td_html += f"<td style='padding: 12px 15px; font-size: 12px;'>{val}</td>"
+                            td_html += f"<td style='{base_td_normal} font-size: 12px;'>{val}</td>"
                             
-                tr_html += f"<tr class='extrato-row' style='{tr_style}'>{td_html}</tr>"
+                tr_html += f"<tr class='extrato-row'>{td_html}</tr>"
 
             tabela_completa = f'''
             <div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'>
