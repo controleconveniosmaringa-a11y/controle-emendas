@@ -903,10 +903,13 @@ elif st.session_state.pagina_atual == 'finisa':
             col_saldo = next((c for c in valid_cols if 'SALDO' in c), None)
             col_exec = next((c for c in valid_cols if '%' in c or 'EXECU' in c), None)
             
-            # --- NOVO: PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
+            # --- PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
             if col_dot and col_exec and col_pago and col_saldo:
                 # Filtra apenas as linhas que são "itens" (tem dotação preenchida)
                 df_itens = df_gestao[df_gestao[col_dot].str.strip() != ''].copy()
+                
+                # Remove dotações repetidas (mantém apenas a primeira ocorrência para não poluir o painel)
+                df_itens = df_itens.drop_duplicates(subset=[col_dot], keep='first')
                 
                 # Conversor de % para float
                 def parse_pct(val):
@@ -920,30 +923,36 @@ elif st.session_state.pagina_atual == 'finisa':
                 
                 # Cria os dois grupos pedidos
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
-                df_80_99 = df_itens[(df_itens['exec_num'] >= 80.0) & (df_itens['exec_num'] < 100.0)]
+                df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
                 # 1. Alertas de 100% Gasto
                 if not df_100.empty:
                     st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px; margin-top: 10px;'>🚨 DOTAÇÕES COM 100% DO ORÇAMENTO EXECUTADO</div>", unsafe_allow_html=True)
                     for _, row in df_100.iterrows():
-                        st.markdown(f"<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--danger-val); padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-size: 13px;'><b style='font-family: monospace;'>{row[col_dot]}</b> - {row[col_proj]}</div>", unsafe_allow_html=True)
+                        nome_p = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
+                        if not nome_p or nome_p.lower() in ['nan', 'none']: nome_p = "Projeto não especificado"
+                        st.markdown(f"<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--danger-val); padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-size: 13px;'><b style='font-family: monospace;'>{row[col_dot]}</b> - {nome_p}</div>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
                 
-                # 2. Gráficos de Rosca (80% a 99% Gasto)
-                if not df_80_99.empty:
-                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--warning-val); margin-bottom: 10px; margin-top: 10px;'>⚠️ DOTAÇÕES PRÓXIMAS DO LIMITE (80% a 99%)</div>", unsafe_allow_html=True)
+                # 2. Gráficos de Rosca (70% a 99% Gasto)
+                if not df_70_99.empty:
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--warning-val); margin-bottom: 10px; margin-top: 10px;'>⚠️ DOTAÇÕES PRÓXIMAS DO LIMITE (70% a 99%)</div>", unsafe_allow_html=True)
                     num_cols = 3
                     cols_chart = st.columns(num_cols)
-                    for i, (_, row) in enumerate(df_80_99.iterrows()):
+                    for i, (_, row) in enumerate(df_70_99.iterrows()):
                         with cols_chart[i % num_cols]:
                             fig_alert = go.Figure(data=[go.Pie(labels=['Gasto', 'Disponível'], values=[row['pago_num'], row['saldo_num']], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                            nome_curto = str(row[col_proj])[:40] + "..." if len(str(row[col_proj])) > 40 else str(row[col_proj])
-                            fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_curto}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
+                            
+                            nome_c = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
+                            if not nome_c or nome_c.lower() in ['nan', 'none']: nome_c = "Projeto não especificado"
+                            nome_c = nome_c[:40] + "..." if len(nome_c) > 40 else nome_c
+                            
+                            fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
                             st.plotly_chart(fig_alert, use_container_width=True)
                     st.markdown("<br>", unsafe_allow_html=True)
             # --- FIM DO PAINEL DE ALERTAS ---
 
-            # CABEÇALHO DA TABELA HTML (Inalterado)
+            # CABEÇALHO DA TABELA HTML
             th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
             
             tr_html = ""
