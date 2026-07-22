@@ -913,12 +913,24 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
                 df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
                 
-                def parse_pct(val):
-                    v = str(val).replace('%', '').strip().replace('.', '').replace(',', '.')
+                def parse_pct_safe(val):
+                    v = str(val).replace('%', '').strip()
+                    # Trata números com padrão brasileiro e americano simultaneamente
+                    v = re.sub(r'[^\d.,]', '', v)
+                    if not v: return 0.0
+                    
+                    if ',' in v and '.' in v:
+                        if v.rfind(',') > v.rfind('.'):
+                            v = v.replace('.', '').replace(',', '.')
+                        else:
+                            v = v.replace(',', '')
+                    elif ',' in v:
+                        v = v.replace(',', '.')
+                    
                     try: return float(v)
                     except: return 0.0
                 
-                df_itens['exec_num'] = df_itens[col_exec].apply(parse_pct)
+                df_itens['exec_num'] = df_itens[col_exec].apply(parse_pct_safe)
                 df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
                 df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
                 
