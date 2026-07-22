@@ -896,37 +896,78 @@ elif st.session_state.pagina_atual == 'finisa':
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             
-            # CABEÇALHO DA TABELA HTML
+            # Identificação das colunas-chave para o dashboard
+            col_dot = next((c for c in valid_cols if 'DOTA' in c), None)
+            col_proj = next((c for c in valid_cols if 'PROJETO' in c or 'AÇ' in c), None)
+            col_pago = next((c for c in valid_cols if 'PAGO' in c), None)
+            col_saldo = next((c for c in valid_cols if 'SALDO' in c), None)
+            col_exec = next((c for c in valid_cols if '%' in c or 'EXECU' in c), None)
+            
+            # --- NOVO: PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
+            if col_dot and col_exec and col_pago and col_saldo:
+                # Filtra apenas as linhas que são "itens" (tem dotação preenchida)
+                df_itens = df_gestao[df_gestao[col_dot].str.strip() != ''].copy()
+                
+                # Conversor de % para float
+                def parse_pct(val):
+                    v = str(val).replace('%', '').strip().replace('.', '').replace(',', '.')
+                    try: return float(v)
+                    except: return 0.0
+                
+                df_itens['exec_num'] = df_itens[col_exec].apply(parse_pct)
+                df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
+                df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
+                
+                # Cria os dois grupos pedidos
+                df_100 = df_itens[df_itens['exec_num'] >= 100.0]
+                df_80_99 = df_itens[(df_itens['exec_num'] >= 80.0) & (df_itens['exec_num'] < 100.0)]
+                
+                # 1. Alertas de 100% Gasto
+                if not df_100.empty:
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px; margin-top: 10px;'>🚨 DOTAÇÕES COM 100% DO ORÇAMENTO EXECUTADO</div>", unsafe_allow_html=True)
+                    for _, row in df_100.iterrows():
+                        st.markdown(f"<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--danger-val); padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-size: 13px;'><b style='font-family: monospace;'>{row[col_dot]}</b> - {row[col_proj]}</div>", unsafe_allow_html=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                
+                # 2. Gráficos de Rosca (80% a 99% Gasto)
+                if not df_80_99.empty:
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--warning-val); margin-bottom: 10px; margin-top: 10px;'>⚠️ DOTAÇÕES PRÓXIMAS DO LIMITE (80% a 99%)</div>", unsafe_allow_html=True)
+                    num_cols = 3
+                    cols_chart = st.columns(num_cols)
+                    for i, (_, row) in enumerate(df_80_99.iterrows()):
+                        with cols_chart[i % num_cols]:
+                            fig_alert = go.Figure(data=[go.Pie(labels=['Gasto', 'Disponível'], values=[row['pago_num'], row['saldo_num']], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
+                            nome_curto = str(row[col_proj])[:40] + "..." if len(str(row[col_proj])) > 40 else str(row[col_proj])
+                            fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_curto}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
+                            st.plotly_chart(fig_alert, use_container_width=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
+            # --- FIM DO PAINEL DE ALERTAS ---
+
+            # CABEÇALHO DA TABELA HTML (Inalterado)
             th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
             
             tr_html = ""
-            col_dot = next((c for c in valid_cols if 'DOTA' in c), None)
-            col_proj = next((c for c in valid_cols if 'PROJETO' in c or 'AÇ' in c), None)
-            
             for _, row in df_gestao.iterrows():
                 val_dot = str(row.get(col_dot, '')) if col_dot else ''
+                val_proj = str(row.get(col_proj, '')) if col_proj else ''
                 
-                # REGRA VISUAL: Tem dotação (item) vs Não tem dotação (grupo/título/total)
                 tem_dotacao = val_dot.strip() != ''
                 
                 if tem_dotacao:
-                    bg_cor = "var(--table-bg)" # Branco ou escuro nativo do modo
+                    bg_cor = "var(--table-bg)"
                     borda_cor = "1px dashed var(--card-border)"
                     fonte_peso = "normal"
                 else:
-                    bg_cor = "rgba(37, 99, 235, 0.12)" # Azul translúcido destacando o agrupamento
+                    bg_cor = "rgba(37, 99, 235, 0.12)"
                     borda_cor = "1px solid var(--blue-val)"
                     fonte_peso = "800"
                 
                 td_html = ""
                 for c in valid_cols:
                     val = str(row.get(c, ''))
-                    
-                    # Pinta a célula diretamente para garantir que o navegador obedeça
                     base_td = f"padding: 12px 15px; background-color: {bg_cor} !important; border-bottom: {borda_cor}; font-weight: {fonte_peso};"
                     
                     if not tem_dotacao:
-                        # Estilo das linhas SEM dotação (Categorias/Totais)
                         if c == col_proj:
                             td_html += f"<td style='{base_td} font-size: 13px; color: var(--blue-val); text-transform: uppercase;'>📂 {val}</td>"
                         elif val.strip() != '':
@@ -938,9 +979,7 @@ elif st.session_state.pagina_atual == 'finisa':
                                 td_html += f"<td style='{base_td} color: var(--blue-val); text-align: right;'>{val}</td>"
                         else:
                             td_html += f"<td style='{base_td}'></td>"
-                            
                     else:
-                        # Estilo das linhas COM dotação (Itens)
                         if c == 'SALDO' or 'SALDO' in c:
                             td_html += f"<td style='{base_td} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
                         elif c == 'PAGO' or 'PAGO' in c:
@@ -1157,7 +1196,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.markdown(f"<div class='section-title'>📋 Lançamentos do Período</div>", unsafe_allow_html=True)
                         df_val_f = fluxo_f[fluxo_f['EMPENHO_COL'] != '-']
                         if not df_val_f.empty:
-                            df_rnd = pd.DataFrame({'Data': df_val_f['DATA_LANCAMENTO'], 'Empenho': df_val_f['EMPENHO_COL'], 'NF': dp_val['NOTA_COL'], 'Valor NF': df_val_f['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])]})
+                            df_rnd = pd.DataFrame({'Data': df_val_f['DATA_LANCAMENTO'], 'Empenho': df_val_f['EMPENHO_COL'], 'NF': df_val_f['NOTA_COL'], 'Valor NF': df_val_f['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])]})
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
 
