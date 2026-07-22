@@ -898,7 +898,7 @@ elif st.session_state.pagina_atual == 'finisa':
             
             # Identificação rigorosa das colunas para os alertas
             col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
-            col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)  # <-- Correção: Busca estrita por PROJETO
+            col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
             col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
@@ -926,13 +926,22 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
                 df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
-                # 1. Alertas de 100% Gasto
+                # 1. Alertas de 100% Gasto (AGORA COM GRÁFICOS DE ROSCA)
                 if not df_100.empty:
                     st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px; margin-top: 10px;'>🚨 DOTAÇÕES COM 100% DO ORÇAMENTO EXECUTADO</div>", unsafe_allow_html=True)
-                    for _, row in df_100.iterrows():
-                        nome_p = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
-                        if not nome_p or nome_p.lower() in ['nan', 'none']: nome_p = "Projeto não especificado"
-                        st.markdown(f"<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--danger-val); padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-size: 13px;'><b style='font-family: monospace;'>{row[col_dot]}</b> - {nome_p}</div>", unsafe_allow_html=True)
+                    num_cols_100 = 3
+                    cols_chart_100 = st.columns(num_cols_100)
+                    for i, (_, row) in enumerate(df_100.iterrows()):
+                        with cols_chart_100[i % num_cols_100]:
+                            # Criação da rosca 100% cheia (saldo_num será 0, então ficará inteira vermelha)
+                            fig_100 = go.Figure(data=[go.Pie(labels=['Gasto', 'Disponível'], values=[row['pago_num'], row['saldo_num']], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
+                            
+                            nome_c = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
+                            if not nome_c or nome_c.lower() in ['nan', 'none']: nome_c = "Projeto não especificado"
+                            nome_c = nome_c[:40] + "..." if len(nome_c) > 40 else nome_c
+                            
+                            fig_100.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--danger-val); font-size:16px;'>{row['exec_num']:.0f}%</b>", x=0.5, y=0.5, showarrow=False)])
+                            st.plotly_chart(fig_100, use_container_width=True)
                     st.markdown("<br>", unsafe_allow_html=True)
                 
                 # 2. Gráficos de Rosca (70% a 99% Gasto)
