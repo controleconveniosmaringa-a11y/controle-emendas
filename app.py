@@ -229,7 +229,6 @@ def obter_base_dados_global():
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
     
-    # Motor cego e preciso para puxar os valores
     df['repasse'] = [limpar_moeda_blindada(v) for v in ext('repasse')]
     df['rendimento'] = [limpar_moeda_blindada(v) for v in ext('rendimento')]
     df['bruto'] = [limpar_moeda_blindada(v) for v in ext('bruto')]
@@ -308,6 +307,24 @@ def obter_base_credito():
     
     return df, att
 
+# FUNÇÃO NOVA: CARREGA A PLANILHA "Gestão de Convênios.csv" APENAS PARA O FINISA
+@st.cache_data(ttl=15)
+def obter_base_gestao_convenios():
+    cache_buster = int(time.time())
+    # Link com formatação de caracteres especiais para evitar quebra no Github
+    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
+    try:
+        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+        return df
+    except Exception:
+        if os.path.exists("Gestão de Convênios.csv"):
+            try:
+                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
+                return df
+            except Exception:
+                return pd.DataFrame()
+        return pd.DataFrame()
+
 @st.cache_data(ttl=2)
 def obter_base_maringa_csv():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -363,7 +380,6 @@ def obter_base_bancos():
             df_b['Conta_Clean'] = df_b[col_conta].apply(clean_conta)
             df_b['Descricao'] = df_b[col_desc] if col_desc else '-'
             
-            # Aqui mantemos a lógica antiga pois o extrato bancário depende do sinal (Débito/Crédito)
             def converter_valor_extrato(val):
                 v = str(val).upper().replace('R$', '').replace('C', '').strip()
                 is_deb = 'D' in v or '-' in v
@@ -413,12 +429,11 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
             rendimento_atual = df_aba['RENDIMENTO'].sum() if 'RENDIMENTO' in df_aba.columns else 0.0
             despesas_atuais = df_aba['VALOR DESPESA'].sum() if 'VALOR DESPESA' in df_aba.columns else 0.0
             
-            # --- HARDCODE: FIXAÇÃO DE VALOR SOLICITADA PARA USINA ---
+            # --- FIXAÇÃO DA USINA ---
             if nome_programa == "USINA" and ("1" in str(aba_nome)):
                 valor_correto = 18534393.63
                 if abs(despesas_atuais - valor_correto) > 0.01:
                     diferenca = valor_correto - despesas_atuais
-                    # Injeta uma linha oculta no dataframe para que as tabelas batam o valor fixado
                     nova_linha = pd.DataFrame([{
                         'DATA': '-',
                         'EMPENHO': 'AJUSTE',
@@ -434,7 +449,6 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
                     }])
                     df_aba = pd.concat([df_aba, nova_linha], ignore_index=True)
                     despesas_atuais = valor_correto
-            # --------------------------------------------------------
             
             recurso_disponivel_total = repasse_puro_atual + rendimento_atual + saldo_anterior
             saldo_remanescente_final = recurso_disponivel_total - despesas_atuais
@@ -468,6 +482,13 @@ df_cred_completo, att_cred = obter_base_credito()
 if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('FINISA', na=False)].copy()
     df_usina = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('USINA', na=False)].copy()
+    
+    if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns:
+        df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
+    
+    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
+        df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
+        
 else:
     df_finisa = pd.DataFrame()
     df_usina = pd.DataFrame()
@@ -483,7 +504,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
-    # CABEÇALHO PRINCIPAL REFORMULADO
     st.markdown(f"""
     <div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'>
         <div>
@@ -498,7 +518,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     </div>
     """, unsafe_allow_html=True)
 
-    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS (AGORA NO TOPO) ---
     df_bancos = obter_base_bancos()
     
     contas_validas = []
@@ -610,9 +629,7 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown("</div></div>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    # --- FIM DA SEÇÃO DE EXTRATOS BANCÁRIOS ---
 
-    # MÓDULOS DE NAVEGAÇÃO REFORMULADOS
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px;'>🧭 Módulos do Sistema</div>", unsafe_allow_html=True)
     
     c1, c2 = st.columns(2, gap="large")
@@ -668,7 +685,6 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     st.markdown("---")
     
-    # --- SEÇÃO REFORMULADA: IDENTIFICAÇÃO DE ANALISTA ---
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
@@ -711,7 +727,6 @@ if st.session_state.pagina_atual == 'menu_principal':
 
     st.markdown("---")
 
-    # --- SEÇÃO REFORMULADA: TESOURO NACIONAL ---
     df_tesouro, att_tesouro = obter_base_maringa_csv()
     
     if not df_tesouro.empty:
@@ -847,35 +862,49 @@ elif st.session_state.pagina_atual == 'credito':
 elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
+    
+    # Busca a base de Gestão de Convênios exclusiva para o Finisa
+    df_gestao = obter_base_gestao_convenios()
+    
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
-    if abas_disponiveis:
-        abas_exibicao = list(reversed(abas_disponiveis))
-        tabs_cred = st.tabs([f"📥 {aba}" for aba in abas_exibicao])
-        for i, aba_nome in enumerate(abas_exibicao):
-            with tabs_cred[i]:
-                info = dados_abas[aba_nome]
-                pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
-                cg1, cg2 = st.columns(2)
-                with cg1:
-                    st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
-                    fig_rosca = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[info['total_despesa'], max(0.0, info['saldo_final'])], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
-                    fig_rosca.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                    st.plotly_chart(fig_rosca, use_container_width=True)
-                with cg2:
-                    st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS POR DESCRIÇÃO</div>", unsafe_allow_html=True)
-                    df_desc = info['df_filtrado'][info['df_filtrado']['VALOR DESPESA'] > 0].groupby('DESCRIÇÃO')['VALOR DESPESA'].sum().reset_index()
-                    if not df_desc.empty:
-                        fig_bar_desc = go.Figure(go.Bar(x=df_desc['VALOR DESPESA'], y=df_desc['DESCRIÇÃO'], orientation='h', marker_color='#3b82f6', text=[fmt(v) for v in df_desc['VALOR DESPESA']], textposition='auto'))
-                        fig_bar_desc.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                        st.plotly_chart(fig_bar_desc, use_container_width=True)
-                    else: st.info("Sem despesas registradas.")
-                st.markdown("<div class='section-title'>📋 Detalhes Fiscais das Despesas Liquidadas</div>", unsafe_allow_html=True)
-                df_exibicao = pd.DataFrame({'Empenho': info['df_filtrado']['EMPENHO'], 'Fornecedor': info['df_filtrado']['FORNECEDOR'], 'Tipo Doc': info['df_filtrado']['TIPO DE DOCUMENTO'], 'Nº Doc': info['df_filtrado']['Nº DOCUMENTO'], 'Descrição': info['df_filtrado']['DESCRIÇÃO'], 'Valor Despesa': info['df_filtrado']['VALOR DESPESA'], 'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])]})
-                df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
-                if not df_exibicao.empty: st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                else: st.info("ℹ️ Nenhum gasto liquidado neste lote de recursos.")
-    else: st.info("ℹ️ Você precisa ir na planilha e clicar em 'Sincronizar Créditos com GitHub' para criar os dados desta aba.")
+    
+    abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
+    
+    # Injeta a nova aba no início
+    nomes_abas = ["📊 Controle Orçamento Finisa"] + [f"📥 {aba}" for aba in abas_exibicao]
+    tabs_cred = st.tabs(nomes_abas)
+    
+    with tabs_cred[0]:
+        st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
+        if not df_gestao.empty:
+            st.dataframe(df_gestao, use_container_width=True, hide_index=True)
+        else:
+            st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
+            
+    for i, aba_nome in enumerate(abas_exibicao):
+        with tabs_cred[i+1]:
+            info = dados_abas[aba_nome]
+            pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
+            st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+            cg1, cg2 = st.columns(2)
+            with cg1:
+                st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
+                fig_rosca = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[info['total_despesa'], max(0.0, info['saldo_final'])], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
+                fig_rosca.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                st.plotly_chart(fig_rosca, use_container_width=True)
+            with cg2:
+                st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS POR DESCRIÇÃO</div>", unsafe_allow_html=True)
+                df_desc = info['df_filtrado'][info['df_filtrado']['VALOR DESPESA'] > 0].groupby('DESCRIÇÃO')['VALOR DESPESA'].sum().reset_index()
+                if not df_desc.empty:
+                    fig_bar_desc = go.Figure(go.Bar(x=df_desc['VALOR DESPESA'], y=df_desc['DESCRIÇÃO'], orientation='h', marker_color='#3b82f6', text=[fmt(v) for v in df_desc['VALOR DESPESA']], textposition='auto'))
+                    fig_bar_desc.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    st.plotly_chart(fig_bar_desc, use_container_width=True)
+                else: st.info("Sem despesas registradas.")
+            st.markdown("<div class='section-title'>📋 Detalhes Fiscais das Despesas Liquidadas</div>", unsafe_allow_html=True)
+            df_exibicao = pd.DataFrame({'Empenho': info['df_filtrado']['EMPENHO'], 'Fornecedor': info['df_filtrado']['FORNECEDOR'], 'Tipo Doc': info['df_filtrado']['TIPO DE DOCUMENTO'], 'Nº Doc': info['df_filtrado']['Nº DOCUMENTO'], 'Descrição': info['df_filtrado']['DESCRIÇÃO'], 'Valor Despesa': info['df_filtrado']['VALOR DESPESA'], 'Visualizar': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(info['df_filtrado']['LINK DOCUMENTO'], info['df_filtrado']['EMPENHO'], info['df_filtrado']['Nº DOCUMENTO'])]})
+            df_exibicao = df_exibicao[df_exibicao['Valor Despesa'] > 0]
+            if not df_exibicao.empty: st.write(df_exibicao.style.format({'Valor Despesa': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
+            else: st.info("ℹ️ Nenhum gasto liquidado neste lote de recursos.")
 
 elif st.session_state.pagina_atual == 'fotovoltaica':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
