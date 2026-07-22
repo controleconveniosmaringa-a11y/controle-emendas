@@ -307,19 +307,40 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO NOVA: CARREGA A PLANILHA "Gestão de Convênios.csv" COM ENCODING LATIN1
+# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
+    
+    def processar_df_gestao(df_raw):
+        header_idx = -1
+        # Procura a linha que contém os cabeçalhos verdadeiros
+        for i, row in df_raw.iterrows():
+            row_str = " ".join([str(x).upper() for x in row.values])
+            if "DOTA" in row_str and "PROJETO" in row_str:
+                header_idx = i
+                break
+        
+        if header_idx != -1:
+            new_cols = [str(c).strip().upper() for c in df_raw.iloc[header_idx].values]
+            # Resolve colunas vazias
+            new_cols = [c if c else f"COL_{j}" for j, c in enumerate(new_cols)]
+            df_raw.columns = new_cols
+            df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
+            
+        # Remove linhas totalmente em branco
+        df_raw = df_raw.replace('', pd.NA).dropna(how='all').fillna('')
+        return df_raw
+
     try:
         df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-        return df
+        return processar_df_gestao(df)
     except Exception:
         if os.path.exists("Gestão de Convênios.csv"):
             try:
                 df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-                return df
+                return processar_df_gestao(df)
             except Exception:
                 return pd.DataFrame()
         return pd.DataFrame()
@@ -503,7 +524,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
-    # CABEÇALHO PRINCIPAL REFORMULADO
     st.markdown(f"""
     <div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'>
         <div>
@@ -518,7 +538,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     </div>
     """, unsafe_allow_html=True)
 
-    # --- INÍCIO DA SEÇÃO DE EXTRATOS BANCÁRIOS (AGORA NO TOPO) ---
     df_bancos = obter_base_bancos()
     
     contas_validas = []
@@ -864,18 +883,78 @@ elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
     
+    # Busca a base de Gestão de Convênios exclusiva para o Finisa
     df_gestao = obter_base_gestao_convenios()
+    
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
     
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
     
+    # Injeta a nova aba no início
     nomes_abas = ["📊 Controle Orçamento Finisa"] + [f"📥 {aba}" for aba in abas_exibicao]
     tabs_cred = st.tabs(nomes_abas)
     
     with tabs_cred[0]:
         st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
+        
         if not df_gestao.empty:
-            st.dataframe(df_gestao, use_container_width=True, hide_index=True)
+            cols = df_gestao.columns.tolist()
+            valid_cols = [c for c in cols if not c.startswith("COL_")]
+            
+            # Cabeçalho da Tabela HTMl
+            th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
+            
+            # Corpo da Tabela
+            tr_html = ""
+            col_dot = next((c for c in valid_cols if 'DOTA' in c), None)
+            col_proj = next((c for c in valid_cols if 'PROJETO' in c or 'AÇ' in c), None)
+            
+            for _, row in df_gestao.iterrows():
+                val_dot = str(row.get(col_dot, '')) if col_dot else ''
+                val_proj = str(row.get(col_proj, '')) if col_proj else ''
+                
+                # Se dotação está vazia mas o projeto tem nome, é uma linha de categoria (ex: "Outros tipos de investimentos")
+                is_category = val_dot.strip() == '' and val_proj.strip() != ''
+                
+                tr_style = "background-color: var(--card-border); font-weight: 800; color: var(--text-main);" if is_category else ""
+                
+                td_html = ""
+                for c in valid_cols:
+                    val = str(row.get(c, ''))
+                    
+                    if is_category:
+                        td_html += f"<td style='padding: 12px 15px;'>{val}</td>"
+                    else:
+                        if c == 'SALDO' or 'SALDO' in c:
+                            td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
+                        elif c == 'PAGO' or 'PAGO' in c:
+                            td_html += f"<td style='padding: 12px 15px; font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
+                        elif 'APROVADO' in c:
+                            td_html += f"<td style='padding: 12px 15px; font-weight: 700; color: var(--blue-val); text-align: right;'>{val}</td>"
+                        elif '%' in c or 'EXECU' in c:
+                            bg_color = "rgba(99, 102, 241, 0.1)" if val.strip() != '' else "transparent"
+                            td_html += f"<td style='padding: 12px 15px; font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
+                        elif c == col_dot:
+                            td_html += f"<td style='padding: 12px 15px; font-size: 11px; font-weight: 600; color: var(--text-muted);'>{val}</td>"
+                        else:
+                            td_html += f"<td style='padding: 12px 15px;'>{val}</td>"
+                            
+                tr_html += f"<tr class='extrato-row' style='{tr_style}'>{td_html}</tr>"
+
+            tabela_completa = f'''
+            <div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'>
+                <table class='extrato-table' style='margin: 0; border: none; width: 100%; border-collapse: separate; border-spacing: 0;'>
+                    <thead style='position: sticky; top: 0; z-index: 1;'>
+                        <tr>{th_html}</tr>
+                    </thead>
+                    <tbody>
+                        {tr_html}
+                    </tbody>
+                </table>
+            </div>
+            '''
+            st.markdown(tabela_completa, unsafe_allow_html=True)
+            
         else:
             st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
             
