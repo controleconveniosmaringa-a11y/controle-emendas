@@ -896,22 +896,23 @@ elif st.session_state.pagina_atual == 'finisa':
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             
-            # Identificação das colunas-chave para o dashboard
-            col_dot = next((c for c in valid_cols if 'DOTA' in c), None)
-            col_proj = next((c for c in valid_cols if 'PROJETO' in c or 'AÇ' in c), None)
-            col_pago = next((c for c in valid_cols if 'PAGO' in c), None)
-            col_saldo = next((c for c in valid_cols if 'SALDO' in c), None)
-            col_exec = next((c for c in valid_cols if '%' in c or 'EXECU' in c), None)
+            # Identificação rigorosa das colunas para os alertas
+            col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
+            col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)  # <-- Correção: Busca estrita por PROJETO
+            col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
+            col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
+            col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
             
             # --- PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
             if col_dot and col_exec and col_pago and col_saldo:
-                # Filtra apenas as linhas que são "itens" (tem dotação preenchida)
-                df_itens = df_gestao[df_gestao[col_dot].str.strip() != ''].copy()
                 
-                # Remove dotações repetidas (mantém apenas a primeira ocorrência para não poluir o painel)
-                df_itens = df_itens.drop_duplicates(subset=[col_dot], keep='first')
+                # Filtra apenas as linhas que são "itens"
+                df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
                 
-                # Conversor de % para float
+                # Cria uma coluna limpa de dotação apenas para garantir que a exclusão de duplicadas funcione 100%
+                df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
+                df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
+                
                 def parse_pct(val):
                     v = str(val).replace('%', '').strip().replace('.', '').replace(',', '.')
                     try: return float(v)
@@ -921,7 +922,7 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
                 df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
                 
-                # Cria os dois grupos pedidos
+                # Nova regra: >= 70%
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
                 df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
