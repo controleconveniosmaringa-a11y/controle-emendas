@@ -315,7 +315,6 @@ def obter_base_gestao_convenios():
     
     def processar_df_gestao(df_raw):
         header_idx = -1
-        # Procura a linha que contém os cabeçalhos verdadeiros
         for i, row in df_raw.iterrows():
             row_str = " ".join([str(x).upper() for x in row.values])
             if "DOTA" in row_str and "PROJETO" in row_str:
@@ -915,10 +914,8 @@ elif st.session_state.pagina_atual == 'finisa':
                 
                 def parse_pct_safe(val):
                     v = str(val).replace('%', '').strip()
-                    # Trata números com padrão brasileiro e americano simultaneamente
                     v = re.sub(r'[^\d.,]', '', v)
                     if not v: return 0.0
-                    
                     if ',' in v and '.' in v:
                         if v.rfind(',') > v.rfind('.'):
                             v = v.replace('.', '').replace(',', '.')
@@ -926,7 +923,6 @@ elif st.session_state.pagina_atual == 'finisa':
                             v = v.replace(',', '')
                     elif ',' in v:
                         v = v.replace(',', '.')
-                    
                     try: return float(v)
                     except: return 0.0
                 
@@ -934,30 +930,17 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
                 df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
                 
-                # Nova regra: >= 70%
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
                 df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
-                # 1. Alertas de 100% Gasto (Estilo Mini-Cards Compactos)
+                # 1. Alertas de 100% Gasto (Card Simples e Limpo - Tópicos)
                 if not df_100.empty:
-                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px; margin-top: 10px;'>🚨 DOTAÇÕES COM ORÇAMENTO 100% ESGOTADO</div>", unsafe_allow_html=True)
-                    
-                    html_100 = "<div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;'>"
+                    st.markdown("<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 5px solid var(--danger-val); padding: 15px; border-radius: 8px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size: 15px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px;'>🚨 DOTAÇÕES COM ORÇAMENTO 100% ESGOTADO</div>", unsafe_allow_html=True)
                     for _, row in df_100.iterrows():
                         nome_p = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else "Projeto não especificado"
-                        nome_p = nome_p[:50] + "..." if len(nome_p) > 50 else nome_p
-                        
-                        html_100 += f'''
-                        <div style='background: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid var(--danger-val); border-radius: 6px; padding: 10px;'>
-                            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'>
-                                <span style='font-size: 10px; font-family: monospace; color: var(--text-muted);'>{row[col_dot]}</span>
-                                <span style='font-size: 11px; font-weight: 800; color: var(--danger-val); background: rgba(220, 38, 38, 0.1); padding: 2px 6px; border-radius: 4px;'>100%</span>
-                            </div>
-                            <div style='font-size: 12px; font-weight: 600; color: var(--text-main); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{nome_p}</div>
-                        </div>
-                        '''
-                    html_100 += "</div><br>"
-                    st.markdown(html_100, unsafe_allow_html=True)
+                        st.markdown(f"<div style='font-size: 13px; color: var(--text-main); margin-bottom: 4px;'>• <b style='font-family: monospace;'>{row[col_dot]}</b> — {nome_p}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 # 2. Gráficos de Rosca (70% a 99% Gasto)
                 if not df_70_99.empty:
@@ -1147,221 +1130,3 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.markdown("<div class='section-title'>📊 Base de Dados Completa</div>", unsafe_allow_html=True)
                 st.dataframe(df_conv_tela, use_container_width=True, hide_index=True)
     else: st.warning("A base de dados de convênios não foi localizada ou está vazia.")
-
-elif st.session_state.pagina_atual == 'emendas':
-    st.button("⬅️ Voltar ao Menu Principal", on_click=mudar_pagina, args=('menu_principal',))
-    if not df.empty:
-        fontes = sorted([f for f in df['fonte_clean'].unique() if f not in ['', 'nan']])
-        st.markdown('''<div class="header-container"><div class="header-left"><div class="main-title">Controle de Emendas Orçamentárias</div></div><div class="header-right"><div class="status-dot"></div><div class="status-text">Base Google Sheets Conectada</div></div></div>''', unsafe_allow_html=True)
-        
-        # --- SOLUÇÃO DEFINITIVA ---
-        # Trocamos o st.tabs() por um st.radio() horizontal. 
-        # Isso impede fisicamente que o Streamlit renderize mais de uma tela por vez, resolvendo o vazamento de layout.
-        aba_selecionada = st.radio(
-            "Navegação:",
-            options=["🎯 Por Fonte", "📋 Por Plano", "🏛️ Por Secretaria", "🔍 Por Deputado"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para respirar o layout
-                    
-        if aba_selecionada == "🎯 Por Fonte":
-            st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
-            if fontes:
-                fonte_final = st.selectbox("🎯 Selecione ou Digite o Número da Fonte Orçamentária:", options=fontes, key="sel_f")
-                if fonte_final:
-                    df_fonte = df[df['fonte_clean'] == fonte_final]
-                    anos_f = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_fonte['ano_mov'].unique() if a not in ['', 'nan']])))
-                    ano_f_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_f, key="ano_f")
-                    if not df_fonte.empty:
-                        fluxo_f = df_fonte if ano_f_sel == anos_f[0] else df_fonte[df_fonte['ano_mov'] == ano_f_sel]
-                        saldo_f = df_fonte if ano_f_sel == anos_f[0] else df_fonte[df_fonte['ano_mov'].astype(int) <= int(ano_f_sel)]
-                        conta_f = df_fonte['conta corrente'].iloc[0]
-                        
-                        df_bc = df[df['conta corrente'] == conta_f] if conta_f != "Não Informada" else pd.DataFrame()
-                        df_bc_fluxo = df_bc if ano_f_sel == anos_f[0] else (df_bc[df_bc['ano_mov'] == ano_f_sel] if not df_bc.empty else pd.DataFrame())
-                        df_bc_saldo = df_bc if ano_f_sel == anos_f[0] else (df_bc[df_bc['ano_mov'].astype(int) <= int(ano_f_sel)] if not df_bc.empty else pd.DataFrame())
-                        
-                        tot_ent_f = float(saldo_f['repasse'].sum() + saldo_f['rendimento'].sum())
-                        tot_sai_f = float(saldo_f['bruto'].sum())
-                        sal_fonte = tot_ent_f - tot_sai_f
-                        pct_disp_f = (sal_fonte / tot_ent_f * 100) if tot_ent_f > 0 else 0.0
-                        sal_banco = float(df_bc_saldo['repasse'].sum() + df_bc_saldo['rendimento'].sum()) - float(df_bc_saldo['bruto'].sum()) if not df_bc_saldo.empty else sal_fonte
-                        lbl_f = "Histórico Total" if ano_f_sel == anos_f[0] else f"Exercício {ano_f_sel}"
-                        
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {df_fonte['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {df_fonte['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {df_fonte['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
-                        
-                        c_graf_f, c_tab_f = st.columns([1, 1])
-                        with c_graf_f:
-                            st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS VS SALDO</div>", unsafe_allow_html=True)
-                            fig_rosca_f = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai_f, max(0.0, sal_fonte)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
-                            fig_rosca_f.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                            st.plotly_chart(fig_rosca_f, use_container_width=True)
-                        
-                        with c_tab_f:
-                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_f})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL</td><td class='extrato-cell-val'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
-                        
-                        secs_f = [s for s in df_fonte['secretaria'].unique() if s != '']
-                        if len(secs_f) > 1:
-                            st.markdown(f"<div class='section-title'>🏢 Divisão por Secretaria</div>", unsafe_allow_html=True)
-                            for sec_f in secs_f:
-                                df_sec_fluxo, df_sec_saldo = fluxo_f[fluxo_f['secretaria'] == sec_f], saldo_f[saldo_f['secretaria'] == sec_f]
-                                st.markdown(f"<div class='secretaria-header'>🏛️ {sec_f}</div>", unsafe_allow_html=True)
-                                st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(df_sec_fluxo['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(df_sec_fluxo['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(df_sec_fluxo['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE</td><td class='extrato-cell-val'>{fmt(float(df_sec_saldo['repasse'].sum() + df_sec_saldo['rendimento'].sum()) - float(df_sec_saldo['bruto'].sum()))}</td></tr></table>''', unsafe_allow_html=True)
-
-                        if conta_f != "Não Informada" and not df_bc_saldo.empty:
-                            st.markdown(f"<div class='section-title'>⚖️ ABERTURA DE SALDOS — CONTA: {conta_f}</div>", unsafe_allow_html=True)
-                            f_comp = sorted([fc for fc in df_bc_saldo['fonte_clean'].unique() if fc != ''])
-                            l_bc = []
-                            tr, trn, tg, ts = 0.0, 0.0, 0.0, 0.0
-                            for fi_f in f_comp:
-                                di_f = df_bc_fluxo[df_bc_fluxo['fonte_clean'] == fi_f] if not df_bc_fluxo.empty else pd.DataFrame()
-                                fr, frn, fd = float(di_f['repasse'].sum() if not di_f.empty else 0), float(di_f['rendimento'].sum() if not di_f.empty else 0), float(di_f['bruto'].sum() if not di_f.empty else 0)
-                                di_s = df_bc_saldo[df_bc_saldo['fonte_clean'] == fi_f]
-                                fs = float(di_s['repasse'].sum() + di_s['rendimento'].sum() - di_s['bruto'].sum())
-                                tr += fr; trn += frn; tg += fd; ts += fs
-                                l_bc.append({'Fonte Orçamentária': fi_f.upper() + (" (Ativa)" if fi_f == fonte_final else ""), 'Repasses': fr, 'Rendimentos': frn, 'Despesas': fd, 'Saldo Real': fs})
-                            l_bc.append({'Fonte Orçamentária': 'TOTAL CONTA 🏦', 'Repasses': tr, 'Rendimentos': trn, 'Despesas': tg, 'Saldo Real': ts})
-                            st.dataframe(pd.DataFrame(l_bc).style.apply(style_abertura_banco, axis=1).format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Real': fmt}), use_container_width=True, hide_index=True)
-                        
-                        st.markdown(f"<div class='section-title'>📋 Lançamentos do Período</div>", unsafe_allow_html=True)
-                        df_val_f = fluxo_f[fluxo_f['EMPENHO_COL'] != '-']
-                        if not df_val_f.empty:
-                            df_rnd = pd.DataFrame({'Data': df_val_f['DATA_LANCAMENTO'], 'Empenho': df_val_f['EMPENHO_COL'], 'NF': df_val_f['NOTA_COL'], 'Valor NF': df_val_f['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])]})
-                            st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                        else: st.info("Nenhum lançamento no período.")
-
-        elif aba_selecionada == "📋 Por Plano":
-            st.markdown("<div class='section-title' style='margin-top:0;'>📋 Seleção Unificada de Plano</div>", unsafe_allow_html=True)
-            planos = sorted([str(p).upper() for p in df['plano_clean'].unique() if str(p).strip() not in ['', 'nan']])
-            if planos:
-                p_fin = st.selectbox("📋 Selecione ou Digite o Número do Plano:", options=planos, key="sel_p")
-                if p_fin:
-                    df_plano = df[df['plano_clean'].str.upper() == p_fin]
-                    anos_p = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_plano['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_p_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_p, key="ano_p")
-                    if not df_plano.empty:
-                        lbl_p = "Histórico Total" if ano_p_sel == anos_p[0] else f"Exercício {ano_p_sel}"
-                        fluxo_p = df_plano if ano_p_sel == anos_p[0] else df_plano[df_plano['ano_mov'] == ano_p_sel]
-                        saldo_p = df_plano if ano_p_sel == anos_p[0] else df_plano[df_plano['ano_mov'].astype(int) <= int(ano_p_sel)]
-                        
-                        tot_ent_p = float(saldo_p['repasse'].sum() + saldo_p['rendimento'].sum())
-                        tot_sai_p = float(saldo_p['bruto'].sum())
-                        sal_p = tot_ent_p - tot_sai_p
-                        pct_disp_p = (sal_p / tot_ent_p * 100) if tot_ent_p > 0 else 0.0
-
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>📋 Plano Ativo</div><div class='kpi-value' style='color:var(--blue-val);'>{p_fin}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_p)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_p:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        st.markdown(f'''<div style='margin-bottom:15px;'><div class='meta-tag'>🎯 Fontes: {", ".join([f.upper() for f in sorted(df_plano['fonte_clean'].unique())])}</div><div class='meta-tag'>👤 Deputado: {df_plano['deputado'].unique()[0]}</div><div class='meta-tag'>🏦 Conta: {df_plano['conta corrente'].iloc[0]}</div></div>''', unsafe_allow_html=True)
-                        
-                        c_graf_p, c_tab_p = st.columns([1, 1])
-                        with c_graf_p:
-                            st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS VS SALDO</div>", unsafe_allow_html=True)
-                            fig_rosca_p = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai_p, max(0.0, sal_p)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
-                            fig_rosca_p.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                            st.plotly_chart(fig_rosca_p, use_container_width=True)
-
-                        with c_tab_p:
-                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_p})</div>", unsafe_allow_html=True)
-                            secs_p = sorted([str(s) for s in df_plano['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']]) or ['NÃO ESPECIFICADA']
-                            html_p = f"<table class='extrato-table'><thead><tr><th>DESCRIÇÃO</th>" + "".join([f"<th style='text-align: right;'>{s}</th>" for s in secs_p]) + "<th style='text-align: right;'>TOTAL</th></tr></thead><tbody>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['repasse'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_p['repasse'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['rendimento'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_p['rendimento'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row'><td class='extrato-cell-label'>(-) DESPESAS</td>" + "".join([f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_p[fluxo_p['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_p['bruto'].sum()))}</td></tr>"
-                            html_p += "<tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO DISPONÍVEL</td>" + "".join([f"<td class='extrato-cell-val'>{fmt(float(saldo_p[saldo_p['secretaria'] == s]['repasse'].sum() + saldo_p[saldo_p['secretaria'] == s]['rendimento'].sum() - saldo_p[saldo_p['secretaria'] == s]['bruto'].sum()))}</td>" for s in secs_p]) + f"<td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_p)}</td></tr></tbody></table>"
-                            st.markdown(html_p, unsafe_allow_html=True)
-                        
-                        st.markdown(f"<div class='section-title'>📋 Lançamentos do Plano</div>", unsafe_allow_html=True)
-                        dp_val = fluxo_p[fluxo_p['EMPENHO_COL'] != '-']
-                        if not dp_val.empty:
-                            df_rp = pd.DataFrame({'Data': dp_val['DATA_LANCAMENTO'], 'Empenho': dp_val['EMPENHO_COL'], 'NF': dp_val['NOTA_COL'], 'Secretaria': dp_val['secretaria'], 'Valor NF': dp_val['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(dp_val['URL_REAL_LINK'], dp_val['EMPENHO_COL'], dp_val['NOTA_COL'])]})
-                            st.write(df_rp.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
-                        else: st.info("Nenhum lançamento no período.")
-
-        elif aba_selecionada == "🏛️ Por Secretaria":
-            st.markdown("<div class='section-title' style='margin-top:0;'>🏛️ Seleção Unificada de Secretaria</div>", unsafe_allow_html=True)
-            secs_totais = sorted([str(s) for s in df['secretaria'].unique() if str(s).strip() not in ['', 'nan', 'NÃO ESPECIFICADA']])
-            if secs_totais:
-                s_fin = st.selectbox("🏛️ Selecione ou Digite o Nome da Secretaria Executiva:", options=secs_totais, key="sel_s")
-                if s_fin:
-                    df_sec = df[df['secretaria'] == s_fin]
-                    anos_s = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_sec['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_s_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_s, key="ano_s")
-                    if not df_sec.empty:
-                        lbl_s = "Histórico Total" if ano_s_sel == anos_s[0] else f"Exercício {ano_s_sel}"
-                        fluxo_s = df_sec if ano_s_sel == anos_s[0] else df_sec[df_sec['ano_mov'] == ano_s_sel]
-                        saldo_s = df_sec if ano_s_sel == anos_s[0] else df_sec[df_sec['ano_mov'].astype(int) <= int(ano_s_sel)]
-                        
-                        tot_ent_s = float(saldo_s['repasse'].sum() + saldo_s['rendimento'].sum())
-                        tot_sai_s = float(saldo_s['bruto'].sum())
-                        sal_s = tot_ent_s - tot_sai_s
-                        pct_disp_s = (sal_s / tot_ent_s * 100) if tot_ent_s > 0 else 0.0
-                        
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>🏛️ Secretaria</div><div class='kpi-value' style='color:var(--blue-val);'>{s_fin}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_s)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_s:.2f}%</div></div></div>''', unsafe_allow_html=True)
-
-                        c_graf_s, c_tab_s = st.columns([1, 1])
-                        with c_graf_s:
-                            st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS VS SALDO</div>", unsafe_allow_html=True)
-                            fig_rosca_s = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai_s, max(0.0, sal_s)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
-                            fig_rosca_s.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                            st.plotly_chart(fig_rosca_s, use_container_width=True)
-
-                        with c_tab_s:
-                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 EXTRATO DA PASTA ({lbl_s})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_s['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_s['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_s['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LIVRE DA PASTA</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_s)}</td></tr></table>''', unsafe_allow_html=True)
-
-                        st.markdown(f"<div class='section-title'>⚖️ Detalhamento por Fonte de Recurso</div>", unsafe_allow_html=True)
-                        fontes_da_secretaria = sorted([f for f in saldo_s['fonte_clean'].unique() if f != ''])
-                        linhas_fontes_sec = []
-                        for fi_s in fontes_da_secretaria:
-                            df_i_fluxo = fluxo_s[fluxo_s['fonte_clean'] == fi_s]
-                            df_i_saldo = saldo_s[saldo_s['fonte_clean'] == fi_s]
-                            linhas_fontes_sec.append({'Fonte Vinculada': fi_s.upper(), 'Repasses': float(df_i_fluxo['repasse'].sum()), 'Rendimentos': float(df_i_fluxo['rendimento'].sum()), 'Despesas': float(df_i_fluxo['bruto'].sum()), 'Saldo Livre': float(df_i_saldo['repasse'].sum() + df_i_saldo['rendimento'].sum() - df_i_saldo['bruto'].sum())})
-                        
-                        if linhas_fontes_sec:
-                            st.dataframe(pd.DataFrame(linhas_fontes_sec).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Livre': fmt}).apply(highlight_saldo_verde, subset=['Saldo Livre']), use_container_width=True, hide_index=True)
-        
-        elif aba_selecionada == "🔍 Por Deputado":
-            st.markdown("<div class='section-title' style='margin-top:0;'>🔍 Seleção Unificada de Parlamentar</div>", unsafe_allow_html=True)
-            deps = sorted([str(d) for d in df['deputado'].unique() if str(d).strip() not in ['', 'nan', 'NÃO INFORMADO']])
-            if deps:
-                deputado_selecionado = st.selectbox("👤 Selecione ou Digite o Nome do Deputado/Parlamentar:", options=deps, key="sel_d")
-                if deputado_selecionado:
-                    df_dep = df[df['deputado'] == deputado_selecionado]
-                    anos_d = ["Exibir Histórico Acumulado Completo"] + sorted(list(set([str(a) for a in df_dep['ano_mov'].unique() if a not in ['', 'nan'] ])))
-                    ano_d_sel = st.selectbox("📅 Exercício Fiscal:", options=anos_d, key="ano_d")
-                    if not df_dep.empty:
-                        lbl_d = "Histórico Total" if ano_d_sel == anos_d[0] else f"Exercício {ano_d_sel}"
-                        fluxo_d = df_dep if ano_d_sel == anos_d[0] else df_dep[df_dep['ano_mov'] == ano_d_sel]
-                        saldo_d = df_dep if ano_d_sel == anos_d[0] else df_dep[df_dep['ano_mov'].astype(int) <= int(ano_d_sel)]
-                        
-                        tot_ent_d = float(saldo_d['repasse'].sum() + saldo_d['rendimento'].sum())
-                        tot_sai_d = float(saldo_d['bruto'].sum())
-                        sal_d = tot_ent_d - tot_sai_d
-                        pct_disp_d = (sal_d / tot_ent_d * 100) if tot_ent_d > 0 else 0.0
-
-                        st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head-blue'><div class='kpi-label'>👤 Parlamentar</div><div class='kpi-value' style='color:var(--blue-val);'>{deputado_selecionado}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>💰 Saldo Consolidado</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_d)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_d:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        
-                        c_graf_d, c_tab_d = st.columns([1, 1])
-                        with c_graf_d:
-                            st.markdown("<div class='section-title' style='margin-top:0;'>📊 DESPESAS VS SALDO</div>", unsafe_allow_html=True)
-                            fig_rosca_d = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[tot_sai_d, max(0.0, sal_d)], hole=.6, marker=dict(colors=['#ef4444', '#10b981']))])
-                            fig_rosca_d.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10), showlegend=True, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-                            st.plotly_chart(fig_rosca_d, use_container_width=True)
-
-                        with c_tab_d:
-                            st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 EXTRATO CONSOLIDADO</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSES TOTAIS</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_d['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS TOTAIS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_d['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS TOTAIS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_d['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO LÍQUIDO GERAL</td><td class='extrato-cell-val' style='font-size:15px;'>{fmt(sal_d)}</td></tr></table>''', unsafe_allow_html=True)
-                        
-                        st.markdown(f"<div class='section-title'>⚖️ Onde o recurso foi aplicado</div>", unsafe_allow_html=True)
-                        grupo_deputado = saldo_d.groupby(['fonte_clean', 'secretaria'])
-                        linhas_detalhe_dep = []
-                        for (fi_dep, sec_dep), df_grupo_saldo in grupo_deputado:
-                            if fi_dep == '': continue
-                            df_grupo_fluxo = fluxo_d[(fluxo_d['fonte_clean'] == fi_dep) & (fluxo_d['secretaria'] == sec_dep)]
-                            linhas_detalhe_dep.append({'Fonte Vinculada': fi_dep.upper(), 'Secretaria': sec_dep.upper(), 'Repasses': float(df_grupo_fluxo['repasse'].sum()), 'Rendimentos': float(df_grupo_fluxo['rendimento'].sum()), 'Despesas': float(df_grupo_fluxo['bruto'].sum()), 'Saldo Específico': float(df_grupo_saldo['repasse'].sum() + df_grupo_saldo['rendimento'].sum() - df_grupo_saldo['bruto'].sum())})
-                        
-                        if linhas_detalhe_dep: 
-                            st.dataframe(pd.DataFrame(linhas_detalhe_dep).style.format({'Repasses': fmt, 'Rendimentos': fmt, 'Despesas': fmt, 'Saldo Específico': fmt}).apply(highlight_saldo_verde, subset=['Saldo Específico']), use_container_width=True, hide_index=True)
