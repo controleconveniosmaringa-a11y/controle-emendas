@@ -896,7 +896,7 @@ elif st.session_state.pagina_atual == 'finisa':
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             
-            # Identificação rigorosa das colunas para os alertas
+            # Identificação rigorosa das colunas
             col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
             col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
@@ -906,10 +906,7 @@ elif st.session_state.pagina_atual == 'finisa':
             # --- PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
             if col_dot and col_exec and col_pago and col_saldo:
                 
-                # Filtra apenas as linhas que são "itens"
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
-                
-                # Cria uma coluna limpa de dotação apenas para garantir que a exclusão de duplicadas funcione 100%
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
                 df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
                 
@@ -1172,7 +1169,17 @@ elif st.session_state.pagina_atual == 'emendas':
                         lbl_f = "Histórico Total" if ano_f_sel == anos_f[0] else f"Exercício {ano_f_sel}"
                         
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
-                        st.markdown(f'''<div style='margin-bottom:10px;'><div class='meta-tag'>👤 Deputado: {df_fonte['deputado'].unique()[0]}</div><div class='meta-tag'>📄 Emenda: {df_fonte['emenda_clean'].unique()[0]}</div><div class='meta-tag'>🎯 Plano: {df_fonte['plano_clean'].unique()[0]}</div></div>''', unsafe_allow_html=True)
+                        
+                        # --- MODIFICAÇÃO SOLICITADA: ADICIONANDO AS SECRETARIAS NAS META-TAGS DA FONTE ---
+                        secs_envolvidas = ", ".join(sorted([str(s) for s in df_fonte['secretaria'].unique() if str(s).strip() != '']))
+                        
+                        st.markdown(f'''<div style='margin-bottom:10px;'>
+                            <div class='meta-tag'>👤 Deputado: {df_fonte['deputado'].unique()[0]}</div>
+                            <div class='meta-tag'>📄 Emenda: {df_fonte['emenda_clean'].unique()[0]}</div>
+                            <div class='meta-tag'>🎯 Plano: {df_fonte['plano_clean'].unique()[0]}</div>
+                            <div class='meta-tag' style='background-color: #e0f2fe; color: #1e3a8a; border-color: #bfdbfe;'>🏛️ Secretarias: {secs_envolvidas}</div>
+                            </div>''', unsafe_allow_html=True)
+                        # ---------------------------------------------------------------------------------
                         
                         c_graf_f, c_tab_f = st.columns([1, 1])
                         with c_graf_f:
@@ -1211,7 +1218,6 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.markdown(f"<div class='section-title'>📋 Lançamentos do Período</div>", unsafe_allow_html=True)
                         df_val_f = fluxo_f[fluxo_f['EMPENHO_COL'] != '-']
                         if not df_val_f.empty:
-                            # ⚠️ AQUI ESTAVA O ERRO! (df_val_f em vez de dp_val) ⚠️
                             df_rnd = pd.DataFrame({'Data': df_val_f['DATA_LANCAMENTO'], 'Empenho': df_val_f['EMPENHO_COL'], 'NF': df_val_f['NOTA_COL'], 'Valor NF': df_val_f['bruto'], 'PDF': [gerar_botoes_documento(u, e, n, "abrir") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])], 'Download': [gerar_botoes_documento(u, e, n, "baixar") for u, e, n in zip(df_val_f['URL_REAL_LINK'], df_val_f['EMPENHO_COL'], df_val_f['NOTA_COL'])]})
                             st.write(df_rnd.style.format({'Valor NF': fmt}).to_html(escape=False, index=False, classes='extrato-table'), unsafe_allow_html=True)
                         else: st.info("Nenhum lançamento no período.")
