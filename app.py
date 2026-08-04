@@ -307,17 +307,21 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
+# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" (Otimizada contra travamentos 15MB)
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
     
     def processar_df_gestao(df_raw):
+        # 1. Filtra as linhas vazias gigantescas geradas pelo Excel super rápido
+        mask = (df_raw != '').any(axis=1)
+        df_raw = df_raw[mask].reset_index(drop=True)
+        
         header_idx = -1
-        # Procura a linha que contém os cabeçalhos verdadeiros
-        for i, row in df_raw.iterrows():
-            row_str = " ".join([str(x).upper() for x in row.values])
+        # Procura a linha que contém os cabeçalhos verdadeiros (limite seguro nas primeiras 50 linhas)
+        for i in range(min(50, len(df_raw))):
+            row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "DOTA" in row_str and "PROJETO" in row_str:
                 header_idx = i
                 break
@@ -328,16 +332,27 @@ def obter_base_gestao_convenios():
             df_raw.columns = new_cols
             df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
             
-        df_raw = df_raw.replace('', pd.NA).dropna(how='all').fillna('')
+        # Refaz a limpeza rápida para o que sobrou abaixo do cabeçalho
+        mask_final = (df_raw != '').any(axis=1)
+        df_raw = df_raw[mask_final].reset_index(drop=True)
+        
         return df_raw
 
     try:
-        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+        # Tenta ler primeiro com separador de ponto e vírgula (padrão Brasil no Excel)
+        df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+        
+        # Se ele trouxer menos de 3 colunas, significa que o Excel salvou com vírgula padrão. A gente inverte automaticamente.
+        if len(df.columns) < 3:
+            df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+            
         return processar_df_gestao(df)
     except Exception:
         if os.path.exists("Gestão de Convênios.csv"):
             try:
-                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+                df = pd.read_csv("Gestão de Convênios.csv", sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+                if len(df.columns) < 3:
+                    df = pd.read_csv("Gestão de Convênios.csv", sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
                 return processar_df_gestao(df)
             except Exception:
                 return pd.DataFrame()
@@ -896,7 +911,7 @@ elif st.session_state.pagina_atual == 'finisa':
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             
-            # Identificação rigorosa das colunas
+            # Identificação rigorosa das colunas para os alertas
             col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
             col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
@@ -906,7 +921,10 @@ elif st.session_state.pagina_atual == 'finisa':
             # --- PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
             if col_dot and col_exec and col_pago and col_saldo:
                 
+                # Filtra apenas as linhas que são "itens"
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
+                
+                # Cria uma coluna limpa de dotação apenas para garantir que a exclusão de duplicadas funcione 100%
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
                 df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
                 
@@ -928,6 +946,7 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
                 df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
                 
+                # Nova regra: >= 70%
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
                 df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
