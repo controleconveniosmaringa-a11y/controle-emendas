@@ -307,21 +307,17 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" (Agora Blindada e Otimizada!)
+# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
     
     def processar_df_gestao(df_raw):
-        # 1. CORTE A LASER DE PERFORMANCE: Exclui todas as linhas 100% vazias em milissegundos
-        mask_validas = (df_raw != '').any(axis=1)
-        df_raw = df_raw[mask_validas].reset_index(drop=True)
-        
         header_idx = -1
-        # 2. Busca rápida do cabeçalho só nas primeiras linhas
-        for i in range(min(50, len(df_raw))):
-            row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
+        # Procura a linha que contém os cabeçalhos verdadeiros
+        for i, row in df_raw.iterrows():
+            row_str = " ".join([str(x).upper() for x in row.values])
             if "DOTA" in row_str and "PROJETO" in row_str:
                 header_idx = i
                 break
@@ -332,26 +328,16 @@ def obter_base_gestao_convenios():
             df_raw.columns = new_cols
             df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
             
-        # 3. Limpa de novo caso tenha sobrado "sujeira"
-        mask_final = (df_raw != '').any(axis=1)
-        df_raw = df_raw[mask_final].reset_index(drop=True)
+        df_raw = df_raw.replace('', pd.NA).dropna(how='all').fillna('')
         return df_raw
 
     try:
-        # Tenta ler primeiro considerando que o Excel do Brasil usa Ponto e Vírgula (;)
-        df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-        
-        # Se ele der erro e ler poucas colunas, ele refaz o teste usando Vírgula (,) automaticamente!
-        if len(df.columns) < 3:
-            df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-            
+        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
         return processar_df_gestao(df)
     except Exception:
         if os.path.exists("Gestão de Convênios.csv"):
             try:
-                df = pd.read_csv("Gestão de Convênios.csv", sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-                if len(df.columns) < 3:
-                    df = pd.read_csv("Gestão de Convênios.csv", sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
+                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
                 return processar_df_gestao(df)
             except Exception:
                 return pd.DataFrame()
