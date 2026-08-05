@@ -1,4 +1,3 @@
+streamlit>=1.40.0
 pandas
 plotly
-requests
-lxml
