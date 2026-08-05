@@ -128,8 +128,6 @@ st.markdown("""<style>
     .module-title { font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     .module-sub { font-size: 12px; font-weight: 600; color: var(--text-muted); }
     
-    .search-box-highlight { background-color: var(--search-bg); border: 1px solid var(--search-border); border-left: 6px solid var(--blue-val); padding: 22px; border-radius: 8px; margin-top: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-    
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .kpi-card-head-blue { flex: 1; background-color: var(--kpi-blue-bg); border: 1px solid var(--kpi-blue-border); border-radius: 8px; padding: 18px 20px; border-left: 5px solid var(--blue-val); }
@@ -186,7 +184,7 @@ def limpar_moeda_blindada(val):
         try: return abs(float(inteiro))
         except: return 0.0
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS (CACHE REDUZIDO PARA 2 SEGUNDOS = TEMPO REAL)
+# 3. CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=2)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -196,14 +194,7 @@ def obter_base_dados_global():
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
-        if os.path.exists("dados.csv"):
-            try:
-                df_raw = pd.read_csv("dados.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-                timestamp = os.path.getmtime("dados.csv")
-                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
-            except Exception:
-                return pd.DataFrame(), "Erro na leitura do arquivo local"
-        else: return pd.DataFrame(), "Indisponível"
+        return pd.DataFrame(), "Indisponível"
         
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
@@ -244,14 +235,7 @@ def obter_base_convenios():
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
-        if os.path.exists("Divisão Convenios - Divisao.csv"):
-            try:
-                d = pd.read_csv("Divisão Convenios - Divisao.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-                timestamp = os.path.getmtime("Divisão Convenios - Divisao.csv")
-                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
-            except Exception:
-                return pd.DataFrame(), "Erro na leitura do arquivo local"
-        else: return pd.DataFrame(), "Indisponível"
+        return pd.DataFrame(), "Indisponível"
         
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
@@ -268,14 +252,7 @@ def obter_base_credito():
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
-        if os.path.exists(nome_arquivo):
-            try:
-                df_raw = pd.read_csv(nome_arquivo, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-                timestamp = os.path.getmtime(nome_arquivo)
-                att = datetime.datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y às %H:%M")
-            except Exception:
-                return pd.DataFrame(), "Erro na leitura do arquivo local"
-        else: return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
+        return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
         
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     
@@ -307,19 +284,17 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" (Otimizada e com V2 para limpar o cache)
 @st.cache_data(ttl=2)
-def obter_base_gestao_convenios_v2():
+def obter_base_gestao_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
     
     def processar_df_gestao(df_raw):
-        # 1. CORTE A LASER DE PERFORMANCE: Exclui todas as linhas 100% vazias em milissegundos
-        mask_validas = (df_raw != '').any(axis=1)
+        # 1. Filtra as linhas vazias geradas pelo Excel (mata arquivos de 15MB)
+        mask_validas = (df_raw.astype(str) != '').any(axis=1)
         df_raw = df_raw[mask_validas].reset_index(drop=True)
         
         header_idx = -1
-        # 2. Busca rápida do cabeçalho só nas primeiras linhas
         for i in range(min(50, len(df_raw))):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "DOTA" in row_str and "PROJETO" in row_str:
@@ -332,22 +307,16 @@ def obter_base_gestao_convenios_v2():
             df_raw.columns = new_cols
             df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
             
-        # 3. Limpa de novo caso tenha sobrado "sujeira"
-        mask_final = (df_raw != '').any(axis=1)
+        mask_final = (df_raw.astype(str) != '').any(axis=1)
         df_raw = df_raw[mask_final].reset_index(drop=True)
         return df_raw
 
     try:
-        # Tenta ler primeiro considerando que o Excel do Brasil usa Ponto e Vírgula (;)
         df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-        
-        # Se ele der erro e ler poucas colunas, ele refaz o teste usando Vírgula (,) automaticamente!
         if len(df.columns) < 3:
             df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-            
         return processar_df_gestao(df)
     except Exception:
-        # REMOVIDO o retorno de arquivo local para garantir que o Streamlit NUNCA puxe o arquivo de 15MB antigo.
         return pd.DataFrame()
 
 @st.cache_data(ttl=2)
@@ -440,7 +409,7 @@ def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if tipo == "baixar" and "drive.google.com" in url and "/file/d/" in url: 
         url = f"https://drive.google.com/uc?export=download&id={url.split('/file/d/')[1].split('/')[0]}"
     if tipo == "abrir": return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
-    nome = f"NF_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
+    nome = f"Doc_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
     return f'<a href="{url}" download="{nome}" class="btn-download-direto">Baixar 💾</a>'
 
 def processar_saldos_acumulados(df_programa, nome_programa=""):
@@ -888,7 +857,7 @@ elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
     
-    df_gestao = obter_base_gestao_convenios_v2()
+    df_gestao = obter_base_gestao_convenios()
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
     
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
@@ -903,16 +872,13 @@ elif st.session_state.pagina_atual == 'finisa':
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             
-            # Identificação rigorosa das colunas
             col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
             col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
             col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
             
-            # --- PAINEL DE ALERTAS (DASHBOARD) ANTES DA TABELA ---
             if col_dot and col_exec and col_pago and col_saldo:
-                
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
                 df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
@@ -938,7 +904,6 @@ elif st.session_state.pagina_atual == 'finisa':
                 df_100 = df_itens[df_itens['exec_num'] >= 100.0]
                 df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
                 
-                # 1. Alertas de 100% Gasto (Card Simples e Limpo - Tópicos)
                 if not df_100.empty:
                     st.markdown("<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 5px solid var(--danger-val); padding: 15px; border-radius: 8px; margin-bottom: 20px;'>", unsafe_allow_html=True)
                     st.markdown("<div style='font-size: 15px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px;'>🚨 DOTAÇÕES COM ORÇAMENTO 100% ESGOTADO</div>", unsafe_allow_html=True)
@@ -947,7 +912,6 @@ elif st.session_state.pagina_atual == 'finisa':
                         st.markdown(f"<div style='font-size: 13px; color: var(--text-main); margin-bottom: 4px;'>• <b style='font-family: monospace;'>{row[col_dot]}</b> — {nome_p}</div>", unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
                 
-                # 2. Gráficos de Rosca (70% a 99% Gasto)
                 if not df_70_99.empty:
                     st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--warning-val); margin-bottom: 10px; margin-top: 10px;'>⚠️ DOTAÇÕES PRÓXIMAS DO LIMITE (70% a 99%)</div>", unsafe_allow_html=True)
                     num_cols = 3
@@ -955,17 +919,13 @@ elif st.session_state.pagina_atual == 'finisa':
                     for i, (_, row) in enumerate(df_70_99.iterrows()):
                         with cols_chart[i % num_cols]:
                             fig_alert = go.Figure(data=[go.Pie(labels=['Gasto', 'Disponível'], values=[row['pago_num'], row['saldo_num']], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                            
                             nome_c = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
                             if not nome_c or nome_c.lower() in ['nan', 'none']: nome_c = "Projeto não especificado"
                             nome_c = nome_c[:40] + "..." if len(nome_c) > 40 else nome_c
-                            
                             fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
                             st.plotly_chart(fig_alert, use_container_width=True)
                     st.markdown("<br>", unsafe_allow_html=True)
-            # --- FIM DO PAINEL DE ALERTAS ---
 
-            # CABEÇALHO DA TABELA HTML
             th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
             
             tr_html = ""
