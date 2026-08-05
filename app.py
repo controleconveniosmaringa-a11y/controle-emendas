@@ -73,7 +73,7 @@ st.markdown("""<style>
         --warning-bg: #fffbeb;
     }
 
-    /* MODO ESCURO (DETECTADO AUTOMATICAMENTE PELO NAVEGADOR) */
+    /* MODO ESCURO */
     @media (prefers-color-scheme: dark) {
         :root {
             --bg-main: #0e1117;
@@ -111,7 +111,6 @@ st.markdown("""<style>
         }
     }
 
-    /* APLICAÇÃO DAS VARIÁVEIS NO LAYOUT */
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: var(--bg-main) !important; color: var(--text-main) !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     
@@ -156,15 +155,13 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 # ==============================================================================
-# MOTOR MATEMÁTICO BLINDADO ABSOLUTO
+# MOTOR MATEMÁTICO BLINDADO
 # ==============================================================================
 def limpar_moeda_blindada(val):
     v_str = str(val).strip()
     if not v_str or v_str.lower() in ['nan', 'none', 'null', '']: return 0.0
-    
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0.0
-    
     last_comma = v_str.rfind(',')
     last_dot = v_str.rfind('.')
     last_sep = max(last_comma, last_dot)
@@ -219,11 +216,9 @@ def obter_base_dados_global():
     df['conta corrente'] = [x if x != '' else 'Não Informada' for x in ext('conta')]
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
-    
     df['repasse'] = [limpar_moeda_blindada(v) for v in ext('repasse')]
     df['rendimento'] = [limpar_moeda_blindada(v) for v in ext('rendimento')]
     df['bruto'] = [limpar_moeda_blindada(v) for v in ext('bruto')]
-    
     return df, att
 
 @st.cache_data(ttl=2)
@@ -277,47 +272,20 @@ def obter_base_credito():
     df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
-    
     df['REPASSE'] = [limpar_moeda_blindada(v) for v in ext_c('repasse', 'repass')]
     df['RENDIMENTO'] = [limpar_moeda_blindada(v) for v in ext_c('rendimento', 'rendim')]
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
-    
     return df, att
 
+
+# ==============================================================================
+# ⚠️ FUNÇÃO DESATIVADA PARA ISOLAMENTO DO ERRO ⚠️
+# ==============================================================================
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
-    cache_buster = int(time.time())
-    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
-    
-    def processar_df_gestao(df_raw):
-        # 1. Filtra as linhas vazias geradas pelo Excel (mata arquivos de 15MB)
-        mask_validas = (df_raw.astype(str) != '').any(axis=1)
-        df_raw = df_raw[mask_validas].reset_index(drop=True)
-        
-        header_idx = -1
-        for i in range(min(50, len(df_raw))):
-            row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
-            if "DOTA" in row_str and "PROJETO" in row_str:
-                header_idx = i
-                break
-        
-        if header_idx != -1:
-            new_cols = [str(c).strip().upper() for c in df_raw.iloc[header_idx].values]
-            new_cols = [c if c else f"COL_{j}" for j, c in enumerate(new_cols)]
-            df_raw.columns = new_cols
-            df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
-            
-        mask_final = (df_raw.astype(str) != '').any(axis=1)
-        df_raw = df_raw[mask_final].reset_index(drop=True)
-        return df_raw
+    # Retorna DataFrame vazio imediatamente para não processar arquivo csv nenhum
+    return pd.DataFrame()
 
-    try:
-        df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-        if len(df.columns) < 3:
-            df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
-        return processar_df_gestao(df)
-    except Exception:
-        return pd.DataFrame()
 
 @st.cache_data(ttl=2)
 def obter_base_maringa_csv():
@@ -330,13 +298,11 @@ def obter_base_maringa_csv():
         if not df.empty:
             df.columns = [str(c).strip() for c in df.columns]
             df['idx'] = df.index 
-                
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
             if col_data:
                 df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
             else:
                 df['Data_Parse'] = pd.Timestamp('1900-01-01')
-                
             col_valor = next((c for c in df.columns if 'VALOR' in c.upper()), None)
             if col_valor:
                 df['Valor_Num'] = df[col_valor].apply(limpar_moeda_blindada)
@@ -356,7 +322,6 @@ def obter_base_bancos():
         try:
             df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
             if df_b.empty: return pd.DataFrame()
-            
             cols = {str(c).strip().lower(): c for c in df_b.columns}
             col_data = next((v for k, v in cols.items() if 'data' in k), None)
             col_conta = next((v for k, v in cols.items() if 'conta' in k), None)
@@ -367,9 +332,7 @@ def obter_base_bancos():
             
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
-            
             df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
-            
             df_b['Conta_Exibicao'] = df_b[col_conta]
             df_b['Conta_Clean'] = df_b[col_conta].apply(clean_conta)
             df_b['Descricao'] = df_b[col_desc] if col_desc else '-'
@@ -423,7 +386,6 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
             rendimento_atual = df_aba['RENDIMENTO'].sum() if 'RENDIMENTO' in df_aba.columns else 0.0
             despesas_atuais = df_aba['VALOR DESPESA'].sum() if 'VALOR DESPESA' in df_aba.columns else 0.0
             
-            # --- FIXAÇÃO DA USINA ---
             if nome_programa == "USINA" and ("1" in str(aba_nome)):
                 valor_correto = 18534393.63
                 if abs(despesas_atuais - valor_correto) > 0.01:
@@ -468,7 +430,9 @@ def style_abertura_banco(row):
     elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: rgba(37, 99, 235, 0.2); font-weight: 700;'] * len(row)
     return [''] * len(row)
 
+# ==============================================================================
 # CARREGAMENTO GLOBAL
+# ==============================================================================
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 df_cred_completo, att_cred = obter_base_credito()
@@ -482,7 +446,6 @@ if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     
     if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
         df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
-        
 else:
     df_finisa = pd.DataFrame()
     df_usina = pd.DataFrame()
@@ -859,7 +822,6 @@ elif st.session_state.pagina_atual == 'finisa':
     
     df_gestao = obter_base_gestao_convenios()
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
-    
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
     
     nomes_abas = ["📊 Controle Orçamento Finisa"] + [f"📥 {aba}" for aba in abas_exibicao]
@@ -867,133 +829,10 @@ elif st.session_state.pagina_atual == 'finisa':
     
     with tabs_cred[0]:
         st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
-        
         if not df_gestao.empty:
-            cols = df_gestao.columns.tolist()
-            valid_cols = [c for c in cols if not c.startswith("COL_")]
-            
-            col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
-            col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
-            col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
-            col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
-            col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
-            
-            if col_dot and col_exec and col_pago and col_saldo:
-                df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
-                df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
-                df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
-                
-                def parse_pct_safe(val):
-                    v = str(val).replace('%', '').strip()
-                    v = re.sub(r'[^\d.,]', '', v)
-                    if not v: return 0.0
-                    if ',' in v and '.' in v:
-                        if v.rfind(',') > v.rfind('.'):
-                            v = v.replace('.', '').replace(',', '.')
-                        else:
-                            v = v.replace(',', '')
-                    elif ',' in v:
-                        v = v.replace(',', '.')
-                    try: return float(v)
-                    except: return 0.0
-                
-                df_itens['exec_num'] = df_itens[col_exec].apply(parse_pct_safe)
-                df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
-                df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
-                
-                df_100 = df_itens[df_itens['exec_num'] >= 100.0]
-                df_70_99 = df_itens[(df_itens['exec_num'] >= 70.0) & (df_itens['exec_num'] < 100.0)]
-                
-                if not df_100.empty:
-                    st.markdown("<div style='background-color: rgba(220, 38, 38, 0.1); border-left: 5px solid var(--danger-val); padding: 15px; border-radius: 8px; margin-bottom: 20px;'>", unsafe_allow_html=True)
-                    st.markdown("<div style='font-size: 15px; font-weight: 800; color: var(--danger-val); margin-bottom: 10px;'>🚨 DOTAÇÕES COM ORÇAMENTO 100% ESGOTADO</div>", unsafe_allow_html=True)
-                    for _, row in df_100.iterrows():
-                        nome_p = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else "Projeto não especificado"
-                        st.markdown(f"<div style='font-size: 13px; color: var(--text-main); margin-bottom: 4px;'>• <b style='font-family: monospace;'>{row[col_dot]}</b> — {nome_p}</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                
-                if not df_70_99.empty:
-                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--warning-val); margin-bottom: 10px; margin-top: 10px;'>⚠️ DOTAÇÕES PRÓXIMAS DO LIMITE (70% a 99%)</div>", unsafe_allow_html=True)
-                    num_cols = 3
-                    cols_chart = st.columns(num_cols)
-                    for i, (_, row) in enumerate(df_70_99.iterrows()):
-                        with cols_chart[i % num_cols]:
-                            fig_alert = go.Figure(data=[go.Pie(labels=['Gasto', 'Disponível'], values=[row['pago_num'], row['saldo_num']], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                            nome_c = str(row[col_proj]).strip() if pd.notna(row[col_proj]) else ""
-                            if not nome_c or nome_c.lower() in ['nan', 'none']: nome_c = "Projeto não especificado"
-                            nome_c = nome_c[:40] + "..." if len(nome_c) > 40 else nome_c
-                            fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
-                            st.plotly_chart(fig_alert, use_container_width=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-            th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
-            
-            tr_html = ""
-            for _, row in df_gestao.iterrows():
-                val_dot = str(row.get(col_dot, '')) if col_dot else ''
-                val_proj = str(row.get(col_proj, '')) if col_proj else ''
-                
-                tem_dotacao = val_dot.strip() != ''
-                
-                if tem_dotacao:
-                    bg_cor = "var(--table-bg)"
-                    borda_cor = "1px dashed var(--card-border)"
-                    fonte_peso = "normal"
-                else:
-                    bg_cor = "rgba(37, 99, 235, 0.12)"
-                    borda_cor = "1px solid var(--blue-val)"
-                    fonte_peso = "800"
-                
-                td_html = ""
-                for c in valid_cols:
-                    val = str(row.get(c, ''))
-                    base_td = f"padding: 12px 15px; background-color: {bg_cor} !important; border-bottom: {borda_cor}; font-weight: {fonte_peso};"
-                    
-                    if not tem_dotacao:
-                        if c == col_proj:
-                            td_html += f"<td style='{base_td} font-size: 13px; color: var(--blue-val); text-transform: uppercase;'>📂 {val}</td>"
-                        elif val.strip() != '':
-                            if c == 'SALDO' or 'SALDO' in c:
-                                td_html += f"<td style='{base_td} color: var(--success-val); text-align: right;'>{val}</td>"
-                            elif c == 'PAGO' or 'PAGO' in c:
-                                td_html += f"<td style='{base_td} color: var(--danger-val); text-align: right;'>{val}</td>"
-                            else:
-                                td_html += f"<td style='{base_td} color: var(--blue-val); text-align: right;'>{val}</td>"
-                        else:
-                            td_html += f"<td style='{base_td}'></td>"
-                    else:
-                        if c == 'SALDO' or 'SALDO' in c:
-                            td_html += f"<td style='{base_td} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
-                        elif c == 'PAGO' or 'PAGO' in c:
-                            td_html += f"<td style='{base_td} font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
-                        elif 'APROVADO' in c:
-                            td_html += f"<td style='{base_td} font-weight: 700; color: var(--text-main); text-align: right;'>{val}</td>"
-                        elif '%' in c or 'EXECU' in c:
-                            bg_color_tag = "rgba(99, 102, 241, 0.1)" if val.strip() != '' else "transparent"
-                            td_html += f"<td style='{base_td} font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color_tag}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
-                        elif c == col_dot:
-                            td_html += f"<td style='{base_td} font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace; border-left: 4px solid var(--success-val);'>{val}</td>"
-                        else:
-                            td_html += f"<td style='{base_td} font-size: 12px; font-weight: 600;'>{val}</td>"
-                            
-                tr_html += f"<tr>{td_html}</tr>"
-
-            tabela_completa = f'''
-            <div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'>
-                <table class='extrato-table' style='margin: 0; border: none; width: 100%; border-collapse: separate; border-spacing: 0;'>
-                    <thead style='position: sticky; top: 0; z-index: 1;'>
-                        <tr>{th_html}</tr>
-                    </thead>
-                    <tbody>
-                        {tr_html}
-                    </tbody>
-                </table>
-            </div>
-            '''
-            st.markdown(tabela_completa, unsafe_allow_html=True)
-            
+            pass # A tabela estaria aqui, mas está desativada no backend para o teste.
         else:
-            st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
+            st.info("ℹ️ Módulo 'Gestão de Convênios' temporariamente desativado para testes do sistema.")
             
     for i, aba_nome in enumerate(abas_exibicao):
         with tabs_cred[i+1]:
