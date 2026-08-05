@@ -6,6 +6,9 @@ import os
 import unicodedata
 import datetime
 import time
+import requests
+import json
+import base64
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -37,109 +40,53 @@ def fmt(v):
 st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
-    /* DEFINIÇÃO DE VARIÁVEIS DE CORES (MODO CLARO PADRÃO) */
     :root {
-        --bg-main: #f8fafc;
-        --text-main: #0f172a;
-        --text-muted: #64748b;
-        --card-bg: #ffffff;
-        --card-border: #e2e8f0;
-        --card-hover: #f1f5f9;
-        --header-bg: #0f172a;
-        --header-text: #f8fafc;
-        --table-bg: #ffffff;
-        --table-border: #cbd5e1;
-        --table-th-bg: #1e293b;
-        --table-th-text: #f8fafc;
-        --table-row-even: #f8fafc;
-        --table-row-hover: #f1f5f9;
-        --table-final-bg: #ecfdf5;
-        --table-final-text: #065f46;
-        --kpi-blue-bg: #f8fafc;
-        --kpi-blue-border: #bfdbfe;
-        --tag-bg: #f1f5f9;
-        --tag-border: #cbd5e1;
-        --tag-text: #334155;
-        --link-bg: #eff6ff;
-        --link-text: #2563eb;
-        --link-hover-bg: #dbeafe;
-        --search-bg: #f0f9ff;
-        --search-border: #bae6fd;
-        --success-val: #059669;
-        --danger-val: #dc2626;
-        --blue-val: #2563eb;
-        --purple-val: #6366f1;
-        --warning-val: #d97706;
-        --warning-bg: #fffbeb;
+        --bg-main: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --card-bg: #ffffff;
+        --card-border: #e2e8f0; --card-hover: #f1f5f9; --header-bg: #0f172a; --header-text: #f8fafc;
+        --table-bg: #ffffff; --table-border: #cbd5e1; --table-th-bg: #1e293b; --table-th-text: #f8fafc;
+        --table-row-even: #f8fafc; --table-row-hover: #f1f5f9; --table-final-bg: #ecfdf5;
+        --table-final-text: #065f46; --kpi-blue-bg: #f8fafc; --kpi-blue-border: #bfdbfe;
+        --tag-bg: #f1f5f9; --tag-border: #cbd5e1; --tag-text: #334155; --link-bg: #eff6ff;
+        --link-text: #2563eb; --link-hover-bg: #dbeafe; --search-bg: #f0f9ff; --search-border: #bae6fd;
+        --success-val: #059669; --danger-val: #dc2626; --blue-val: #2563eb; --purple-val: #6366f1;
+        --warning-val: #d97706; --warning-bg: #fffbeb;
     }
 
-    /* MODO ESCURO (DETECTADO AUTOMATICAMENTE PELO NAVEGADOR) */
     @media (prefers-color-scheme: dark) {
         :root {
-            --bg-main: #0e1117;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --card-bg: #1e293b;
-            --card-border: #334155;
-            --card-hover: #0f172a;
-            --header-bg: #020617;
-            --header-text: #f8fafc;
-            --table-bg: #1e293b;
-            --table-border: #334155;
-            --table-th-bg: #0f172a;
-            --table-th-text: #f8fafc;
-            --table-row-even: #0f172a;
-            --table-row-hover: #334155;
-            --table-final-bg: #064e3b;
-            --table-final-text: #34d399;
-            --kpi-blue-bg: #0f172a;
-            --kpi-blue-border: #1e3a8a;
-            --tag-bg: #334155;
-            --tag-border: #475569;
-            --tag-text: #cbd5e1;
-            --link-bg: #1e3a8a;
-            --link-text: #93c5fd;
-            --link-hover-bg: #1e40af;
-            --search-bg: #0c4a6e;
-            --search-border: #0284c7;
-            --success-val: #34d399;
-            --danger-val: #f87171;
-            --blue-val: #60a5fa;
-            --purple-val: #a78bfa;
-            --warning-val: #fbbf24;
-            --warning-bg: #451a03;
+            --bg-main: #0e1117; --text-main: #f8fafc; --text-muted: #94a3b8; --card-bg: #1e293b;
+            --card-border: #334155; --card-hover: #0f172a; --header-bg: #020617; --header-text: #f8fafc;
+            --table-bg: #1e293b; --table-border: #334155; --table-th-bg: #0f172a; --table-th-text: #f8fafc;
+            --table-row-even: #0f172a; --table-row-hover: #334155; --table-final-bg: #064e3b;
+            --table-final-text: #34d399; --kpi-blue-bg: #0f172a; --kpi-blue-border: #1e3a8a;
+            --tag-bg: #334155; --tag-border: #475569; --tag-text: #cbd5e1; --link-bg: #1e3a8a;
+            --link-text: #93c5fd; --link-hover-bg: #1e40af; --search-bg: #0c4a6e; --search-border: #0284c7;
+            --success-val: #34d399; --danger-val: #f87171; --blue-val: #60a5fa; --purple-val: #a78bfa;
+            --warning-val: #fbbf24; --warning-bg: #451a03;
         }
     }
 
-    /* APLICAÇÃO DAS VARIÁVEIS NO LAYOUT */
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: var(--bg-main) !important; color: var(--text-main) !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
-    
     .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background: var(--header-bg); border-radius: 8px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-bottom: 4px solid var(--blue-val); }
     .header-left { display: flex; align-items: center; }
     .main-title { font-size: 26px; font-weight: 800; color: var(--header-text) !important; letter-spacing: -0.5px; margin: 0; padding: 0; }
     .header-right { display: flex; align-items: center; background-color: var(--card-bg); padding: 8px 16px; border-radius: 6px; border: 1px solid var(--card-border); }
     .status-dot { width: 8px; height: 8px; background-color: var(--success-val); border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px var(--success-val); }
     .status-text { font-size: 11px; font-weight: 700; color: var(--text-main) !important; text-transform: uppercase; letter-spacing: 0.5px; }
-    
     .module-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 20px; margin-bottom: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .module-icon { font-size: 32px; background: var(--bg-main); width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--card-border); }
     .module-info { flex: 1; text-align: left; }
     .module-title { font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     .module-sub { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    
-    .search-box-highlight { background-color: var(--search-bg); border: 1px solid var(--search-border); border-left: 6px solid var(--blue-val); padding: 22px; border-radius: 8px; margin-top: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-    
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .kpi-card-head-blue { flex: 1; background-color: var(--kpi-blue-bg); border: 1px solid var(--kpi-blue-border); border-radius: 8px; padding: 18px 20px; border-left: 5px solid var(--blue-val); }
     .kpi-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .kpi-value { font-size: 24px; font-weight: 800; color: var(--success-val); margin-top: 4px; }
-    
     .section-title { font-size: 15px; font-weight: 800; text-transform: uppercase; color: var(--text-main); margin-top: 30px; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--card-border); }
     .meta-tag { background-color: var(--tag-bg); color: var(--tag-text); padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; border: 1px solid var(--tag-border); margin-right: 6px; display: inline-block; }
     .secretaria-header { font-size: 15px; font-weight: 800; color: var(--text-main); margin-top: 20px; padding-left: 8px; border-left: 4px solid var(--blue-val); background-color: var(--kpi-blue-bg); padding-top: 6px; padding-bottom: 6px; border-radius: 0 6px 6px 0; }
-    
     .extrato-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; margin-bottom: 20px; background-color: var(--table-bg); border: 1px solid var(--table-border); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .extrato-table th { background-color: var(--table-th-bg); color: var(--table-th-text); padding: 12px 15px; font-size: 12px; font-weight: 700; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; }
     .extrato-row { transition: all 0.2s ease; background-color: var(--table-bg); }
@@ -150,7 +97,6 @@ st.markdown("""<style>
     .extrato-row-final td { color: var(--table-final-text) !important; border-top: 2px solid var(--success-val); }
     .extrato-cell-label { padding: 12px 15px; font-size: 12px; font-weight: 600; color: var(--text-main); text-align: left; border-right: 1px dashed var(--card-border); }
     .extrato-cell-val { padding: 12px 15px; font-size: 13px; font-weight: 800; color: var(--text-main); text-align: right; white-space: nowrap; }
-    
     .btn-download-direto { background-color: var(--tag-bg); color: var(--text-main) !important; text-decoration: none !important; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid var(--tag-border); display: inline-block; transition: all 0.2s ease; text-transform: uppercase; }
     .btn-download-direto:hover { background-color: var(--card-hover); color: var(--text-main) !important; border-color: var(--text-muted); }
     .link-abrir-doc { color: var(--link-text) !important; text-decoration: none !important; font-size: 12px; font-weight: 700; background-color: var(--link-bg); padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid var(--kpi-blue-border); transition: 0.2s; }
@@ -163,10 +109,8 @@ st.markdown("""<style>
 def limpar_moeda_blindada(val):
     v_str = str(val).strip()
     if not v_str or v_str.lower() in ['nan', 'none', 'null', '']: return 0.0
-    
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0.0
-    
     last_comma = v_str.rfind(',')
     last_dot = v_str.rfind('.')
     last_sep = max(last_comma, last_dot)
@@ -174,7 +118,6 @@ def limpar_moeda_blindada(val):
     if last_sep == -1:
         try: return abs(float(v_str))
         except: return 0.0
-        
     if len(v_str) - last_sep <= 3:
         inteiro = v_str[:last_sep].replace('.', '').replace(',', '')
         decimal = v_str[last_sep+1:]
@@ -197,7 +140,6 @@ def obter_base_dados_global():
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Indisponível"
-        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -221,11 +163,9 @@ def obter_base_dados_global():
     df['conta corrente'] = [x if x != '' else 'Não Informada' for x in ext('conta')]
     df['ano_mov'] = [re.search(r'(20\d{2})', str(d)).group(1) if re.search(r'(20\d{2})', str(d)) else '2025' for d in ext('data')]
     df['DATA_LANCAMENTO'] = ext('data')
-    
     df['repasse'] = [limpar_moeda_blindada(v) for v in ext('repasse')]
     df['rendimento'] = [limpar_moeda_blindada(v) for v in ext('rendimento')]
     df['bruto'] = [limpar_moeda_blindada(v) for v in ext('bruto')]
-    
     return df, att
 
 @st.cache_data(ttl=2)
@@ -238,7 +178,6 @@ def obter_base_convenios():
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Indisponível"
-        
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
@@ -255,9 +194,7 @@ def obter_base_credito():
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
-        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
-    
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     def ext_c(chave_exata, chave_parcial):
         for limpo, orig in list(col_orig.items()):
@@ -267,7 +204,6 @@ def obter_base_credito():
             if chave_parcial in limpo:
                 del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         return [''] * len(df_raw)
-        
     df = pd.DataFrame()
     prog_vals = ext_c('programa', 'programa')
     df['PROGRAMA'] = [str(x).upper().strip() if str(x).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for x in prog_vals]
@@ -279,14 +215,11 @@ def obter_base_credito():
     df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
-    
     df['REPASSE'] = [limpar_moeda_blindada(v) for v in ext_c('repasse', 'repass')]
     df['RENDIMENTO'] = [limpar_moeda_blindada(v) for v in ext_c('rendimento', 'rendim')]
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
-    
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" (COM VARREDURA DE COLUNAS FANTASMAS)
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
@@ -294,32 +227,22 @@ def obter_base_gestao_convenios():
     
     def processar_df_gestao(df_raw):
         if df_raw.empty: return pd.DataFrame()
-        
-        # Corta as linhas infinitas vazias geradas pelo Excel
         df_raw = df_raw.dropna(how='all')
-        
-        # Remove espaços invisíveis que quebram o visual
         df_raw = df_raw.astype(str).apply(lambda x: x.str.strip())
-        
         mask_validas = (df_raw != '').any(axis=1)
         df_raw = df_raw[mask_validas].reset_index(drop=True)
-        
         header_idx = -1
-        # Busca inteligente da primeira linha real do cabeçalho
         for i in range(min(50, len(df_raw))):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "DOTA" in row_str and "PROJETO" in row_str:
                 header_idx = i
                 break
-                
-        # Varredura inteligente de colunas (Ignora as famosas "Unnamed" que estragam a tabela)
         if header_idx != -1:
             new_cols = [str(c).strip().upper() for c in df_raw.iloc[header_idx].values]
             new_cols = [c if c and "UNNAMED" not in c.upper() else f"COL_{j}" for j, c in enumerate(new_cols)]
             df_raw.columns = new_cols
             df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
         else:
-            # Caso os cabeçalhos já estejam na primeira linha (lidos direto pelo pandas)
             new_cols = [str(c).strip().upper() for c in df_raw.columns]
             new_cols = [c if c and "UNNAMED" not in c.upper() else f"COL_{j}" for j, c in enumerate(new_cols)]
             df_raw.columns = new_cols
@@ -329,18 +252,15 @@ def obter_base_gestao_convenios():
         return df_raw
 
     try:
-        # Sistema duplo de decodificação (proteção contra quebra de acentos no UTF-8 e Latin1)
         try:
             df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
         except Exception:
             df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-            
         if len(df.columns) < 3:
             try:
                 df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
             except Exception:
                 df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-                
         return processar_df_gestao(df)
     except Exception:
         return pd.DataFrame()
@@ -356,13 +276,11 @@ def obter_base_maringa_csv():
         if not df.empty:
             df.columns = [str(c).strip() for c in df.columns]
             df['idx'] = df.index 
-                
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
             if col_data:
                 df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
             else:
                 df['Data_Parse'] = pd.Timestamp('1900-01-01')
-                
             col_valor = next((c for c in df.columns if 'VALOR' in c.upper()), None)
             if col_valor:
                 df['Valor_Num'] = df[col_valor].apply(limpar_moeda_blindada)
@@ -377,29 +295,22 @@ def obter_base_bancos():
     cache_buster = int(time.time())
     url_bb = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/banco_do_brasil.csv?v={cache_buster}"
     url_cx = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/caixa.csv?v={cache_buster}"
-    
     def processar_extrato(url, banco_nome):
         try:
             df_b = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
             if df_b.empty: return pd.DataFrame()
-            
             cols = {str(c).strip().lower(): c for c in df_b.columns}
             col_data = next((v for k, v in cols.items() if 'data' in k), None)
             col_conta = next((v for k, v in cols.items() if 'conta' in k), None)
             col_valor = next((v for k, v in cols.items() if 'valor' in k or 'credito' in k or 'lançamento' in k), None)
             col_desc = next((v for k, v in cols.items() if 'historico' in k or 'descrição' in k or 'histórico' in k), None)
-            
             if not col_valor or not col_conta: return pd.DataFrame()
-            
             df_b['Banco'] = banco_nome
             df_b['Data_Parse'] = pd.to_datetime(df_b[col_data], dayfirst=True, errors='coerce') if col_data else pd.Timestamp('1900-01-01')
-            
             df_b['Data_Exibicao'] = df_b['Data_Parse'].dt.strftime('%d/%m/%Y') 
-            
             df_b['Conta_Exibicao'] = df_b[col_conta]
             df_b['Conta_Clean'] = df_b[col_conta].apply(clean_conta)
             df_b['Descricao'] = df_b[col_desc] if col_desc else '-'
-            
             def converter_valor_extrato(val):
                 v = str(val).upper().replace('R$', '').replace('C', '').strip()
                 is_deb = 'D' in v or '-' in v
@@ -413,22 +324,15 @@ def obter_base_bancos():
                     num = float(v)
                     return -num if is_deb else num
                 except: return 0.0
-            
             df_b['Valor_Num'] = df_b[col_valor].apply(converter_valor_extrato)
             return df_b[['Banco', 'Data_Parse', 'Data_Exibicao', 'Conta_Clean', 'Conta_Exibicao', 'Descricao', 'Valor_Num']]
         except: return pd.DataFrame()
-
     df_bb = processar_extrato(url_bb, 'Banco do Brasil')
     df_caixa = processar_extrato(url_cx, 'Caixa Econômica')
-    
-    if not df_bb.empty and not df_caixa.empty:
-        return pd.concat([df_bb, df_caixa], ignore_index=True)
-    elif not df_bb.empty:
-        return df_bb
-    elif not df_caixa.empty:
-        return df_caixa
-    else:
-        return pd.DataFrame()
+    if not df_bb.empty and not df_caixa.empty: return pd.concat([df_bb, df_caixa], ignore_index=True)
+    elif not df_bb.empty: return df_bb
+    elif not df_caixa.empty: return df_caixa
+    else: return pd.DataFrame()
 
 def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if not url or url == '': return '-'
@@ -448,39 +352,25 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
             repasse_puro_atual = df_aba['REPASSE'].sum() if 'REPASSE' in df_aba.columns else 0.0
             rendimento_atual = df_aba['RENDIMENTO'].sum() if 'RENDIMENTO' in df_aba.columns else 0.0
             despesas_atuais = df_aba['VALOR DESPESA'].sum() if 'VALOR DESPESA' in df_aba.columns else 0.0
-            
-            # --- FIXAÇÃO DA USINA ---
             if nome_programa == "USINA" and ("1" in str(aba_nome)):
                 valor_correto = 18534393.63
                 if abs(despesas_atuais - valor_correto) > 0.01:
                     diferenca = valor_correto - despesas_atuais
                     nova_linha = pd.DataFrame([{
-                        'DATA': '-',
-                        'EMPENHO': 'AJUSTE',
-                        'FORNECEDOR': 'AJUSTE DE CÁLCULO SISTEMA',
-                        'TIPO DE DOCUMENTO': '-',
-                        'Nº DOCUMENTO': '-',
+                        'DATA': '-', 'EMPENHO': 'AJUSTE', 'FORNECEDOR': 'AJUSTE DE CÁLCULO SISTEMA',
+                        'TIPO DE DOCUMENTO': '-', 'Nº DOCUMENTO': '-',
                         'DESCRIÇÃO': 'VALOR FIXADO PELO SISTEMA (AJUSTE DE LANÇAMENTO)',
-                        'REF VALOR REPASSADO': aba_nome,
-                        'LINK DOCUMENTO': '-',
-                        'REPASSE': 0.0,
-                        'RENDIMENTO': 0.0,
-                        'VALOR DESPESA': diferenca
+                        'REF VALOR REPASSADO': aba_nome, 'LINK DOCUMENTO': '-',
+                        'REPASSE': 0.0, 'RENDIMENTO': 0.0, 'VALOR DESPESA': diferenca
                     }])
                     df_aba = pd.concat([df_aba, nova_linha], ignore_index=True)
                     despesas_atuais = valor_correto
-            
             recurso_disponivel_total = repasse_puro_atual + rendimento_atual + saldo_anterior
             saldo_remanescente_final = recurso_disponivel_total - despesas_atuais
-            
             dados_finais[aba_nome] = {
-                'repasse_atual': repasse_puro_atual,
-                'rendimento_atual': rendimento_atual,
-                'saldo_anterior': saldo_anterior, 
-                'total_disponivel': recurso_disponivel_total,
-                'total_despesa': despesas_atuais, 
-                'saldo_final': saldo_remanescente_final, 
-                'df_filtrado': df_aba
+                'repasse_atual': repasse_puro_atual, 'rendimento_atual': rendimento_atual,
+                'saldo_anterior': saldo_anterior, 'total_disponivel': recurso_disponivel_total,
+                'total_despesa': despesas_atuais, 'saldo_final': saldo_remanescente_final, 'df_filtrado': df_aba
             }
             saldo_anterior = saldo_remanescente_final
         return dados_finais, abas
@@ -494,7 +384,9 @@ def style_abertura_banco(row):
     elif '(ATIVA)' in str(row['Fonte Orçamentária']): return ['background-color: rgba(37, 99, 235, 0.2); font-weight: 700;'] * len(row)
     return [''] * len(row)
 
+# ==============================================================================
 # CARREGAMENTO GLOBAL
+# ==============================================================================
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
 df_cred_completo, att_cred = obter_base_credito()
@@ -502,13 +394,8 @@ df_cred_completo, att_cred = obter_base_credito()
 if not df_cred_completo.empty and 'PROGRAMA' in df_cred_completo.columns:
     df_finisa = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('FINISA', na=False)].copy()
     df_usina = df_cred_completo[df_cred_completo['PROGRAMA'].str.contains('USINA', na=False)].copy()
-    
-    if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns:
-        df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
-    
-    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns:
-        df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
-        
+    if not df_finisa.empty and 'VALOR DESPESA' in df_finisa.columns: df_finisa['VALOR DESPESA'] = df_finisa['VALOR DESPESA'].abs()
+    if not df_usina.empty and 'VALOR DESPESA' in df_usina.columns: df_usina['VALOR DESPESA'] = df_usina['VALOR DESPESA'].abs()
 else:
     df_finisa = pd.DataFrame()
     df_usina = pd.DataFrame()
@@ -516,195 +403,70 @@ else:
 # ==============================================================================
 # ROTEAMENTO DAS TELAS
 # ==============================================================================
-
 if st.session_state.pagina_atual == 'menu_principal':
-    
     tz_br = datetime.timezone(datetime.timedelta(hours=-3))
     agora_br = datetime.datetime.now(tz_br)
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
     
-    st.markdown(f"""
-    <div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'>
-        <div>
-            <h1 style='font-size: 28px; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.5px; text-transform: uppercase;'>Controle Convênios</h1>
-            <p style='color: #94a3b8; font-size: 14px; font-weight: 500; margin: 0; margin-top: 4px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p>
-        </div>
-        <div style='font-size: 12px; color: #cbd5e1; font-weight: 600; display: flex; gap: 15px; background: rgba(0,0,0,0.25); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);'>
-            <span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span>
-            <span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span>
-            <span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(f'''<div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'><div><h1 style='font-size: 28px; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.5px; text-transform: uppercase;'>Controle Convênios</h1><p style='color: #94a3b8; font-size: 14px; font-weight: 500; margin: 0; margin-top: 4px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p></div><div style='font-size: 12px; color: #cbd5e1; font-weight: 600; display: flex; gap: 15px; background: rgba(0,0,0,0.25); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div></div>''', unsafe_allow_html=True)
     df_bancos = obter_base_bancos()
-    
     contas_validas = []
     mapa_fontes = {}
-    
     if not df_conv.empty and 'CONTA CORRENTE' in df_conv.columns:
         if 'FONTE DE RECURSO' in df_conv.columns:
             for _, row in df_conv.iterrows():
                 c_clean = clean_conta(str(row['CONTA CORRENTE']))
                 f_rec = str(row['FONTE DE RECURSO']).strip()
                 if c_clean and f_rec and f_rec.lower() != 'nan':
-                    if c_clean not in mapa_fontes:
-                        mapa_fontes[c_clean] = f_rec
-                        
+                    if c_clean not in mapa_fontes: mapa_fontes[c_clean] = f_rec
         contas_validas = df_conv['CONTA CORRENTE'].apply(clean_conta).unique().tolist()
         contas_validas = [c for c in contas_validas if c != '']
-        
     df_receitas = df_bancos[(df_bancos['Valor_Num'] > 0) & (df_bancos['Conta_Clean'].isin(contas_validas))].copy() if not df_bancos.empty and contas_validas else pd.DataFrame()
-    
-    if not df_receitas.empty:
-        df_receitas['Fonte_Conv'] = df_receitas['Conta_Clean'].map(mapa_fontes).fillna('-')
-        
+    if not df_receitas.empty: df_receitas['Fonte_Conv'] = df_receitas['Conta_Clean'].map(mapa_fontes).fillna('-')
     texto_data = "Aguardando dados"
     if not df_bancos.empty:
         df_datas_validas = df_bancos[df_bancos['Data_Parse'] > pd.Timestamp('1900-01-01')]
-        if not df_datas_validas.empty:
-            min_date = df_datas_validas['Data_Parse'].min().strftime('%d/%m/%Y')
-            max_date = df_datas_validas['Data_Parse'].max().strftime('%d/%m/%Y')
-            texto_data = f"Extrato de {min_date} a {max_date}"
-
-    st.markdown(f"""
-    <div style='display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; margin-bottom: 15px;'>
-        <div style='font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--text-main);'>
-            🏦 Últimas Receitas Bancárias <span style='color: var(--text-muted); font-size: 13px; font-weight: 600;'>(Contas Convênios)</span>
-        </div>
-        <div style='font-size: 11px; background: var(--link-bg); color: var(--link-text); padding: 6px 12px; border-radius: 6px; font-weight: 700; border: 1px solid var(--blue-val);'>
-            {texto_data}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+        if not df_datas_validas.empty: texto_data = f"Extrato de {df_datas_validas['Data_Parse'].min().strftime('%d/%m/%Y')} a {df_datas_validas['Data_Parse'].max().strftime('%d/%m/%Y')}"
+    st.markdown(f'''<div style='display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; margin-bottom: 15px;'><div style='font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--text-main);'>🏦 Últimas Receitas Bancárias <span style='color: var(--text-muted); font-size: 13px; font-weight: 600;'>(Contas Convênios)</span></div><div style='font-size: 11px; background: var(--link-bg); color: var(--link-text); padding: 6px 12px; border-radius: 6px; font-weight: 700; border: 1px solid var(--blue-val);'>{texto_data}</div></div>''', unsafe_allow_html=True)
     c_bb, c_cx = st.columns(2, gap="large")
-    
     df_bb_top5 = df_receitas[df_receitas['Banco'] == 'Banco do Brasil'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
     df_cx_top5 = df_receitas[df_receitas['Banco'] == 'Caixa Econômica'].sort_values(by='Data_Parse', ascending=False).head(5) if not df_receitas.empty else pd.DataFrame()
-    
     with c_bb:
-        st.markdown(f"""
-        <div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #facc15; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'>
-            <div style='background-color: rgba(250, 204, 21, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'>
-                <h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>
-                    🟡 Banco do Brasil
-                </h4>
-            </div>
-            <div style='padding: 10px 20px;'>
-        """, unsafe_allow_html=True)
-        
+        st.markdown('''<div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #facc15; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'><div style='background-color: rgba(250, 204, 21, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'><h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>🟡 Banco do Brasil</h4></div><div style='padding: 10px 20px;'>''', unsafe_allow_html=True)
         if not df_bb_top5.empty:
             for _, r in df_bb_top5.iterrows():
-                desc = str(r['Descricao'])
-                desc = desc if desc.strip() not in ['-', ''] else 'Receita Identificada'
-                st.markdown(f"""
-                <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
-                    <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
-                        <div style='flex: 1; min-width: 0;'>
-                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div>
-                            <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
-                        </div>
-                        <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
-                            {fmt(r['Valor_Num'])}
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Aguardando novas receitas no Banco do Brasil vinculadas a contas de convênios.")
+                desc = str(r['Descricao']) if str(r['Descricao']).strip() not in ['-', ''] else 'Receita Identificada'
+                st.markdown(f'''<div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'><div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'><div style='flex: 1; min-width: 0;'><div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div><div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div></div><div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>{fmt(r['Valor_Num'])}</div></div></div>''', unsafe_allow_html=True)
+        else: st.info("Aguardando novas receitas no Banco do Brasil.")
         st.markdown("</div></div>", unsafe_allow_html=True)
-        
     with c_cx:
-        st.markdown(f"""
-        <div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #0284c7; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'>
-            <div style='background-color: rgba(2, 132, 199, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'>
-                <h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>
-                    🔵 Caixa Econômica
-                </h4>
-            </div>
-            <div style='padding: 10px 20px;'>
-        """, unsafe_allow_html=True)
-        
+        st.markdown('''<div style='background-color: var(--card-bg); border: 1px solid var(--card-border); border-left: 4px solid #0284c7; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); height: 100%; overflow: hidden;'><div style='background-color: rgba(2, 132, 199, 0.1); padding: 12px 20px; border-bottom: 1px solid var(--card-border);'><h4 style='margin:0; color:var(--text-main); font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px;'>🔵 Caixa Econômica</h4></div><div style='padding: 10px 20px;'>''', unsafe_allow_html=True)
         if not df_cx_top5.empty:
             for _, r in df_cx_top5.iterrows():
-                desc = str(r['Descricao'])
-                desc = desc if desc.strip() not in ['-', ''] else 'Receita Identificada'
-                st.markdown(f"""
-                <div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'>
-                    <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'>
-                        <div style='flex: 1; min-width: 0;'>
-                            <div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div>
-                            <div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div>
-                        </div>
-                        <div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>
-                            {fmt(r['Valor_Num'])}
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Aguardando novas receitas na Caixa Econômica vinculadas a contas de convênios.")
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+                desc = str(r['Descricao']) if str(r['Descricao']).strip() not in ['-', ''] else 'Receita Identificada'
+                st.markdown(f'''<div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'><div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'><div style='flex: 1; min-width: 0;'><div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div><div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div></div><div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>{fmt(r['Valor_Num'])}</div></div></div>''', unsafe_allow_html=True)
+        else: st.info("Aguardando novas receitas na Caixa Econômica.")
+        st.markdown("</div></div><br>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px;'>🧭 Módulos do Sistema</div>", unsafe_allow_html=True)
-    
     c1, c2 = st.columns(2, gap="large")
     with c1:
-        st.markdown(f"""
-        <div class='module-card' style='border-left: 4px solid var(--purple-val);'>
-            <div class='module-icon' style='color: var(--purple-val);'>📈</div>
-            <div class='module-info'>
-                <div class='module-title'>Resumo Emendas</div>
-                <div class='module-sub'>Dashboard Executivo Global</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('''<div class='module-card' style='border-left: 4px solid var(--purple-val);'><div class='module-icon' style='color: var(--purple-val);'>📈</div><div class='module-info'><div class='module-title'>Resumo Emendas</div><div class='module-sub'>Dashboard Executivo Global</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_resumo", use_container_width=True, type="primary", on_click=mudar_pagina, args=('resumo_emendas',))
-        
     with c2:
-        st.markdown(f"""
-        <div class='module-card' style='border-left: 4px solid var(--blue-val);'>
-            <div class='module-icon' style='color: var(--blue-val);'>📊</div>
-            <div class='module-info'>
-                <div class='module-title'>Emendas Orçamentárias</div>
-                <div class='module-sub'>Última Atualização: {att_emendas}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'''<div class='module-card' style='border-left: 4px solid var(--blue-val);'><div class='module-icon' style='color: var(--blue-val);'>📊</div><div class='module-info'><div class='module-title'>Emendas Orçamentárias</div><div class='module-sub'>Última Atualização: {att_emendas}</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_emendas", use_container_width=True, type="primary", on_click=mudar_pagina, args=('emendas',))
-
     st.markdown("<br>", unsafe_allow_html=True)
-    
     c3, c4 = st.columns(2, gap="large")
     with c3:
-        st.markdown(f"""
-        <div class='module-card' style='border-left: 4px solid var(--success-val);'>
-            <div class='module-icon' style='color: var(--success-val);'>🏦</div>
-            <div class='module-info'>
-                <div class='module-title'>Operações de Crédito</div>
-                <div class='module-sub'>Status: Monitoramento Ativo</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('''<div class='module-card' style='border-left: 4px solid var(--success-val);'><div class='module-icon' style='color: var(--success-val);'>🏦</div><div class='module-info'><div class='module-title'>Operações de Crédito</div><div class='module-sub'>Status: Monitoramento Ativo</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_credito", use_container_width=True, type="primary", on_click=mudar_pagina, args=('credito',))
-        
     with c4:
-        st.markdown(f"""
-        <div class='module-card' style='border-left: 4px solid var(--warning-val);'>
-            <div class='module-icon' style='color: var(--warning-val);'>🤝</div>
-            <div class='module-info'>
-                <div class='module-title'>Divisão Convênios</div>
-                <div class='module-sub'>Última Atualização: {att_convenios}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'''<div class='module-card' style='border-left: 4px solid var(--warning-val);'><div class='module-icon' style='color: var(--warning-val);'>🤝</div><div class='module-info'><div class='module-title'>Divisão Convênios</div><div class='module-sub'>Última Atualização: {att_convenios}</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
-    
     st.markdown("---")
+    
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
@@ -768,33 +530,6 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
             if not df_finalizadas.empty:
                 df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                 st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
-        
-        st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
-        if not df_top5.empty:
-            cols = st.columns(len(df_top5))
-            for i, (_, row) in enumerate(df_top5.iterrows()):
-                with cols[i]:
-                    fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                    fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-        st.markdown("<div class='section-title'>📊 Panorama de Saldos por Secretaria e Deputado</div>", unsafe_allow_html=True)
-        df_g_sec = df[df['secretaria'] != 'Não Especificada'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-        df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
-        df_g_dep = df[df['deputado'] != 'Não Informado'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-        df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
-            fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
-            fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-            st.plotly_chart(fig1, use_container_width=True)
-        with col_g2:
-            st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
-            fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
-            fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-            st.plotly_chart(fig2, use_container_width=True)
-
         st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas</div>", unsafe_allow_html=True)
         df_todas_show = df_fontes.sort_values(by='saldo', ascending=False)[['fonte_clean', 'secretaria', 'repasse', 'rendimento', 'bruto', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'repasse': 'REPASSES (+)', 'rendimento': 'RENDIMENTOS (+)', 'bruto': 'DESPESAS (-)', 'saldo': 'SALDO DISPONÍVEL (=)'})
         st.dataframe(df_todas_show.style.format({'REPASSES (+)': fmt, 'RENDIMENTOS (+)': fmt, 'DESPESAS (-)': fmt, 'SALDO DISPONÍVEL (=)': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL (=)']), use_container_width=True, hide_index=True)
@@ -820,7 +555,7 @@ elif st.session_state.pagina_atual == 'finisa':
     tabs_cred = st.tabs(nomes_abas)
     
     with tabs_cred[0]:
-        st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title' style='margin-top:0;'>📊 Editor do Controle Orçamentário Finisa</div>", unsafe_allow_html=True)
         if not df_gestao.empty:
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
@@ -830,6 +565,7 @@ elif st.session_state.pagina_atual == 'finisa':
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
             col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
             
+            # --- PAINEL DE ALERTAS 100% e 70% ---
             if col_dot and col_exec and col_pago and col_saldo:
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
@@ -874,44 +610,52 @@ elif st.session_state.pagina_atual == 'finisa':
                             fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
                             st.plotly_chart(fig_alert, use_container_width=True, key=f"alert_pie_{i}")
                     st.markdown("<br>", unsafe_allow_html=True)
-
-            th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
-            tr_html = ""
-            for _, row in df_gestao.iterrows():
-                val_dot = str(row.get(col_dot, '')) if col_dot else ''
-                val_proj = str(row.get(col_proj, '')) if col_proj else ''
-                tem_dotacao = val_dot.strip() != ''
-                if tem_dotacao:
-                    bg_cor = "var(--table-bg)"
-                    borda_cor = "1px dashed var(--card-border)"
-                    fonte_peso = "normal"
+            
+            # --- NOVA TABELA EDITÁVEL COM BOTÃO SALVAR ---
+            st.info("💡 Dê um duplo clique nas células da tabela abaixo para editar os valores. Para salvar as mudanças permanentemente no GitHub, clique no botão no final da página.")
+            
+            # Editor de Dados do Streamlit
+            df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 Salvar Alterações e Atualizar Banco de Dados (GitHub)", type="primary"):
+                if "GITHUB_TOKEN" not in st.secrets:
+                    st.error("⚠️ Token de autorização não encontrado! Para habilitar o salvamento automático, configure o GITHUB_TOKEN no menu 'Secrets' do Streamlit Cloud.")
                 else:
-                    bg_cor = "rgba(37, 99, 235, 0.12)"
-                    borda_cor = "1px solid var(--blue-val)"
-                    fonte_peso = "800"
-                td_html = ""
-                for c in valid_cols:
-                    val = str(row.get(c, ''))
-                    base_td = f"padding: 12px 15px; background-color: {bg_cor} !important; border-bottom: {borda_cor}; font-weight: {fonte_peso};"
-                    if not tem_dotacao:
-                        if c == col_proj: td_html += f"<td style='{base_td} font-size: 13px; color: var(--blue-val); text-transform: uppercase;'>📂 {val}</td>"
-                        elif val.strip() != '':
-                            if c == 'SALDO' or 'SALDO' in c: td_html += f"<td style='{base_td} color: var(--success-val); text-align: right;'>{val}</td>"
-                            elif c == 'PAGO' or 'PAGO' in c: td_html += f"<td style='{base_td} color: var(--danger-val); text-align: right;'>{val}</td>"
-                            else: td_html += f"<td style='{base_td} color: var(--blue-val); text-align: right;'>{val}</td>"
-                        else: td_html += f"<td style='{base_td}'></td>"
-                    else:
-                        if c == 'SALDO' or 'SALDO' in c: td_html += f"<td style='{base_td} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
-                        elif c == 'PAGO' or 'PAGO' in c: td_html += f"<td style='{base_td} font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
-                        elif 'APROVADO' in c: td_html += f"<td style='{base_td} font-weight: 700; color: var(--text-main); text-align: right;'>{val}</td>"
-                        elif '%' in c or 'EXECU' in c:
-                            bg_color_tag = "rgba(99, 102, 241, 0.1)" if val.strip() != '' else "transparent"
-                            td_html += f"<td style='{base_td} font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color_tag}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
-                        elif c == col_dot: td_html += f"<td style='{base_td} font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace; border-left: 4px solid var(--success-val);'>{val}</td>"
-                        else: td_html += f"<td style='{base_td} font-size: 12px; font-weight: 600;'>{val}</td>"
-                tr_html += f"<tr>{td_html}</tr>"
-            tabela_completa = f"<div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'><table class='extrato-table' style='margin: 0; border: none; width: 100%; border-collapse: separate; border-spacing: 0;'><thead style='position: sticky; top: 0; z-index: 1;'><tr>{th_html}</tr></thead><tbody>{tr_html}</tbody></table></div>"
-            st.markdown(tabela_completa, unsafe_allow_html=True)
+                    with st.spinner("Conectando ao GitHub e salvando os novos dados..."):
+                        try:
+                            token = st.secrets["GITHUB_TOKEN"]
+                            repo = "controleconveniosmaringa-a11y/controle-emendas"
+                            url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
+                            headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+                            
+                            # Pegar SHA do arquivo atual
+                            r_get = requests.get(url_api, headers=headers)
+                            if r_get.status_code == 200:
+                                sha = r_get.json().get('sha')
+                                
+                                # Converter o DataFrame editado para CSV
+                                csv_novo = df_editado.to_csv(index=False, sep=';', encoding='utf-8')
+                                content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
+                                
+                                data_payload = {
+                                    "message": "Atualização da Gestão de Convênios FINISA (via Painel Streamlit)",
+                                    "content": content_b64,
+                                    "sha": sha
+                                }
+                                
+                                r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
+                                if r_put.status_code in [200, 201]:
+                                    st.success("✅ Sucesso! Os novos dados foram atualizados no repositório.")
+                                    st.cache_data.clear() # Limpa o cache para carregar os dados novos
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
+                            else:
+                                st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
+                        except Exception as e:
+                            st.error(f"Erro no sistema: {str(e)}")
         else:
             st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
 
