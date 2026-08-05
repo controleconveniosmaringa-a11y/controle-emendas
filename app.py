@@ -307,17 +307,21 @@ def obter_base_credito():
     
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
+# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" (Otimizada e com V2 para limpar o cache)
 @st.cache_data(ttl=2)
-def obter_base_gestao_convenios():
+def obter_base_gestao_convenios_v2():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
     
     def processar_df_gestao(df_raw):
+        # 1. CORTE A LASER DE PERFORMANCE: Exclui todas as linhas 100% vazias em milissegundos
+        mask_validas = (df_raw != '').any(axis=1)
+        df_raw = df_raw[mask_validas].reset_index(drop=True)
+        
         header_idx = -1
-        # Procura a linha que contém os cabeçalhos verdadeiros
-        for i, row in df_raw.iterrows():
-            row_str = " ".join([str(x).upper() for x in row.values])
+        # 2. Busca rápida do cabeçalho só nas primeiras linhas
+        for i in range(min(50, len(df_raw))):
+            row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "DOTA" in row_str and "PROJETO" in row_str:
                 header_idx = i
                 break
@@ -328,19 +332,22 @@ def obter_base_gestao_convenios():
             df_raw.columns = new_cols
             df_raw = df_raw.iloc[header_idx+1:].reset_index(drop=True)
             
-        df_raw = df_raw.replace('', pd.NA).dropna(how='all').fillna('')
+        # 3. Limpa de novo caso tenha sobrado "sujeira"
+        mask_final = (df_raw != '').any(axis=1)
+        df_raw = df_raw[mask_final].reset_index(drop=True)
         return df_raw
 
     try:
-        df = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+        # Tenta ler primeiro considerando que o Excel do Brasil usa Ponto e Vírgula (;)
+        df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
+        
+        # Se ele der erro e ler poucas colunas, ele refaz o teste usando Vírgula (,) automaticamente!
+        if len(df.columns) < 3:
+            df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1', engine='c')
+            
         return processar_df_gestao(df)
     except Exception:
-        if os.path.exists("Gestão de Convênios.csv"):
-            try:
-                df = pd.read_csv("Gestão de Convênios.csv", low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-                return processar_df_gestao(df)
-            except Exception:
-                return pd.DataFrame()
+        # REMOVIDO o retorno de arquivo local para garantir que o Streamlit NUNCA puxe o arquivo de 15MB antigo.
         return pd.DataFrame()
 
 @st.cache_data(ttl=2)
@@ -433,7 +440,7 @@ def gerar_botoes_documento(url, emp, nota, tipo="abrir"):
     if tipo == "baixar" and "drive.google.com" in url and "/file/d/" in url: 
         url = f"https://drive.google.com/uc?export=download&id={url.split('/file/d/')[1].split('/')[0]}"
     if tipo == "abrir": return f'<a href="{url}" target="_blank" class="link-abrir-doc">Visualizar 🔗</a>'
-    nome = f"Doc_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
+    nome = f"NF_{nota}.pdf" if nota not in ['-',''] else (f"Empenho_{emp}.pdf" if emp not in ['-',''] else "documento.pdf")
     return f'<a href="{url}" download="{nome}" class="btn-download-direto">Baixar 💾</a>'
 
 def processar_saldos_acumulados(df_programa, nome_programa=""):
@@ -881,7 +888,7 @@ elif st.session_state.pagina_atual == 'finisa':
     st.button("⬅️ Voltar para Operações de Crédito", on_click=mudar_pagina, args=('credito',))
     st.markdown('<div class="header-container"><div class="main-title">🏦 Operação de Crédito: FINISA</div></div>', unsafe_allow_html=True)
     
-    df_gestao = obter_base_gestao_convenios()
+    df_gestao = obter_base_gestao_convenios_v2()
     dados_abas, abas_disponiveis = processar_saldos_acumulados(df_finisa, "FINISA")
     
     abas_exibicao = list(reversed(abas_disponiveis)) if abas_disponiveis else []
@@ -1170,7 +1177,6 @@ elif st.session_state.pagina_atual == 'emendas':
                         
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
                         
-                        # --- MODIFICAÇÃO SOLICITADA: ADICIONANDO AS SECRETARIAS NAS META-TAGS DA FONTE ---
                         secs_envolvidas = ", ".join(sorted([str(s) for s in df_fonte['secretaria'].unique() if str(s).strip() != '']))
                         
                         st.markdown(f'''<div style='margin-bottom:10px;'>
@@ -1179,7 +1185,6 @@ elif st.session_state.pagina_atual == 'emendas':
                             <div class='meta-tag'>🎯 Plano: {df_fonte['plano_clean'].unique()[0]}</div>
                             <div class='meta-tag' style='background-color: #e0f2fe; color: #1e3a8a; border-color: #bfdbfe;'>🏛️ Secretarias: {secs_envolvidas}</div>
                             </div>''', unsafe_allow_html=True)
-                        # ---------------------------------------------------------------------------------
                         
                         c_graf_f, c_tab_f = st.columns([1, 1])
                         with c_graf_f:
