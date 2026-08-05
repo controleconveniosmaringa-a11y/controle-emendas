@@ -16,15 +16,13 @@ if 'pagina_atual' not in st.session_state:
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# Função de limpeza APENAS para os nomes dos Analistas/Responsáveis
+# Função de limpeza APENAS para nomes
 def normalizar_texto(texto):
-    if pd.isna(texto) or str(texto).strip() == '':
-        return ""
+    if pd.isna(texto) or str(texto).strip() == '': return ""
     texto_limpo = str(texto).strip().upper()
     nfkd_form = unicodedata.normalize('NFKD', texto_limpo)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-# Função para higienizar números de contas para cruzamento exato
 def clean_conta(val):
     return re.sub(r'[^A-Z0-9]', '', str(val).upper().strip())
 
@@ -33,7 +31,7 @@ def fmt(v):
     if round(val, 2) == 0: val = 0.0
     return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-# 2. INTERFACE VISUAL (CSS RESPONSIVO DARK/LIGHT MODE)
+# 2. INTERFACE VISUAL (CSS RESPONSIVO)
 st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
@@ -65,30 +63,25 @@ st.markdown("""<style>
 
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: var(--bg-main) !important; color: var(--text-main) !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
-    
     .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background: var(--header-bg); border-radius: 8px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-bottom: 4px solid var(--blue-val); }
     .header-left { display: flex; align-items: center; }
     .main-title { font-size: 26px; font-weight: 800; color: var(--header-text) !important; letter-spacing: -0.5px; margin: 0; padding: 0; }
     .header-right { display: flex; align-items: center; background-color: var(--card-bg); padding: 8px 16px; border-radius: 6px; border: 1px solid var(--card-border); }
     .status-dot { width: 8px; height: 8px; background-color: var(--success-val); border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px var(--success-val); }
     .status-text { font-size: 11px; font-weight: 700; color: var(--text-main) !important; text-transform: uppercase; letter-spacing: 0.5px; }
-    
     .module-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 20px; margin-bottom: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .module-icon { font-size: 32px; background: var(--bg-main); width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--card-border); }
     .module-info { flex: 1; text-align: left; }
     .module-title { font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     .module-sub { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    
     .kpi-row-container { display: flex; gap: 15px; margin-top: 10px; margin-bottom: 5px; }
     .kpi-card-head { flex: 1; background-color: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .kpi-card-head-blue { flex: 1; background-color: var(--kpi-blue-bg); border: 1px solid var(--kpi-blue-border); border-radius: 8px; padding: 18px 20px; border-left: 5px solid var(--blue-val); }
     .kpi-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .kpi-value { font-size: 24px; font-weight: 800; color: var(--success-val); margin-top: 4px; }
-    
     .section-title { font-size: 15px; font-weight: 800; text-transform: uppercase; color: var(--text-main); margin-top: 30px; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--card-border); }
     .meta-tag { background-color: var(--tag-bg); color: var(--tag-text); padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; border: 1px solid var(--tag-border); margin-right: 6px; display: inline-block; }
     .secretaria-header { font-size: 15px; font-weight: 800; color: var(--text-main); margin-top: 20px; padding-left: 8px; border-left: 4px solid var(--blue-val); background-color: var(--kpi-blue-bg); padding-top: 6px; padding-bottom: 6px; border-radius: 0 6px 6px 0; }
-    
     .extrato-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; margin-bottom: 20px; background-color: var(--table-bg); border: 1px solid var(--table-border); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .extrato-table th { background-color: var(--table-th-bg); color: var(--table-th-text); padding: 12px 15px; font-size: 12px; font-weight: 700; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; }
     .extrato-row { transition: all 0.2s ease; background-color: var(--table-bg); }
@@ -99,7 +92,6 @@ st.markdown("""<style>
     .extrato-row-final td { color: var(--table-final-text) !important; border-top: 2px solid var(--success-val); }
     .extrato-cell-label { padding: 12px 15px; font-size: 12px; font-weight: 600; color: var(--text-main); text-align: left; border-right: 1px dashed var(--card-border); }
     .extrato-cell-val { padding: 12px 15px; font-size: 13px; font-weight: 800; color: var(--text-main); text-align: right; white-space: nowrap; }
-    
     .btn-download-direto { background-color: var(--tag-bg); color: var(--text-main) !important; text-decoration: none !important; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid var(--tag-border); display: inline-block; transition: all 0.2s ease; text-transform: uppercase; }
     .btn-download-direto:hover { background-color: var(--card-hover); color: var(--text-main) !important; border-color: var(--text-muted); }
     .link-abrir-doc { color: var(--link-text) !important; text-decoration: none !important; font-size: 12px; font-weight: 700; background-color: var(--link-bg); padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid var(--kpi-blue-border); transition: 0.2s; }
@@ -121,7 +113,6 @@ def limpar_moeda_blindada(val):
     if last_sep == -1:
         try: return abs(float(v_str))
         except: return 0.0
-        
     if len(v_str) - last_sep <= 3:
         inteiro = v_str[:last_sep].replace('.', '').replace(',', '')
         decimal = v_str[last_sep+1:]
@@ -144,7 +135,6 @@ def obter_base_dados_global():
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Indisponível"
-        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -183,7 +173,6 @@ def obter_base_convenios():
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Indisponível"
-        
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
@@ -200,9 +189,7 @@ def obter_base_credito():
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
     except Exception:
         return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
-        
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
-    
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     def ext_c(chave_exata, chave_parcial):
         for limpo, orig in list(col_orig.items()):
@@ -212,7 +199,6 @@ def obter_base_credito():
             if chave_parcial in limpo:
                 del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         return [''] * len(df_raw)
-        
     df = pd.DataFrame()
     prog_vals = ext_c('programa', 'programa')
     df['PROGRAMA'] = [str(x).upper().strip() if str(x).strip().lower() not in ['', 'nan'] else 'NÃO ESPECIFICADO' for x in prog_vals]
@@ -224,13 +210,12 @@ def obter_base_credito():
     df['DESCRIÇÃO'] = ext_c('descricao', 'descri')
     df['REF VALOR REPASSADO'] = [str(x).upper() if str(x) != '' else 'NÃO ESPECIFICADO' for x in ext_c('refvalor', 'ref')]
     df['LINK DOCUMENTO'] = ext_c('link', 'url')
-    
     df['REPASSE'] = [limpar_moeda_blindada(v) for v in ext_c('repasse', 'repass')]
     df['RENDIMENTO'] = [limpar_moeda_blindada(v) for v in ext_c('rendimento', 'rendim')]
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
-# ⚠️ TABELA DESATIVADA PARA EVITAR ERRO DE MEMÓRIA (15MB) ⚠️
+# ⚠️ TABELA DESATIVADA PROPOSITALMENTE PARA ISOLAR O ERRO ⚠️
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     return pd.DataFrame()
@@ -418,7 +403,6 @@ if st.session_state.pagina_atual == 'menu_principal':
                 st.markdown(f'''<div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'><div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'><div style='flex: 1; min-width: 0;'><div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div><div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div></div><div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>{fmt(r['Valor_Num'])}</div></div></div>''', unsafe_allow_html=True)
         else: st.info("Aguardando novas receitas na Caixa Econômica.")
         st.markdown("</div></div><br>", unsafe_allow_html=True)
-
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px;'>🧭 Módulos do Sistema</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2, gap="large")
     with c1:
@@ -436,7 +420,6 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown(f'''<div class='module-card' style='border-left: 4px solid var(--warning-val);'><div class='module-icon' style='color: var(--warning-val);'>🤝</div><div class='module-info'><div class='module-title'>Divisão Convênios</div><div class='module-sub'>Última Atualização: {att_convenios}</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
     st.markdown("---")
-    
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
@@ -500,33 +483,6 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
             if not df_finalizadas.empty:
                 df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                 st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
-        
-        st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
-        if not df_top5.empty:
-            cols = st.columns(len(df_top5))
-            for i, (_, row) in enumerate(df_top5.iterrows()):
-                with cols[i]:
-                    fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
-                    fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-        st.markdown("<div class='section-title'>📊 Panorama de Saldos por Secretaria e Deputado</div>", unsafe_allow_html=True)
-        df_g_sec = df[df['secretaria'] != 'Não Especificada'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-        df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
-        df_g_dep = df[df['deputado'] != 'Não Informado'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
-        df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
-            fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
-            fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-            st.plotly_chart(fig1, use_container_width=True)
-        with col_g2:
-            st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
-            fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
-            fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
-            st.plotly_chart(fig2, use_container_width=True)
-
         st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas</div>", unsafe_allow_html=True)
         df_todas_show = df_fontes.sort_values(by='saldo', ascending=False)[['fonte_clean', 'secretaria', 'repasse', 'rendimento', 'bruto', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'repasse': 'REPASSES (+)', 'rendimento': 'RENDIMENTOS (+)', 'bruto': 'DESPESAS (-)', 'saldo': 'SALDO DISPONÍVEL (=)'})
         st.dataframe(df_todas_show.style.format({'REPASSES (+)': fmt, 'RENDIMENTOS (+)': fmt, 'DESPESAS (-)': fmt, 'SALDO DISPONÍVEL (=)': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL (=)']), use_container_width=True, hide_index=True)
@@ -553,9 +509,9 @@ elif st.session_state.pagina_atual == 'finisa':
     with tabs_cred[0]:
         st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
         if not df_gestao.empty:
-            st.info("Módulo de Gestão Carregado (Desenvolvimento futuro aqui)")
+            st.info("Módulo de Gestão Carregado com sucesso.")
         else:
-            st.info("ℹ️ Tabela de Gestão de Convênios do FINISA temporariamente desativada ou aguardando novo arquivo mais leve do Excel.")
+            st.info("ℹ️ Tabela de Gestão de Convênios do FINISA temporariamente desativada ou vazia.")
     for i, aba_nome in enumerate(abas_exibicao):
         with tabs_cred[i+1]:
             info = dados_abas[aba_nome]
@@ -591,7 +547,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -646,7 +602,6 @@ elif st.session_state.pagina_atual == 'emendas':
         st.markdown("<br>", unsafe_allow_html=True)
         
         if aba_selecionada == "🎯 Por Fonte":
-            st.markdown("<div class='section-title' style='margin-top:0;'>🎯 Seleção Unificada de Fonte</div>", unsafe_allow_html=True)
             if fontes:
                 fonte_final = st.selectbox("Selecione a Fonte:", options=fontes)
                 if fonte_final:
