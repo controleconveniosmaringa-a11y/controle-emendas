@@ -220,11 +220,11 @@ def obter_base_credito():
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
+# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     cache_buster = int(time.time())
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
-    
     def processar_df_gestao(df_raw):
         if df_raw.empty: return pd.DataFrame()
         df_raw = df_raw.dropna(how='all')
@@ -246,7 +246,6 @@ def obter_base_gestao_convenios():
             new_cols = [str(c).strip().upper() for c in df_raw.columns]
             new_cols = [c if c and "UNNAMED" not in c.upper() else f"COL_{j}" for j, c in enumerate(new_cols)]
             df_raw.columns = new_cols
-            
         mask_final = (df_raw != '').any(axis=1)
         df_raw = df_raw[mask_final].reset_index(drop=True)
         return df_raw
@@ -555,7 +554,7 @@ elif st.session_state.pagina_atual == 'finisa':
     tabs_cred = st.tabs(nomes_abas)
     
     with tabs_cred[0]:
-        st.markdown("<div class='section-title' style='margin-top:0;'>📊 Editor do Controle Orçamentário Finisa</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title' style='margin-top:0;'>📊 Controle Orçamento Finisa</div>", unsafe_allow_html=True)
         if not df_gestao.empty:
             cols = df_gestao.columns.tolist()
             valid_cols = [c for c in cols if not c.startswith("COL_")]
@@ -565,7 +564,6 @@ elif st.session_state.pagina_atual == 'finisa':
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
             col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
             
-            # --- PAINEL DE ALERTAS 100% e 70% ---
             if col_dot and col_exec and col_pago and col_saldo:
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
@@ -611,51 +609,88 @@ elif st.session_state.pagina_atual == 'finisa':
                             st.plotly_chart(fig_alert, use_container_width=True, key=f"alert_pie_{i}")
                     st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- NOVA TABELA EDITÁVEL COM BOTÃO SALVAR ---
-            st.info("💡 Dê um duplo clique nas células da tabela abaixo para editar os valores. Para salvar as mudanças permanentemente no GitHub, clique no botão no final da página.")
-            
-            # Editor de Dados do Streamlit
-            df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("💾 Salvar Alterações e Atualizar Banco de Dados (GitHub)", type="primary"):
-                if "GITHUB_TOKEN" not in st.secrets:
-                    st.error("⚠️ Token de autorização não encontrado! Para habilitar o salvamento automático, configure o GITHUB_TOKEN no menu 'Secrets' do Streamlit Cloud.")
-                else:
-                    with st.spinner("Conectando ao GitHub e salvando os novos dados..."):
-                        try:
-                            token = st.secrets["GITHUB_TOKEN"]
-                            repo = "controleconveniosmaringa-a11y/controle-emendas"
-                            url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
-                            headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-                            
-                            # Pegar SHA do arquivo atual
-                            r_get = requests.get(url_api, headers=headers)
-                            if r_get.status_code == 200:
-                                sha = r_get.json().get('sha')
+            # --- CHAVE DE EDIÇÃO (TOGGLE) ---
+            modo_edicao = st.toggle("✏️ Habilitar Modo de Edição (Planilha Interativa)")
+
+            if modo_edicao:
+                st.info("💡 Edite os valores dando dois cliques nas células. Após concluir, clique no botão azul abaixo para salvar as mudanças no GitHub.")
+                df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if st.button("💾 Salvar Alterações e Atualizar Banco de Dados (GitHub)", type="primary"):
+                    if "GITHUB_TOKEN" not in st.secrets:
+                        st.error("⚠️ Token de autorização não encontrado! Configure a senha GITHUB_TOKEN no menu 'Secrets' do Streamlit Cloud.")
+                    else:
+                        with st.spinner("Conectando ao GitHub e salvando os novos dados..."):
+                            try:
+                                token = st.secrets["GITHUB_TOKEN"]
+                                repo = "controleconveniosmaringa-a11y/controle-emendas"
+                                url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
+                                headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
                                 
-                                # Converter o DataFrame editado para CSV
-                                csv_novo = df_editado.to_csv(index=False, sep=';', encoding='utf-8')
-                                content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
-                                
-                                data_payload = {
-                                    "message": "Atualização da Gestão de Convênios FINISA (via Painel Streamlit)",
-                                    "content": content_b64,
-                                    "sha": sha
-                                }
-                                
-                                r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
-                                if r_put.status_code in [200, 201]:
-                                    st.success("✅ Sucesso! Os novos dados foram atualizados no repositório.")
-                                    st.cache_data.clear() # Limpa o cache para carregar os dados novos
-                                    time.sleep(2)
-                                    st.rerun()
+                                r_get = requests.get(url_api, headers=headers)
+                                if r_get.status_code == 200:
+                                    sha = r_get.json().get('sha')
+                                    csv_novo = df_editado.to_csv(index=False, sep=';', encoding='utf-8')
+                                    content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
+                                    
+                                    data_payload = {
+                                        "message": "Atualização da Gestão de Convênios FINISA (via Painel Streamlit)",
+                                        "content": content_b64,
+                                        "sha": sha
+                                    }
+                                    
+                                    r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
+                                    if r_put.status_code in [200, 201]:
+                                        st.success("✅ Sucesso! Os novos dados foram atualizados no repositório.")
+                                        st.cache_data.clear()
+                                        time.sleep(2)
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
                                 else:
-                                    st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
-                            else:
-                                st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
-                        except Exception as e:
-                            st.error(f"Erro no sistema: {str(e)}")
+                                    st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
+                            except Exception as e:
+                                st.error(f"Erro no sistema: {str(e)}")
+            else:
+                # --- TABELA HTML BONITA (MODO DE LEITURA) ---
+                th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
+                tr_html = ""
+                for _, row in df_gestao.iterrows():
+                    val_dot = str(row.get(col_dot, '')) if col_dot else ''
+                    val_proj = str(row.get(col_proj, '')) if col_proj else ''
+                    tem_dotacao = val_dot.strip() != ''
+                    if tem_dotacao:
+                        bg_cor = "var(--table-bg)"
+                        borda_cor = "1px dashed var(--card-border)"
+                        fonte_peso = "normal"
+                    else:
+                        bg_cor = "rgba(37, 99, 235, 0.12)"
+                        borda_cor = "1px solid var(--blue-val)"
+                        fonte_peso = "800"
+                    td_html = ""
+                    for c in valid_cols:
+                        val = str(row.get(c, ''))
+                        base_td = f"padding: 12px 15px; background-color: {bg_cor} !important; border-bottom: {borda_cor}; font-weight: {fonte_peso};"
+                        if not tem_dotacao:
+                            if c == col_proj: td_html += f"<td style='{base_td} font-size: 13px; color: var(--blue-val); text-transform: uppercase;'>📂 {val}</td>"
+                            elif val.strip() != '':
+                                if c == 'SALDO' or 'SALDO' in c: td_html += f"<td style='{base_td} color: var(--success-val); text-align: right;'>{val}</td>"
+                                elif c == 'PAGO' or 'PAGO' in c: td_html += f"<td style='{base_td} color: var(--danger-val); text-align: right;'>{val}</td>"
+                                else: td_html += f"<td style='{base_td} color: var(--blue-val); text-align: right;'>{val}</td>"
+                            else: td_html += f"<td style='{base_td}'></td>"
+                        else:
+                            if c == 'SALDO' or 'SALDO' in c: td_html += f"<td style='{base_td} font-weight: 800; color: var(--success-val); text-align: right;'>{val}</td>"
+                            elif c == 'PAGO' or 'PAGO' in c: td_html += f"<td style='{base_td} font-weight: 700; color: var(--danger-val); text-align: right;'>{val}</td>"
+                            elif 'APROVADO' in c: td_html += f"<td style='{base_td} font-weight: 700; color: var(--text-main); text-align: right;'>{val}</td>"
+                            elif '%' in c or 'EXECU' in c:
+                                bg_color_tag = "rgba(99, 102, 241, 0.1)" if val.strip() != '' else "transparent"
+                                td_html += f"<td style='{base_td} font-weight: 800; color: var(--purple-val); text-align: center;'><span style='background: {bg_color_tag}; padding: 4px 8px; border-radius: 4px;'>{val}</span></td>"
+                            elif c == col_dot: td_html += f"<td style='{base_td} font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace; border-left: 4px solid var(--success-val);'>{val}</td>"
+                            else: td_html += f"<td style='{base_td} font-size: 12px; font-weight: 600;'>{val}</td>"
+                    tr_html += f"<tr>{td_html}</tr>"
+                tabela_completa = f"<div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'><table class='extrato-table' style='margin: 0; border: none; width: 100%; border-collapse: separate; border-spacing: 0;'><thead style='position: sticky; top: 0; z-index: 1;'><tr>{th_html}</tr></thead><tbody>{tr_html}</tbody></table></div>"
+                st.markdown(tabela_completa, unsafe_allow_html=True)
         else:
             st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
 
