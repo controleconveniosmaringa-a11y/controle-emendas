@@ -617,11 +617,7 @@ elif st.session_state.pagina_atual == 'finisa':
                 if not df_saldo_disp.empty:
                     st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 DOTAÇÕES COM SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
                     nomes_completos = [str(d) + (" - " + str(p) if str(p).strip() != '' else "") for d, p in zip(df_saldo_disp['clean_dot'], df_saldo_disp[col_proj])]
-                    fig_bar_s = go.Figure(go.Bar(
-                        x=df_saldo_disp['saldo_num'],
-                        y=nomes_completos,
-                        orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_disp['saldo_num']], textposition='auto'
-                    ))
+                    fig_bar_s = go.Figure(go.Bar(x=df_saldo_disp['saldo_num'], y=nomes_completos, orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_disp['saldo_num']], textposition='auto'))
                     altura_dinamica = max(350, len(df_saldo_disp) * 40)
                     fig_bar_s.update_layout(height=altura_dinamica, margin=dict(t=10, b=10, r=10, l=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
                     fig_bar_s.update_yaxes(automargin=True)
@@ -632,7 +628,6 @@ elif st.session_state.pagina_atual == 'finisa':
 
             if modo_edicao:
                 st.info("💡 **DICAS DO EDITOR:**\n\n1. **Editar:** Dê dois cliques no valor APROVADO ou PAGO e digite.\n2. **Adicionar Linha:** Role até o fim da tabela e clique no símbolo de **`+`**.\n3. **Excluir Linha:** Pare o mouse no canto esquerdo extremo da linha que deseja apagar, marque a caixinha quadrada e aperte a tecla **Delete** no teclado.")
-                
                 df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -652,17 +647,10 @@ elif st.session_state.pagina_atual == 'finisa':
                                         s = f"{v:,.2f}".replace(".", ",")
                                         if s.endswith(",00"): return s.replace(",00", "%")
                                         return s + "%"
-                                    
-                                    total_aprov = 0.0
-                                    total_pago = 0.0
-                                    idx_categoria = -1
-                                    sub_aprov = 0.0
-                                    sub_pago = 0.0
-                                    
+                                    total_aprov = 0.0; total_pago = 0.0; idx_categoria = -1; sub_aprov = 0.0; sub_pago = 0.0
                                     for i, row in df_calc.iterrows():
                                         dot = str(row.get(col_dot, '')).strip()
                                         proj = str(row.get(col_proj, '')).strip().upper()
-                                        
                                         if "TOTAL" in proj or "TOTAIS" in proj or "TOTAL" in dot.upper() or "TOTAIS" in dot.upper():
                                             df_calc.at[i, col_aprov] = formata_br(total_aprov)
                                             df_calc.at[i, col_pago] = formata_br(total_pago)
@@ -674,64 +662,42 @@ elif st.session_state.pagina_atual == 'finisa':
                                                 df_calc.at[idx_categoria, col_pago] = formata_br(sub_pago)
                                                 df_calc.at[idx_categoria, col_saldo] = formata_br(sub_aprov - sub_pago)
                                                 if col_pct: df_calc.at[idx_categoria, col_pct] = ""
-                                            idx_categoria = i
-                                            sub_aprov = 0.0
-                                            sub_pago = 0.0
+                                            idx_categoria = i; sub_aprov = 0.0; sub_pago = 0.0
                                         elif dot != "":
                                             val_aprov = limpar_moeda_blindada(row.get(col_aprov, '0'))
                                             val_pago = limpar_moeda_blindada(row.get(col_pago, '0'))
                                             val_saldo = val_aprov - val_pago
                                             pct = (val_pago / val_aprov * 100) if val_aprov > 0 else 0.0
-                                            
                                             df_calc.at[i, col_aprov] = formata_br(val_aprov)
                                             df_calc.at[i, col_pago] = formata_br(val_pago)
                                             df_calc.at[i, col_saldo] = formata_br(val_saldo)
                                             if col_pct: df_calc.at[i, col_pct] = formata_pct(pct)
-                                            
-                                            sub_aprov += val_aprov
-                                            sub_pago += val_pago
-                                            total_aprov += val_aprov
-                                            total_pago += val_pago
-                                            
+                                            sub_aprov += val_aprov; sub_pago += val_pago; total_aprov += val_aprov; total_pago += val_pago
                                     if idx_categoria != -1:
                                         df_calc.at[idx_categoria, col_aprov] = formata_br(sub_aprov)
                                         df_calc.at[idx_categoria, col_pago] = formata_br(sub_pago)
                                         df_calc.at[idx_categoria, col_saldo] = formata_br(sub_aprov - sub_pago)
                                         if col_pct: df_calc.at[idx_categoria, col_pct] = ""
-                                        
                                     return df_calc
 
                                 df_editado_calculado = recalcular_tabela_finisa(df_editado.copy())
-
                                 token = st.secrets["GITHUB_TOKEN"]
                                 repo = "controleconveniosmaringa-a11y/controle-emendas"
                                 url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
                                 headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-                                
                                 r_get = requests.get(url_api, headers=headers)
                                 if r_get.status_code == 200:
                                     sha = r_get.json().get('sha')
                                     csv_novo = df_editado_calculado.to_csv(index=False, sep=';', encoding='utf-8')
                                     content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
-                                    
-                                    data_payload = {
-                                        "message": "Painel Streamlit: Edição FINISA e Auto-Recálculo de Saldos",
-                                        "content": content_b64,
-                                        "sha": sha
-                                    }
-                                    
+                                    data_payload = {"message": "Painel Streamlit: Edição FINISA e Auto-Recálculo de Saldos", "content": content_b64, "sha": sha}
                                     r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
                                     if r_put.status_code in [200, 201]:
                                         st.success("✅ Tudo Calculado e Salvo com Sucesso!")
-                                        st.cache_data.clear()
-                                        time.sleep(2)
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
-                                else:
-                                    st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
-                            except Exception as e:
-                                st.error(f"Erro no sistema: {str(e)}")
+                                        st.cache_data.clear(); time.sleep(2); st.rerun()
+                                    else: st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
+                                else: st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
+                            except Exception as e: st.error(f"Erro no sistema: {str(e)}")
             else:
                 th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
                 tr_html = ""
@@ -739,14 +705,8 @@ elif st.session_state.pagina_atual == 'finisa':
                     val_dot = str(row.get(col_dot, '')) if col_dot else ''
                     val_proj = str(row.get(col_proj, '')) if col_proj else ''
                     tem_dotacao = val_dot.strip() != ''
-                    if tem_dotacao:
-                        bg_cor = "var(--table-bg)"
-                        borda_cor = "1px dashed var(--card-border)"
-                        fonte_peso = "normal"
-                    else:
-                        bg_cor = "rgba(37, 99, 235, 0.12)"
-                        borda_cor = "1px solid var(--blue-val)"
-                        fonte_peso = "800"
+                    if tem_dotacao: bg_cor = "var(--table-bg)"; borda_cor = "1px dashed var(--card-border)"; fonte_peso = "normal"
+                    else: bg_cor = "rgba(37, 99, 235, 0.12)"; borda_cor = "1px solid var(--blue-val)"; fonte_peso = "800"
                     td_html = ""
                     for c in valid_cols:
                         val = str(row.get(c, ''))
@@ -770,8 +730,7 @@ elif st.session_state.pagina_atual == 'finisa':
                     tr_html += f"<tr>{td_html}</tr>"
                 tabela_completa = f"<div style='max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--table-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;'><table class='extrato-table' style='margin: 0; border: none; width: 100%; border-collapse: separate; border-spacing: 0;'><thead style='position: sticky; top: 0; z-index: 1;'><tr>{th_html}</tr></thead><tbody>{tr_html}</tbody></table></div>"
                 st.markdown(tabela_completa, unsafe_allow_html=True)
-        else:
-            st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
+        else: st.info("ℹ️ Tabela 'Gestão de Convênios.csv' não encontrada ou está vazia.")
 
     for i, aba_nome in enumerate(abas_exibicao):
         with tabs_cred[i+1]:
@@ -867,13 +826,10 @@ elif st.session_state.pagina_atual == 'convenios':
                 st.dataframe(df_conv_tela, use_container_width=True)
             else:
                 modo_edicao_conv = st.toggle("✏️ Habilitar Modo de Edição e Inserção de Linhas", key="toggle_edicao_conv")
-                
                 if modo_edicao_conv:
                     st.info("💡 **DICAS DO EDITOR:** Dê dois cliques nas células para editar o texto. Você pode adicionar ou excluir linhas exatamente como faz no Excel.")
-                    
                     df_editado_conv = st.data_editor(df_conv_tela, use_container_width=True, num_rows="dynamic", key="editor_conv")
                     st.markdown("<br>", unsafe_allow_html=True)
-                    
                     if st.button("💾 Salvar Convênios Atualizados (GitHub)", type="primary"):
                         if "GITHUB_TOKEN" not in st.secrets:
                             st.error("⚠️ Token não encontrado! Configure a senha GITHUB_TOKEN no menu 'Secrets'.")
@@ -884,31 +840,19 @@ elif st.session_state.pagina_atual == 'convenios':
                                     repo = "controleconveniosmaringa-a11y/controle-emendas"
                                     url_api = f"https://api.github.com/repos/{repo}/contents/Divis%C3%A3o%20Convenios%20-%20Divisao.csv"
                                     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-                                    
                                     r_get = requests.get(url_api, headers=headers)
                                     if r_get.status_code == 200:
                                         sha = r_get.json().get('sha')
                                         csv_novo = df_editado_conv.to_csv(index=False, sep=',', encoding='utf-8')
                                         content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
-                                        
-                                        data_payload = {
-                                            "message": "Painel Streamlit: Edição Geral de Convênios",
-                                            "content": content_b64,
-                                            "sha": sha
-                                        }
-                                        
+                                        data_payload = {"message": "Painel Streamlit: Edição Geral de Convênios", "content": content_b64, "sha": sha}
                                         r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
                                         if r_put.status_code in [200, 201]:
                                             st.success("✅ Base de Convênios atualizada com sucesso no repositório!")
-                                            st.cache_data.clear()
-                                            time.sleep(2)
-                                            st.rerun()
-                                        else:
-                                            st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
-                                    else:
-                                        st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
-                                except Exception as e:
-                                    st.error(f"Erro no sistema: {str(e)}")
+                                            st.cache_data.clear(); time.sleep(2); st.rerun()
+                                        else: st.error(f"Erro ao tentar salvar no GitHub: {r_put.text}")
+                                    else: st.error("Não foi possível localizar o arquivo atual no GitHub para atualização.")
+                                except Exception as e: st.error(f"Erro no sistema: {str(e)}")
                 else:
                     st.dataframe(df_conv_tela, use_container_width=True)
 
@@ -945,7 +889,7 @@ elif st.session_state.pagina_atual == 'emendas':
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
                         secs_envolvidas = ", ".join(sorted([str(s) for s in df_f['secretaria'].unique() if str(s).strip() != '']))
                         
-                        # --- INÍCIO DA BUSCA DO PROCESSO SEI ---
+                        # --- INÍCIO DA BUSCA DO PROCESSO SEI COM FILTRO INTELIGENTE ---
                         sei_info = "Não Informado"
                         if not df_conv.empty:
                             col_sei = next((c for c in df_conv.columns if 'SEI' in str(c).upper()), None)
@@ -953,7 +897,17 @@ elif st.session_state.pagina_atual == 'emendas':
                             if col_sei and col_fonte:
                                 def limpa_f(f): return str(f).split('.')[0].lower().replace('-', '').strip()
                                 df_sei_match = df_conv[df_conv[col_fonte].apply(limpa_f) == str(fonte_final).lower().strip()]
-                                seis_encontrados = [str(x).strip() for x in df_sei_match[col_sei].unique() if str(x).strip() not in ['', 'nan', 'NAN', '-']]
+                                
+                                # O FILTRO INTELIGENTE (REGEX)
+                                seis_encontrados = []
+                                padrao_busca = r'(?i)(sei|execu[cç][aã]o|formaliza[cç][aã]o)'
+                                
+                                for x in df_sei_match[col_sei].unique():
+                                    if pd.notna(x) and str(x).strip() not in ['', '-', 'nan', 'NAN']:
+                                        texto_celula = str(x).strip()
+                                        if re.search(padrao_busca, texto_celula):
+                                            seis_encontrados.append(texto_celula)
+                                
                                 if seis_encontrados:
                                     sei_info = " | ".join(seis_encontrados)
                         # --- FIM DA BUSCA DO PROCESSO SEI ---
@@ -962,7 +916,7 @@ elif st.session_state.pagina_atual == 'emendas':
                             <div class='meta-tag'>👤 Deputado: {df_f['deputado'].unique()[0]}</div>
                             <div class='meta-tag'>📄 Emenda: {df_f['emenda_clean'].unique()[0]}</div>
                             <div class='meta-tag'>🎯 Plano: {df_f['plano_clean'].unique()[0]}</div>
-                            <div class='meta-tag' style='background-color: #fef08a; color: #854d0e; border-color: #fde047;'>📝 Processo SEI: {sei_info}</div>
+                            <div class='meta-tag' style='background-color: #fef08a; color: #854d0e; border-color: #fde047;'>📝 {sei_info}</div>
                             <div class='meta-tag' style='background-color: #e0f2fe; color: #1e3a8a; border-color: #bfdbfe;'>🏛️ Secretarias: {secs_envolvidas}</div>
                             </div>''', unsafe_allow_html=True)
                         
