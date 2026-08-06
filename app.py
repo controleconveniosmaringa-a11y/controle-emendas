@@ -592,15 +592,14 @@ elif st.session_state.pagina_atual == 'finisa':
                             st.plotly_chart(fig_alert, use_container_width=True, key=f"alert_pie_{i}")
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                # --- NOVO: GRÁFICO DE TODOS OS SALDOS (BARRAS DECRESCENTES) ---
-                # Remove a palavra "TOTAL" de aparecer no gráfico tanto se estiver na coluna de projeto quanto na de dotação
-                mask_totais = df_itens[col_dot].str.upper().str.contains('TOTAL', na=False) | df_itens[col_proj].str.upper().str.contains('TOTAL', na=False)
+                # --- GRÁFICO DE TODOS OS SALDOS (BARRAS DECRESCENTES) ---
+                # A nova vassoura que varre "TOTAL" ou "TOTAIS" sem deixar escapar nada!
+                mask_totais = df_itens[col_dot].str.upper().str.contains('TOTAL|TOTAIS', na=False, regex=True) | df_itens[col_proj].str.upper().str.contains('TOTAL|TOTAIS', na=False, regex=True)
                 df_saldo_disp = df_itens[(df_itens['saldo_num'] > 0) & (~mask_totais)].sort_values(by='saldo_num', ascending=True) 
                 
                 if not df_saldo_disp.empty:
                     st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 DOTAÇÕES COM SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
                     
-                    # Usa o nome inteiro do projeto/dotação
                     nomes_completos = [str(d) + (" - " + str(p) if str(p).strip() != '' else "") for d, p in zip(df_saldo_disp['clean_dot'], df_saldo_disp[col_proj])]
                     
                     fig_bar_s = go.Figure(go.Bar(
@@ -609,10 +608,10 @@ elif st.session_state.pagina_atual == 'finisa':
                         orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_disp['saldo_num']], textposition='auto'
                     ))
                     
-                    # Altura dinâmica para não esmagar se tiver muitas dotações
+                    # Altura dinâmica estica o gráfico automaticamente para não cortar nada
                     altura_dinamica = max(350, len(df_saldo_disp) * 40)
                     
-                    fig_bar_s.update_layout(height=altura_dinamica, margin=dict(t=10, b=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    fig_bar_s.update_layout(height=altura_dinamica, margin=dict(t=10, b=10, r=10, l=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
                     fig_bar_s.update_yaxes(automargin=True)
                     st.plotly_chart(fig_bar_s, use_container_width=True, key="bar_top_saldos_finisa")
             
