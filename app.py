@@ -9,6 +9,7 @@ import time
 import requests
 import json
 import base64
+import io
 
 # 1. CONFIGURAÇÃO ESTRUTURAL
 st.set_page_config(page_title="Controle Convênios", page_icon="🏛️", layout="wide")
@@ -19,7 +20,6 @@ if 'pagina_atual' not in st.session_state:
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# Função de limpeza APENAS para os nomes dos Analistas/Responsáveis
 def normalizar_texto(texto):
     if pd.isna(texto) or str(texto).strip() == '':
         return ""
@@ -27,7 +27,6 @@ def normalizar_texto(texto):
     nfkd_form = unicodedata.normalize('NFKD', texto_limpo)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-# Função para higienizar números de contas para cruzamento exato
 def clean_conta(val):
     return re.sub(r'[^A-Z0-9]', '', str(val).upper().strip())
 
@@ -36,36 +35,11 @@ def fmt(v):
     if round(val, 2) == 0: val = 0.0
     return f"R$ {val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-# 2. INTERFACE VISUAL (CSS RESPONSIVO DARK/LIGHT MODE)
+# 2. INTERFACE VISUAL
 st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    
-    :root {
-        --bg-main: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --card-bg: #ffffff;
-        --card-border: #e2e8f0; --card-hover: #f1f5f9; --header-bg: #0f172a; --header-text: #f8fafc;
-        --table-bg: #ffffff; --table-border: #cbd5e1; --table-th-bg: #1e293b; --table-th-text: #f8fafc;
-        --table-row-even: #f8fafc; --table-row-hover: #f1f5f9; --table-final-bg: #ecfdf5;
-        --table-final-text: #065f46; --kpi-blue-bg: #f8fafc; --kpi-blue-border: #bfdbfe;
-        --tag-bg: #f1f5f9; --tag-border: #cbd5e1; --tag-text: #334155; --link-bg: #eff6ff;
-        --link-text: #2563eb; --link-hover-bg: #dbeafe; --search-bg: #f0f9ff; --search-border: #bae6fd;
-        --success-val: #059669; --danger-val: #dc2626; --blue-val: #2563eb; --purple-val: #6366f1;
-        --warning-val: #d97706; --warning-bg: #fffbeb;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --bg-main: #0e1117; --text-main: #f8fafc; --text-muted: #94a3b8; --card-bg: #1e293b;
-            --card-border: #334155; --card-hover: #0f172a; --header-bg: #020617; --header-text: #f8fafc;
-            --table-bg: #1e293b; --table-border: #334155; --table-th-bg: #0f172a; --table-th-text: #f8fafc;
-            --table-row-even: #0f172a; --table-row-hover: #334155; --table-final-bg: #064e3b;
-            --table-final-text: #34d399; --kpi-blue-bg: #0f172a; --kpi-blue-border: #1e3a8a;
-            --tag-bg: #334155; --tag-border: #475569; --tag-text: #cbd5e1; --link-bg: #1e3a8a;
-            --link-text: #93c5fd; --link-hover-bg: #1e40af; --search-bg: #0c4a6e; --search-border: #0284c7;
-            --success-val: #34d399; --danger-val: #f87171; --blue-val: #60a5fa; --purple-val: #a78bfa;
-            --warning-val: #fbbf24; --warning-bg: #451a03;
-        }
-    }
-
+    :root { --bg-main: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --card-bg: #ffffff; --card-border: #e2e8f0; --card-hover: #f1f5f9; --header-bg: #0f172a; --header-text: #f8fafc; --table-bg: #ffffff; --table-border: #cbd5e1; --table-th-bg: #1e293b; --table-th-text: #f8fafc; --table-row-even: #f8fafc; --table-row-hover: #f1f5f9; --table-final-bg: #ecfdf5; --table-final-text: #065f46; --kpi-blue-bg: #f8fafc; --kpi-blue-border: #bfdbfe; --tag-bg: #f1f5f9; --tag-border: #cbd5e1; --tag-text: #334155; --link-bg: #eff6ff; --link-text: #2563eb; --link-hover-bg: #dbeafe; --search-bg: #f0f9ff; --search-border: #bae6fd; --success-val: #059669; --danger-val: #dc2626; --blue-val: #2563eb; --purple-val: #6366f1; --warning-val: #d97706; --warning-bg: #fffbeb; }
+    @media (prefers-color-scheme: dark) { :root { --bg-main: #0e1117; --text-main: #f8fafc; --text-muted: #94a3b8; --card-bg: #1e293b; --card-border: #334155; --card-hover: #0f172a; --header-bg: #020617; --header-text: #f8fafc; --table-bg: #1e293b; --table-border: #334155; --table-th-bg: #0f172a; --table-th-text: #f8fafc; --table-row-even: #0f172a; --table-row-hover: #334155; --table-final-bg: #064e3b; --table-final-text: #34d399; --kpi-blue-bg: #0f172a; --kpi-blue-border: #1e3a8a; --tag-bg: #334155; --tag-border: #475569; --tag-text: #cbd5e1; --link-bg: #1e3a8a; --link-text: #93c5fd; --link-hover-bg: #1e40af; --search-bg: #0c4a6e; --search-border: #0284c7; --success-val: #34d399; --danger-val: #f87171; --blue-val: #60a5fa; --purple-val: #a78bfa; --warning-val: #fbbf24; --warning-bg: #451a03; } }
     html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'Inter', sans-serif; background-color: var(--bg-main) !important; color: var(--text-main) !important; }
     [data-testid="stSidebar"], [data-testid="stSidebarUserContent"] { display: none !important; }
     .header-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; background: var(--header-bg); border-radius: 8px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-bottom: 4px solid var(--blue-val); }
@@ -103,9 +77,7 @@ st.markdown("""<style>
     .link-abrir-doc:hover { background-color: var(--link-hover-bg); }
 </style>""", unsafe_allow_html=True)
 
-# ==============================================================================
-# MOTOR MATEMÁTICO BLINDADO ABSOLUTO
-# ==============================================================================
+# MOTOR MATEMÁTICO
 def limpar_moeda_blindada(val):
     v_str = str(val).strip()
     if not v_str or v_str.lower() in ['nan', 'none', 'null', '']: return 0.0
@@ -129,7 +101,7 @@ def limpar_moeda_blindada(val):
         try: return abs(float(inteiro))
         except: return 0.0
 
-# 3. CARREGAMENTO DOS BANCOS DE DADOS
+# CARREGAMENTO DOS BANCOS DE DADOS
 @st.cache_data(ttl=2)
 def obter_base_dados_global():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -138,8 +110,7 @@ def obter_base_dados_global():
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/dados.csv?v={cache_buster}"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-    except Exception:
-        return pd.DataFrame(), "Indisponível"
+    except Exception: return pd.DataFrame(), "Indisponível"
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     df = pd.DataFrame()
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
@@ -176,8 +147,7 @@ def obter_base_convenios():
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Divis%C3%A3o%20Convenios%20-%20Divisao.csv?v={cache_buster}"
     try:
         d = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-    except Exception:
-        return pd.DataFrame(), "Indisponível"
+    except Exception: return pd.DataFrame(), "Indisponível"
     if not d.empty:
         d.columns = [str(c).strip() for c in d.columns]
         if 'RESPONSÁVEL' in d.columns: d['RESPONSÁVEL'] = d['RESPONSÁVEL'].apply(normalizar_texto)
@@ -192,17 +162,14 @@ def obter_base_credito():
     url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/{nome_arquivo}?v={cache_buster}"
     try:
         df_raw = pd.read_csv(url, low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip')
-    except Exception:
-        return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
+    except Exception: return pd.DataFrame(), "Aguardando envio pelo Google Sheets"
     if df_raw.empty: return pd.DataFrame(), "Base Vazia"
     col_orig = {re.sub(r'[^\w\s]', '', str(c).strip().lower()).replace('â', 'a').replace('ç', 'c').replace('ã', 'a').replace('ó', 'o'): c for c in df_raw.columns}
     def ext_c(chave_exata, chave_parcial):
         for limpo, orig in list(col_orig.items()):
-            if chave_exata in limpo:
-                del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
+            if chave_exata in limpo: del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         for limpo, orig in list(col_orig.items()):
-            if chave_parcial in limpo:
-                del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
+            if chave_parcial in limpo: del col_orig[limpo]; return [str(i).strip() if str(i).strip().lower() not in ['', 'nan'] else '' for i in df_raw[orig]]
         return [''] * len(df_raw)
     df = pd.DataFrame()
     prog_vals = ext_c('programa', 'programa')
@@ -220,11 +187,15 @@ def obter_base_credito():
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
-# FUNÇÃO: CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv"
+# CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" DIRETO DA API DO GITHUB (SEM CACHE DE ATRASO)
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
-    cache_buster = int(time.time())
-    url = f"https://raw.githubusercontent.com/controleconveniosmaringa-a11y/controle-emendas/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
+    repo = "controleconveniosmaringa-a11y/controle-emendas"
+    url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    if "GITHUB_TOKEN" in st.secrets:
+        headers["Authorization"] = f"token {st.secrets['GITHUB_TOKEN']}"
+
     def processar_df_gestao(df_raw):
         if df_raw.empty: return pd.DataFrame()
         df_raw = df_raw.dropna(how='all')
@@ -251,18 +222,24 @@ def obter_base_gestao_convenios():
         return df_raw
 
     try:
-        try:
-            df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
-        except Exception:
-            df = pd.read_csv(url, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
-        if len(df.columns) < 3:
-            try:
-                df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
-            except Exception:
-                df = pd.read_csv(url, sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+        r = requests.get(url_api, headers=headers)
+        if r.status_code == 200:
+            file_info = r.json()
+            content_bytes = base64.b64decode(file_info['content'])
+            try: df = pd.read_csv(io.BytesIO(content_bytes), sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
+            except Exception: df = pd.read_csv(io.BytesIO(content_bytes), sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+            if len(df.columns) < 3:
+                try: df = pd.read_csv(io.BytesIO(content_bytes), sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
+                except Exception: df = pd.read_csv(io.BytesIO(content_bytes), sep=',', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='latin1')
+            return processar_df_gestao(df)
+    except Exception: pass
+
+    cache_buster = int(time.time())
+    url_raw = f"https://raw.githubusercontent.com/{repo}/main/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv?v={cache_buster}"
+    try:
+        df = pd.read_csv(url_raw, sep=';', low_memory=False, dtype=str, keep_default_na=False, na_filter=False, on_bad_lines='skip', encoding='utf-8')
         return processar_df_gestao(df)
-    except Exception:
-        return pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 @st.cache_data(ttl=2)
 def obter_base_maringa_csv():
@@ -276,18 +253,13 @@ def obter_base_maringa_csv():
             df.columns = [str(c).strip() for c in df.columns]
             df['idx'] = df.index 
             col_data = next((c for c in df.columns if 'DATA' in c.upper()), None)
-            if col_data:
-                df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
-            else:
-                df['Data_Parse'] = pd.Timestamp('1900-01-01')
+            if col_data: df['Data_Parse'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').fillna(pd.Timestamp('1900-01-01'))
+            else: df['Data_Parse'] = pd.Timestamp('1900-01-01')
             col_valor = next((c for c in df.columns if 'VALOR' in c.upper()), None)
-            if col_valor:
-                df['Valor_Num'] = df[col_valor].apply(limpar_moeda_blindada)
-            else:
-                df['Valor_Num'] = 0.0
+            if col_valor: df['Valor_Num'] = df[col_valor].apply(limpar_moeda_blindada)
+            else: df['Valor_Num'] = 0.0
         return df, att
-    except Exception:
-        return pd.DataFrame(), "Falha na consulta"
+    except Exception: return pd.DataFrame(), "Falha na consulta"
 
 @st.cache_data(ttl=2)
 def obter_base_bancos():
@@ -319,9 +291,7 @@ def obter_base_bancos():
                     if v.rfind(',') > v.rfind('.'): v = v.replace('.', '').replace(',', '.')
                     else: v = v.replace(',', '')
                 elif ',' in v: v = v.replace(',', '.')
-                try: 
-                    num = float(v)
-                    return -num if is_deb else num
+                try: num = float(v); return -num if is_deb else num
                 except: return 0.0
             df_b['Valor_Num'] = df_b[col_valor].apply(converter_valor_extrato)
             return df_b[['Banco', 'Data_Parse', 'Data_Exibicao', 'Conta_Clean', 'Conta_Exibicao', 'Descricao', 'Valor_Num']]
@@ -355,22 +325,12 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
                 valor_correto = 18534393.63
                 if abs(despesas_atuais - valor_correto) > 0.01:
                     diferenca = valor_correto - despesas_atuais
-                    nova_linha = pd.DataFrame([{
-                        'DATA': '-', 'EMPENHO': 'AJUSTE', 'FORNECEDOR': 'AJUSTE DE CÁLCULO SISTEMA',
-                        'TIPO DE DOCUMENTO': '-', 'Nº DOCUMENTO': '-',
-                        'DESCRIÇÃO': 'VALOR FIXADO PELO SISTEMA (AJUSTE DE LANÇAMENTO)',
-                        'REF VALOR REPASSADO': aba_nome, 'LINK DOCUMENTO': '-',
-                        'REPASSE': 0.0, 'RENDIMENTO': 0.0, 'VALOR DESPESA': diferenca
-                    }])
+                    nova_linha = pd.DataFrame([{'DATA': '-', 'EMPENHO': 'AJUSTE', 'FORNECEDOR': 'AJUSTE DE CÁLCULO SISTEMA', 'TIPO DE DOCUMENTO': '-', 'Nº DOCUMENTO': '-', 'DESCRIÇÃO': 'VALOR FIXADO PELO SISTEMA (AJUSTE DE LANÇAMENTO)', 'REF VALOR REPASSADO': aba_nome, 'LINK DOCUMENTO': '-', 'REPASSE': 0.0, 'RENDIMENTO': 0.0, 'VALOR DESPESA': diferenca}])
                     df_aba = pd.concat([df_aba, nova_linha], ignore_index=True)
                     despesas_atuais = valor_correto
             recurso_disponivel_total = repasse_puro_atual + rendimento_atual + saldo_anterior
             saldo_remanescente_final = recurso_disponivel_total - despesas_atuais
-            dados_finais[aba_nome] = {
-                'repasse_atual': repasse_puro_atual, 'rendimento_atual': rendimento_atual,
-                'saldo_anterior': saldo_anterior, 'total_disponivel': recurso_disponivel_total,
-                'total_despesa': despesas_atuais, 'saldo_final': saldo_remanescente_final, 'df_filtrado': df_aba
-            }
+            dados_finais[aba_nome] = {'repasse_atual': repasse_puro_atual, 'rendimento_atual': rendimento_atual, 'saldo_anterior': saldo_anterior, 'total_disponivel': recurso_disponivel_total, 'total_despesa': despesas_atuais, 'saldo_final': saldo_remanescente_final, 'df_filtrado': df_aba}
             saldo_anterior = saldo_remanescente_final
         return dados_finais, abas
     return {}, []
@@ -384,7 +344,7 @@ def style_abertura_banco(row):
     return [''] * len(row)
 
 # ==============================================================================
-# CARREGAMENTO GLOBAL
+# CARREGAMENTO GLOBAL E LIMPEZA
 # ==============================================================================
 df, att_emendas = obter_base_dados_global()
 df_conv, att_convenios = obter_base_convenios()
@@ -407,7 +367,6 @@ if st.session_state.pagina_atual == 'menu_principal':
     agora_br = datetime.datetime.now(tz_br)
     hora_str = agora_br.strftime("%H:%M")
     data_str = agora_br.strftime("%d/%m/%Y")
-    
     st.markdown(f'''<div style='background: linear-gradient(90deg, var(--header-bg) 0%, #1e293b 100%); padding: 25px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--blue-val);'><div><h1 style='font-size: 28px; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.5px; text-transform: uppercase;'>Controle Convênios</h1><p style='color: #94a3b8; font-size: 14px; font-weight: 500; margin: 0; margin-top: 4px; letter-spacing: 0.5px;'>Painel de Gestão e Monitoramento Orçamentário</p></div><div style='font-size: 12px; color: #cbd5e1; font-weight: 600; display: flex; gap: 15px; background: rgba(0,0,0,0.25); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);'><span style='display:flex; align-items:center; gap:5px;'>📍 Maringá, PR</span><span style='display:flex; align-items:center; gap:5px;'>📅 {data_str}</span><span style='display:flex; align-items:center; gap:5px;'>🕒 {hora_str}</span></div></div>''', unsafe_allow_html=True)
     df_bancos = obter_base_bancos()
     contas_validas = []
@@ -447,7 +406,6 @@ if st.session_state.pagina_atual == 'menu_principal':
                 st.markdown(f'''<div style='padding: 10px 0; border-bottom: 1px dashed var(--card-border);'><div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;'><div style='flex: 1; min-width: 0;'><div style='font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;'>📅 {r['Data_Exibicao']} &nbsp;|&nbsp; C/C: {r['Conta_Exibicao']} &nbsp;|&nbsp; Fonte: {r['Fonte_Conv']}</div><div style='font-size: 12px; color: var(--text-main); line-height: 1.4; word-wrap: break-word;'>{desc}</div></div><div style='font-size: 14px; font-weight: 800; color: var(--success-val); white-space: nowrap; padding-top: 2px;'>{fmt(r['Valor_Num'])}</div></div></div>''', unsafe_allow_html=True)
         else: st.info("Aguardando novas receitas na Caixa Econômica.")
         st.markdown("</div></div><br>", unsafe_allow_html=True)
-
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px;'>🧭 Módulos do Sistema</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2, gap="large")
     with c1:
@@ -465,7 +423,6 @@ if st.session_state.pagina_atual == 'menu_principal':
         st.markdown(f'''<div class='module-card' style='border-left: 4px solid var(--warning-val);'><div class='module-icon' style='color: var(--warning-val);'>🤝</div><div class='module-info'><div class='module-title'>Divisão Convênios</div><div class='module-sub'>Última Atualização: {att_convenios}</div></div></div>''', unsafe_allow_html=True)
         st.button("Acessar Módulo", key="btn_convenios", use_container_width=True, type="primary", on_click=mudar_pagina, args=('convenios',))
     st.markdown("---")
-    
     st.markdown("<div class='section-title' style='border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-top: 0;'>🔍 IDENTIFICAÇÃO ANALISTA RESPONSÁVEL PELO CONVÊNIO</div>", unsafe_allow_html=True)
     c_search, c_res = st.columns([1, 2], gap="large")
     with c_search:
@@ -484,7 +441,6 @@ if st.session_state.pagina_atual == 'menu_principal':
                     else: st.warning("⚠️ Registro localizado, mas sem analista associado.")
                 else: st.error("❌ Nenhum registro encontrado.")
         else: st.markdown("<div style='border: 1px dashed var(--card-border); border-radius: 6px; padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;'>Os resultados da sua busca aparecerão aqui.</div>", unsafe_allow_html=True)
-
     st.markdown("---")
     df_tesouro, att_tesouro = obter_base_maringa_csv()
     if not df_tesouro.empty:
@@ -499,7 +455,6 @@ if st.session_state.pagina_atual == 'menu_principal':
             col_favorecido = next((c for c in df_tesouro_sorted.columns if 'FAVORECIDO' in c.upper() and 'NOME' in c.upper()), None)
             col_emenda = next((c for c in df_tesouro_sorted.columns if 'EMENDA' in c.upper()), None)
             col_mes = next((c for c in df_tesouro_sorted.columns if c.upper() in ['MS', 'MÊS', 'MES']), None)
-            
             categoria = str(r[col_categoria]) if col_categoria else '-'
             favorecido = str(r[col_favorecido]) if col_favorecido else '-'
             emenda = str(r[col_emenda]) if col_emenda else '-'
@@ -529,6 +484,33 @@ elif st.session_state.pagina_atual == 'resumo_emendas':
             if not df_finalizadas.empty:
                 df_fin_show = df_finalizadas[['fonte_clean', 'deputado', 'bruto']].rename(columns={'fonte_clean': 'FONTE', 'deputado': 'DEPUTADO', 'bruto': 'TOTAL EXECUTADO'})
                 st.dataframe(df_fin_show.style.format({'TOTAL EXECUTADO': fmt}).apply(highlight_total_azul, subset=['TOTAL EXECUTADO']), use_container_width=True, hide_index=True, height=250)
+        
+        st.markdown("<div class='section-title'>🍩 Top 5 Fontes (Maior Saldo Disponível)</div>", unsafe_allow_html=True)
+        if not df_top5.empty:
+            cols = st.columns(len(df_top5))
+            for i, (_, row) in enumerate(df_top5.iterrows()):
+                with cols[i]:
+                    fig = go.Figure(data=[go.Pie(labels=['Gasto Liquidado', 'Saldo Disponível'], values=[row['bruto'], max(0, row['saldo'])], hole=0.6, marker=dict(colors=['#ef4444', '#10b981']), textinfo='none')])
+                    fig.update_layout(title_text=f"Fonte: {str(row['fonte_clean']).upper()}", title_x=0.5, title_font_size=13, height=240, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:#10b981;'>{fmt(row['saldo'])}</b>", x=0.5, y=0.5, showarrow=False, font=dict(size=12))], font=dict(color='gray'))
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+        st.markdown("<div class='section-title'>📊 Panorama de Saldos por Secretaria e Deputado</div>", unsafe_allow_html=True)
+        df_g_sec = df[df['secretaria'] != 'Não Especificada'].groupby('secretaria').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+        df_g_sec['saldo'] = df_g_sec['repasse'] + df_g_sec['rendimento'] - df_g_sec['bruto']
+        df_g_dep = df[df['deputado'] != 'Não Informado'].groupby('deputado').agg({'repasse':'sum', 'rendimento':'sum', 'bruto':'sum'}).reset_index()
+        df_g_dep['saldo'] = df_g_dep['repasse'] + df_g_dep['rendimento'] - df_g_dep['bruto']
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.markdown("<b>🏛️ SALDO POR SECRETARIA:</b>", unsafe_allow_html=True)
+            fig1 = go.Figure(go.Bar(x=df_g_sec['secretaria'], y=df_g_sec['saldo'], marker_color='#3b82f6', text=[fmt(v) for v in df_g_sec['saldo']], textposition='auto'))
+            fig1.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+            st.plotly_chart(fig1, use_container_width=True)
+        with col_g2:
+            st.markdown("<b>👤 SALDO POR DEPUTADO:</b>", unsafe_allow_html=True)
+            fig2 = go.Figure(go.Bar(x=df_g_dep['deputado'], y=df_g_dep['saldo'], marker_color='#8b5cf6', text=[fmt(v) for v in df_g_dep['saldo']], textposition='auto'))
+            fig2.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+            st.plotly_chart(fig2, use_container_width=True)
+
         st.markdown("<div class='section-title'>📋 Todas as Fontes Ativas</div>", unsafe_allow_html=True)
         df_todas_show = df_fontes.sort_values(by='saldo', ascending=False)[['fonte_clean', 'secretaria', 'repasse', 'rendimento', 'bruto', 'saldo']].rename(columns={'fonte_clean': 'FONTE', 'secretaria': 'SECRETARIA', 'repasse': 'REPASSES (+)', 'rendimento': 'RENDIMENTOS (+)', 'bruto': 'DESPESAS (-)', 'saldo': 'SALDO DISPONÍVEL (=)'})
         st.dataframe(df_todas_show.style.format({'REPASSES (+)': fmt, 'RENDIMENTOS (+)': fmt, 'DESPESAS (-)': fmt, 'SALDO DISPONÍVEL (=)': fmt}).apply(highlight_saldo_verde, subset=['SALDO DISPONÍVEL (=)']), use_container_width=True, hide_index=True)
@@ -560,6 +542,7 @@ elif st.session_state.pagina_atual == 'finisa':
             valid_cols = [c for c in cols if not c.startswith("COL_")]
             col_dot = next((c for c in valid_cols if 'DOTA' in c.upper()), None)
             col_proj = next((c for c in valid_cols if 'PROJETO' in c.upper()), None)
+            col_aprov = next((c for c in valid_cols if 'APROVADO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
             col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
@@ -608,21 +591,99 @@ elif st.session_state.pagina_atual == 'finisa':
                             fig_alert.update_layout(title_text=f"<span style='font-size:11px; font-family: monospace;'>{row[col_dot]}</span><br><b style='font-size:12px;'>{nome_c}</b>", title_x=0.5, height=220, margin=dict(l=10, r=10, t=40, b=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', annotations=[dict(text=f"<b style='color:var(--warning-val); font-size:16px;'>{row['exec_num']:.1f}%</b>", x=0.5, y=0.5, showarrow=False)])
                             st.plotly_chart(fig_alert, use_container_width=True, key=f"alert_pie_{i}")
                     st.markdown("<br>", unsafe_allow_html=True)
+
+                # --- NOVO: GRÁFICO DE MAIORES SALDOS (BARRAS DECRESCENTES) ---
+                df_saldo_disp = df_itens[df_itens['saldo_num'] > 0].sort_values(by='saldo_num', ascending=True) 
+                if not df_saldo_disp.empty:
+                    df_saldo_top = df_saldo_disp.tail(10)
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 TOP DOTAÇÕES COM MAIOR SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
+                    fig_bar_s = go.Figure(go.Bar(
+                        x=df_saldo_top['saldo_num'],
+                        y=[str(d) + " - " + str(p)[:25] + "..." for d, p in zip(df_saldo_top['clean_dot'], df_saldo_top[col_proj])],
+                        orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_top['saldo_num']], textposition='auto'
+                    ))
+                    fig_bar_s.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    st.plotly_chart(fig_bar_s, use_container_width=True, key="bar_top_saldos_finisa")
             
             # --- CHAVE DE EDIÇÃO (TOGGLE) ---
-            modo_edicao = st.toggle("✏️ Habilitar Modo de Edição (Planilha Interativa)")
+            st.markdown("<hr>", unsafe_allow_html=True)
+            modo_edicao = st.toggle("✏️ Habilitar Modo de Edição e Inserção de Linhas")
 
             if modo_edicao:
-                st.info("💡 Edite os valores dando dois cliques nas células. Após concluir, clique no botão azul abaixo para salvar as mudanças no GitHub.")
+                st.info("💡 **DICAS DO EDITOR:**\n\n1. **Editar:** Dê dois cliques no valor APROVADO ou PAGO e digite.\n2. **Adicionar Linha:** Role até o fim da tabela e clique no símbolo de **`+`** (ou clique na linha vazia no fundo).\n3. **Excluir Linha:** Pare o mouse no canto esquerdo extremo da linha que deseja apagar, marque a caixinha quadrada e aperte a tecla **Delete** no teclado.")
+                
                 df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                if st.button("💾 Salvar Alterações e Atualizar Banco de Dados (GitHub)", type="primary"):
+                if st.button("💾 Salvar Alterações e Recalcular Automaticamente (GitHub)", type="primary"):
                     if "GITHUB_TOKEN" not in st.secrets:
-                        st.error("⚠️ Token de autorização não encontrado! Configure a senha GITHUB_TOKEN no menu 'Secrets' do Streamlit Cloud.")
+                        st.error("⚠️ Token não encontrado! Configure a senha GITHUB_TOKEN no menu 'Secrets'.")
                     else:
-                        with st.spinner("Conectando ao GitHub e salvando os novos dados..."):
+                        with st.spinner("Calculando matemáticas (Saldos, Porcentagens e Totais) e salvando no GitHub..."):
                             try:
+                                # MOTOR MATEMÁTICO QUE RECALCULA A PLANILHA INTEIRA COMO O EXCEL FAZ
+                                def recalcular_tabela_finisa(df_calc):
+                                    if not (col_dot and col_aprov and col_pago and col_saldo): return df_calc
+                                    def formata_br(v):
+                                        if v == 0: return "0,00"
+                                        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                                    def formata_pct(v):
+                                        if v == 0: return "0%"
+                                        s = f"{v:,.2f}".replace(".", ",")
+                                        if s.endswith(",00"): return s.replace(",00", "%")
+                                        return s + "%"
+                                    
+                                    total_aprov = 0.0
+                                    total_pago = 0.0
+                                    idx_categoria = -1
+                                    sub_aprov = 0.0
+                                    sub_pago = 0.0
+                                    
+                                    for i, row in df_calc.iterrows():
+                                        dot = str(row.get(col_dot, '')).strip()
+                                        proj = str(row.get(col_proj, '')).strip().upper()
+                                        
+                                        if "TOTAL" in proj or "TOTAIS" in proj:
+                                            df_calc.at[i, col_aprov] = formata_br(total_aprov)
+                                            df_calc.at[i, col_pago] = formata_br(total_pago)
+                                            df_calc.at[i, col_saldo] = formata_br(total_aprov - total_pago)
+                                            if col_pct: df_calc.at[i, col_pct] = ""
+                                        elif dot == "" and proj != "":
+                                            if idx_categoria != -1:
+                                                df_calc.at[idx_categoria, col_aprov] = formata_br(sub_aprov)
+                                                df_calc.at[idx_categoria, col_pago] = formata_br(sub_pago)
+                                                df_calc.at[idx_categoria, col_saldo] = formata_br(sub_aprov - sub_pago)
+                                                if col_pct: df_calc.at[idx_categoria, col_pct] = ""
+                                            idx_categoria = i
+                                            sub_aprov = 0.0
+                                            sub_pago = 0.0
+                                        elif dot != "":
+                                            val_aprov = limpar_moeda_blindada(row.get(col_aprov, '0'))
+                                            val_pago = limpar_moeda_blindada(row.get(col_pago, '0'))
+                                            val_saldo = val_aprov - val_pago
+                                            pct = (val_pago / val_aprov * 100) if val_aprov > 0 else 0.0
+                                            
+                                            df_calc.at[i, col_aprov] = formata_br(val_aprov)
+                                            df_calc.at[i, col_pago] = formata_br(val_pago)
+                                            df_calc.at[i, col_saldo] = formata_br(val_saldo)
+                                            if col_pct: df_calc.at[i, col_pct] = formata_pct(pct)
+                                            
+                                            sub_aprov += val_aprov
+                                            sub_pago += val_pago
+                                            total_aprov += val_aprov
+                                            total_pago += val_pago
+                                            
+                                    if idx_categoria != -1:
+                                        df_calc.at[idx_categoria, col_aprov] = formata_br(sub_aprov)
+                                        df_calc.at[idx_categoria, col_pago] = formata_br(sub_pago)
+                                        df_calc.at[idx_categoria, col_saldo] = formata_br(sub_aprov - sub_pago)
+                                        if col_pct: df_calc.at[idx_categoria, col_pct] = ""
+                                        
+                                    return df_calc
+
+                                # Aplica os cálculos matemáticos novos
+                                df_editado_calculado = recalcular_tabela_finisa(df_editado.copy())
+
                                 token = st.secrets["GITHUB_TOKEN"]
                                 repo = "controleconveniosmaringa-a11y/controle-emendas"
                                 url_api = f"https://api.github.com/repos/{repo}/contents/Gest%C3%A3o%20de%20Conv%C3%AAnios.csv"
@@ -631,18 +692,18 @@ elif st.session_state.pagina_atual == 'finisa':
                                 r_get = requests.get(url_api, headers=headers)
                                 if r_get.status_code == 200:
                                     sha = r_get.json().get('sha')
-                                    csv_novo = df_editado.to_csv(index=False, sep=';', encoding='utf-8')
+                                    csv_novo = df_editado_calculado.to_csv(index=False, sep=';', encoding='utf-8')
                                     content_b64 = base64.b64encode(csv_novo.encode('utf-8')).decode('utf-8')
                                     
                                     data_payload = {
-                                        "message": "Atualização da Gestão de Convênios FINISA (via Painel Streamlit)",
+                                        "message": "Painel Streamlit: Edição FINISA e Auto-Recálculo de Saldos",
                                         "content": content_b64,
                                         "sha": sha
                                     }
                                     
                                     r_put = requests.put(url_api, headers=headers, data=json.dumps(data_payload))
                                     if r_put.status_code in [200, 201]:
-                                        st.success("✅ Sucesso! Os novos dados foram atualizados no repositório.")
+                                        st.success("✅ Tudo Calculado e Salvo com Sucesso!")
                                         st.cache_data.clear()
                                         time.sleep(2)
                                         st.rerun()
