@@ -187,7 +187,7 @@ def obter_base_credito():
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
-# CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" DIRETO DA API DO GITHUB (SEM CACHE DE ATRASO)
+# CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" DIRETO DA API DO GITHUB
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     repo = "controleconveniosmaringa-a11y/controle-emendas"
@@ -592,23 +592,27 @@ elif st.session_state.pagina_atual == 'finisa':
                             st.plotly_chart(fig_alert, use_container_width=True, key=f"alert_pie_{i}")
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                # --- NOVO: GRÁFICO DE MAIORES SALDOS (BARRAS DECRESCENTES) ---
-                # Removemos a palavra "TOTAL" para não aparecer no gráfico
-                df_saldo_disp = df_itens[(df_itens['saldo_num'] > 0) & (~df_itens[col_proj].str.upper().str.contains('TOTAL', na=False))].sort_values(by='saldo_num', ascending=True) 
+                # --- NOVO: GRÁFICO DE TODOS OS SALDOS (BARRAS DECRESCENTES) ---
+                # Remove a palavra "TOTAL" de aparecer no gráfico tanto se estiver na coluna de projeto quanto na de dotação
+                mask_totais = df_itens[col_dot].str.upper().str.contains('TOTAL', na=False) | df_itens[col_proj].str.upper().str.contains('TOTAL', na=False)
+                df_saldo_disp = df_itens[(df_itens['saldo_num'] > 0) & (~mask_totais)].sort_values(by='saldo_num', ascending=True) 
+                
                 if not df_saldo_disp.empty:
-                    df_saldo_top = df_saldo_disp.tail(10)
-                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 DOTAÇÕES COM MAIOR SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 DOTAÇÕES COM SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
                     
                     # Usa o nome inteiro do projeto/dotação
-                    nomes_completos = [str(d) + " - " + str(p) if str(d).strip() != '' else str(p) for d, p in zip(df_saldo_top['clean_dot'], df_saldo_top[col_proj])]
+                    nomes_completos = [str(d) + (" - " + str(p) if str(p).strip() != '' else "") for d, p in zip(df_saldo_disp['clean_dot'], df_saldo_disp[col_proj])]
                     
                     fig_bar_s = go.Figure(go.Bar(
-                        x=df_saldo_top['saldo_num'],
+                        x=df_saldo_disp['saldo_num'],
                         y=nomes_completos,
-                        orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_top['saldo_num']], textposition='auto'
+                        orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_disp['saldo_num']], textposition='auto'
                     ))
-                    # Ajustado a margem e altura para caber textos grandes inteiros
-                    fig_bar_s.update_layout(height=450, margin=dict(t=10, b=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    
+                    # Altura dinâmica para não esmagar se tiver muitas dotações
+                    altura_dinamica = max(350, len(df_saldo_disp) * 40)
+                    
+                    fig_bar_s.update_layout(height=altura_dinamica, margin=dict(t=10, b=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
                     fig_bar_s.update_yaxes(automargin=True)
                     st.plotly_chart(fig_bar_s, use_container_width=True, key="bar_top_saldos_finisa")
             
@@ -649,7 +653,7 @@ elif st.session_state.pagina_atual == 'finisa':
                                         dot = str(row.get(col_dot, '')).strip()
                                         proj = str(row.get(col_proj, '')).strip().upper()
                                         
-                                        if "TOTAL" in proj or "TOTAIS" in proj:
+                                        if "TOTAL" in proj or "TOTAIS" in proj or "TOTAL" in dot.upper() or "TOTAIS" in dot.upper():
                                             df_calc.at[i, col_aprov] = formata_br(total_aprov)
                                             df_calc.at[i, col_pago] = formata_br(total_pago)
                                             df_calc.at[i, col_saldo] = formata_br(total_aprov - total_pago)
