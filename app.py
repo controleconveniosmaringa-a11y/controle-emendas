@@ -139,7 +139,6 @@ def obter_base_dados_global():
     df['bruto'] = [limpar_moeda_blindada(v) for v in ext('bruto')]
     return df, att
 
-# CARREGA CONVÊNIOS DIRETO DA API (SEM CACHE DE ATRASO) E APLICA NORMALIZAÇÃO
 @st.cache_data(ttl=2)
 def obter_base_convenios():
     agora = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
@@ -208,7 +207,6 @@ def obter_base_credito():
     df['VALOR DESPESA'] = [limpar_moeda_blindada(v) for v in ext_c('valordespesa', 'despesa')]
     return df, att
 
-# CARREGA E LIMPA A PLANILHA "Gestão de Convênios.csv" DIRETO DA API DO GITHUB
 @st.cache_data(ttl=2)
 def obter_base_gestao_convenios():
     repo = "controleconveniosmaringa-a11y/controle-emendas"
@@ -864,7 +862,6 @@ elif st.session_state.pagina_atual == 'convenios':
         with tab_conv_geral:
             st.markdown("<div class='section-title' style='margin-top:0;'>📋 Tabela Geral de Convênios</div>", unsafe_allow_html=True)
             
-            # Trava de Segurança OBRIGATÓRIA para evitar deleção de dados ocultos no GitHub
             if busca_global:
                 st.warning("⚠️ O modo de edição fica desabilitado enquanto uma busca global está ativa (para evitar salvar e apagar os convênios ocultados pelo filtro). Limpe o campo de busca global para conseguir editar a tabela geral.")
                 st.dataframe(df_conv_tela, use_container_width=True)
@@ -947,10 +944,25 @@ elif st.session_state.pagina_atual == 'emendas':
                         
                         st.markdown(f'''<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>🎯 Saldo Fonte</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(sal_fonte)}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>🏦 Saldo Conta: {conta_f}</div><div class='kpi-value' style='color:var(--blue-val);'>{fmt(sal_banco)}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Disponível</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_disp_f:.2f}%</div></div></div>''', unsafe_allow_html=True)
                         secs_envolvidas = ", ".join(sorted([str(s) for s in df_f['secretaria'].unique() if str(s).strip() != '']))
+                        
+                        # --- INÍCIO DA BUSCA DO PROCESSO SEI ---
+                        sei_info = "Não Informado"
+                        if not df_conv.empty:
+                            col_sei = next((c for c in df_conv.columns if 'SEI' in str(c).upper()), None)
+                            col_fonte = next((c for c in df_conv.columns if 'FONTE' in str(c).upper()), None)
+                            if col_sei and col_fonte:
+                                def limpa_f(f): return str(f).split('.')[0].lower().replace('-', '').strip()
+                                df_sei_match = df_conv[df_conv[col_fonte].apply(limpa_f) == str(fonte_final).lower().strip()]
+                                seis_encontrados = [str(x).strip() for x in df_sei_match[col_sei].unique() if str(x).strip() not in ['', 'nan', 'NAN', '-']]
+                                if seis_encontrados:
+                                    sei_info = " | ".join(seis_encontrados)
+                        # --- FIM DA BUSCA DO PROCESSO SEI ---
+                        
                         st.markdown(f'''<div style='margin-bottom:10px;'>
                             <div class='meta-tag'>👤 Deputado: {df_f['deputado'].unique()[0]}</div>
                             <div class='meta-tag'>📄 Emenda: {df_f['emenda_clean'].unique()[0]}</div>
                             <div class='meta-tag'>🎯 Plano: {df_f['plano_clean'].unique()[0]}</div>
+                            <div class='meta-tag' style='background-color: #fef08a; color: #854d0e; border-color: #fde047;'>📝 Processo SEI: {sei_info}</div>
                             <div class='meta-tag' style='background-color: #e0f2fe; color: #1e3a8a; border-color: #bfdbfe;'>🏛️ Secretarias: {secs_envolvidas}</div>
                             </div>''', unsafe_allow_html=True)
                         
