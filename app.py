@@ -545,9 +545,9 @@ elif st.session_state.pagina_atual == 'finisa':
             col_aprov = next((c for c in valid_cols if 'APROVADO' in c.upper()), None)
             col_pago = next((c for c in valid_cols if 'PAGO' in c.upper()), None)
             col_saldo = next((c for c in valid_cols if 'SALDO' in c.upper()), None)
-            col_exec = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
+            col_pct = next((c for c in valid_cols if '%' in c.upper() or 'EXECU' in c.upper()), None)
             
-            if col_dot and col_exec and col_pago and col_saldo:
+            if col_dot and col_pct and col_pago and col_saldo:
                 df_itens = df_gestao[df_gestao[col_dot].astype(str).str.strip() != ''].copy()
                 df_itens['clean_dot'] = df_itens[col_dot].astype(str).str.strip()
                 df_itens = df_itens.drop_duplicates(subset=['clean_dot'], keep='first')
@@ -563,7 +563,7 @@ elif st.session_state.pagina_atual == 'finisa':
                     try: return float(v)
                     except: return 0.0
                 
-                df_itens['exec_num'] = df_itens[col_exec].apply(parse_pct_safe)
+                df_itens['exec_num'] = df_itens[col_pct].apply(parse_pct_safe)
                 df_itens['pago_num'] = df_itens[col_pago].apply(limpar_moeda_blindada)
                 df_itens['saldo_num'] = df_itens[col_saldo].apply(limpar_moeda_blindada)
                 
@@ -593,16 +593,23 @@ elif st.session_state.pagina_atual == 'finisa':
                     st.markdown("<br>", unsafe_allow_html=True)
 
                 # --- NOVO: GRÁFICO DE MAIORES SALDOS (BARRAS DECRESCENTES) ---
-                df_saldo_disp = df_itens[df_itens['saldo_num'] > 0].sort_values(by='saldo_num', ascending=True) 
+                # Removemos a palavra "TOTAL" para não aparecer no gráfico
+                df_saldo_disp = df_itens[(df_itens['saldo_num'] > 0) & (~df_itens[col_proj].str.upper().str.contains('TOTAL', na=False))].sort_values(by='saldo_num', ascending=True) 
                 if not df_saldo_disp.empty:
                     df_saldo_top = df_saldo_disp.tail(10)
-                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 TOP DOTAÇÕES COM MAIOR SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size: 14px; font-weight: 800; color: var(--success-val); margin-bottom: 10px; margin-top: 15px;'>📈 DOTAÇÕES COM MAIOR SALDO DISPONÍVEL</div>", unsafe_allow_html=True)
+                    
+                    # Usa o nome inteiro do projeto/dotação
+                    nomes_completos = [str(d) + " - " + str(p) if str(d).strip() != '' else str(p) for d, p in zip(df_saldo_top['clean_dot'], df_saldo_top[col_proj])]
+                    
                     fig_bar_s = go.Figure(go.Bar(
                         x=df_saldo_top['saldo_num'],
-                        y=[str(d) + " - " + str(p)[:25] + "..." for d, p in zip(df_saldo_top['clean_dot'], df_saldo_top[col_proj])],
+                        y=nomes_completos,
                         orientation='h', marker_color='#10b981', text=[fmt(v) for v in df_saldo_top['saldo_num']], textposition='auto'
                     ))
-                    fig_bar_s.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    # Ajustado a margem e altura para caber textos grandes inteiros
+                    fig_bar_s.update_layout(height=450, margin=dict(t=10, b=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='gray'))
+                    fig_bar_s.update_yaxes(automargin=True)
                     st.plotly_chart(fig_bar_s, use_container_width=True, key="bar_top_saldos_finisa")
             
             # --- CHAVE DE EDIÇÃO (TOGGLE) ---
@@ -610,7 +617,7 @@ elif st.session_state.pagina_atual == 'finisa':
             modo_edicao = st.toggle("✏️ Habilitar Modo de Edição e Inserção de Linhas")
 
             if modo_edicao:
-                st.info("💡 **DICAS DO EDITOR:**\n\n1. **Editar:** Dê dois cliques no valor APROVADO ou PAGO e digite.\n2. **Adicionar Linha:** Role até o fim da tabela e clique no símbolo de **`+`** (ou clique na linha vazia no fundo).\n3. **Excluir Linha:** Pare o mouse no canto esquerdo extremo da linha que deseja apagar, marque a caixinha quadrada e aperte a tecla **Delete** no teclado.")
+                st.info("💡 **DICAS DO EDITOR:**\n\n1. **Editar:** Dê dois cliques no valor APROVADO ou PAGO e digite.\n2. **Adicionar Linha:** Role até o fim da tabela e clique no símbolo de **`+`**.\n3. **Excluir Linha:** Pare o mouse no canto esquerdo extremo da linha que deseja apagar, marque a caixinha quadrada e aperte a tecla **Delete** no teclado.")
                 
                 df_editado = st.data_editor(df_gestao, use_container_width=True, num_rows="dynamic", key="editor_gestao")
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -621,7 +628,6 @@ elif st.session_state.pagina_atual == 'finisa':
                     else:
                         with st.spinner("Calculando matemáticas (Saldos, Porcentagens e Totais) e salvando no GitHub..."):
                             try:
-                                # MOTOR MATEMÁTICO QUE RECALCULA A PLANILHA INTEIRA COMO O EXCEL FAZ
                                 def recalcular_tabela_finisa(df_calc):
                                     if not (col_dot and col_aprov and col_pago and col_saldo): return df_calc
                                     def formata_br(v):
@@ -681,7 +687,6 @@ elif st.session_state.pagina_atual == 'finisa':
                                         
                                     return df_calc
 
-                                # Aplica os cálculos matemáticos novos
                                 df_editado_calculado = recalcular_tabela_finisa(df_editado.copy())
 
                                 token = st.secrets["GITHUB_TOKEN"]
@@ -714,7 +719,6 @@ elif st.session_state.pagina_atual == 'finisa':
                             except Exception as e:
                                 st.error(f"Erro no sistema: {str(e)}")
             else:
-                # --- TABELA HTML BONITA (MODO DE LEITURA) ---
                 th_html = "".join([f"<th style='text-align: {'right' if c in ['VALORES APROVADOS', 'PAGO', 'SALDO'] else ('center' if '%' in c else 'left')};'>{c}</th>" for c in valid_cols])
                 tr_html = ""
                 for _, row in df_gestao.iterrows():
