@@ -975,7 +975,38 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.plotly_chart(fig_rosca_f, use_container_width=True, key="pie_fonte")
                         with c_tab_f:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_f})</div>", unsafe_allow_html=True)
-                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL</td><td class='extrato-cell-val'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
+
+                            # DIVISÃO DE RENDIMENTOS: Receita (ano atual) vs Superávit (anos anteriores)
+                            ano_atual_real = str(datetime.datetime.now().year)
+                            rendimento_receita_f = float(fluxo_f[fluxo_f['ano_mov'] == ano_atual_real]['rendimento'].sum())
+                            rendimento_superavit_f = float(fluxo_f[fluxo_f['ano_mov'] != ano_atual_real]['rendimento'].sum())
+
+                            st.markdown(f'''<table class='extrato-table'>
+                                <tr class='extrato-row'>
+                                    <td class='extrato-cell-label'>(+) REPASSE</td>
+                                    <td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td>
+                                </tr>
+                                <tr class='extrato-row'>
+                                    <td class='extrato-cell-label'>(+) RENDIMENTOS (TOTAL)</td>
+                                    <td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td>
+                                </tr>
+                                <tr class='extrato-row'>
+                                    <td class='extrato-cell-label' style='padding-left: 28px; font-size: 11px; color: var(--text-muted); border-right: 1px dashed var(--card-border);'>↳ Receita (Rendimento {ano_atual_real})</td>
+                                    <td class='extrato-cell-val' style='font-size: 12px; color: var(--success-val);'>{fmt(rendimento_receita_f)}</td>
+                                </tr>
+                                <tr class='extrato-row'>
+                                    <td class='extrato-cell-label' style='padding-left: 28px; font-size: 11px; color: var(--text-muted); border-right: 1px dashed var(--card-border);'>↳ Superávit (Anos Anteriores)</td>
+                                    <td class='extrato-cell-val' style='font-size: 12px; color: var(--purple-val);'>{fmt(rendimento_superavit_f)}</td>
+                                </tr>
+                                <tr class='extrato-row'>
+                                    <td>(-) DESPESAS</td>
+                                    <td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td>
+                                </tr>
+                                <tr class='extrato-row-final'>
+                                    <td class='extrato-cell-label'>(=) SALDO REAL</td>
+                                    <td class='extrato-cell-val'>{fmt(sal_fonte)}</td>
+                                </tr>
+                            </table>''', unsafe_allow_html=True)
                         
                         secs_f = [s for s in df_f['secretaria'].unique() if s != '']
                         if len(secs_f) > 1:
