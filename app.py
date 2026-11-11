@@ -347,9 +347,20 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
                     nova_linha = pd.DataFrame([{'DATA': '-', 'EMPENHO': 'AJUSTE', 'FORNECEDOR': 'AJUSTE DE CÁLCULO SISTEMA', 'TIPO DE DOCUMENTO': '-', 'Nº DOCUMENTO': '-', 'DESCRIÇÃO': 'VALOR FIXADO PELO SISTEMA (AJUSTE DE LANÇAMENTO)', 'REF VALOR REPASSADO': aba_nome, 'LINK DOCUMENTO': '-', 'REPASSE': 0.0, 'RENDIMENTO': 0.0, 'VALOR DESPESA': diferenca}])
                     df_aba = pd.concat([df_aba, nova_linha], ignore_index=True)
                     despesas_atuais = valor_correto
-            recurso_disponivel_total = repasse_puro_atual + rendimento_atual + saldo_anterior
-            saldo_remanescente_final = recurso_disponivel_total - despesas_atuais
-            dados_finais[aba_nome] = {'repasse_atual': repasse_puro_atual, 'rendimento_atual': rendimento_atual, 'saldo_anterior': saldo_anterior, 'total_disponivel': recurso_disponivel_total, 'total_despesa': despesas_atuais, 'saldo_final': saldo_remanescente_final, 'df_filtrado': df_aba}
+            
+            # Ajustado para Recurso Disponível = Repasse - Total Despesas
+            recurso_disponivel_total = repasse_puro_atual
+            saldo_remanescente_final = repasse_puro_atual - despesas_atuais
+            
+            dados_finais[aba_nome] = {
+                'repasse_atual': repasse_puro_atual, 
+                'rendimento_atual': rendimento_atual, 
+                'saldo_anterior': saldo_anterior, 
+                'total_disponivel': recurso_disponivel_total, 
+                'total_despesa': despesas_atuais, 
+                'saldo_final': saldo_remanescente_final, 
+                'df_filtrado': df_aba
+            }
             saldo_anterior = saldo_remanescente_final
         return dados_finais, abas
     return {}, []
@@ -779,7 +790,24 @@ elif st.session_state.pagina_atual == 'finisa':
         with tabs_cred[i+1]:
             info = dados_abas[aba_nome]
             pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-            st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class='kpi-row-container'>
+                <div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'>
+                    <div class='kpi-label'>Repasse</div>
+                    <div class='kpi-value' style='color:var(--success-val);'>{fmt(info['repasse_atual'])}</div>
+                </div>
+                <div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'>
+                    <div class='kpi-label'>Total Despesas</div>
+                    <div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div>
+                </div>
+                <div class='kpi-card-head-blue'>
+                    <div class='kpi-label'>Recurso Disponível</div>
+                    <div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div>
+                </div>
+                <div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'>
+                    <div class='kpi-label'>% Utilizado do Saldo</div>
+                    <div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
             cg1, cg2 = st.columns(2)
             with cg1:
                 st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -811,7 +839,24 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
                 pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
-                st.markdown(f"""<div class='kpi-row-container'><div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'><div class='kpi-label'>Aporte Atual</div><div class='kpi-value' style='color:var(--success-val);'>{fmt(info['total_disponivel'])}</div><div style='font-size:11px; color:var(--text-muted); margin-top:4px;'>Repasse: {fmt(info['repasse_atual'])}<br>Rendimento: {fmt(info['rendimento_atual'])}<br>Saldo Anterior Remanescente: {fmt(info['saldo_anterior'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'><div class='kpi-label'>Total Despesas</div><div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div></div><div class='kpi-card-head-blue'><div class='kpi-label'>Recurso Disponível</div><div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div></div><div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'><div class='kpi-label'>% Utilizado do Saldo</div><div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='kpi-row-container'>
+                    <div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'>
+                        <div class='kpi-label'>Repasse</div>
+                        <div class='kpi-value' style='color:var(--success-val);'>{fmt(info['repasse_atual'])}</div>
+                    </div>
+                    <div class='kpi-card-head' style='border-left: 5px solid var(--danger-val);'>
+                        <div class='kpi-label'>Total Despesas</div>
+                        <div class='kpi-value' style='color:var(--danger-val);'>{fmt(info['total_despesa'])}</div>
+                    </div>
+                    <div class='kpi-card-head-blue'>
+                        <div class='kpi-label'>Recurso Disponível</div>
+                        <div class='w-value' style='font-size:24px; font-weight:800; color:var(--blue-val); margin-top:4px;'>{fmt(info['saldo_final'])}</div>
+                    </div>
+                    <div class='kpi-card-head' style='border-left: 5px solid var(--purple-val);'>
+                        <div class='kpi-label'>% Utilizado do Saldo</div>
+                        <div class='kpi-value' style='color:var(--purple-val);'>{pct_gasta:.2f}%</div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
                 cg1, cg2 = st.columns(2)
                 with cg1:
                     st.markdown("<div class='section-title' style='margin-top:0;'>📊 COMPOSIÇÃO DO SALDO DO PERÍODO</div>", unsafe_allow_html=True)
@@ -857,7 +902,7 @@ elif st.session_state.pagina_atual == 'convenios':
                 analistas = sorted([str(a) for a in df_conv_tela['RESPONSÁVEL'].unique() if str(a) != ''])
                 if analistas:
                     a_final = st.selectbox("Escolha o Analista:", options=analistas, key="sel_conv_analista")
-                    if a_final: st.dataframe(df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final], use_container_width=True)
+                    if f_final: st.dataframe(df_conv_tela[df_conv_tela['RESPONSÁVEL'] == a_final], use_container_width=True)
         with tab_conv_busca:
             st.dataframe(df_conv_tela, use_container_width=True)
             
@@ -975,38 +1020,7 @@ elif st.session_state.pagina_atual == 'emendas':
                             st.plotly_chart(fig_rosca_f, use_container_width=True, key="pie_fonte")
                         with c_tab_f:
                             st.markdown(f"<div class='section-title' style='margin-top:0;'>🌍 RESUMO ({lbl_f})</div>", unsafe_allow_html=True)
-
-                            # DIVISÃO DE RENDIMENTOS: Receita (ano atual) vs Superávit (anos anteriores)
-                            ano_atual_real = str(datetime.datetime.now().year)
-                            rendimento_receita_f = float(fluxo_f[fluxo_f['ano_mov'] == ano_atual_real]['rendimento'].sum())
-                            rendimento_superavit_f = float(fluxo_f[fluxo_f['ano_mov'] != ano_atual_real]['rendimento'].sum())
-
-                            st.markdown(f'''<table class='extrato-table'>
-                                <tr class='extrato-row'>
-                                    <td class='extrato-cell-label'>(+) REPASSE</td>
-                                    <td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td>
-                                </tr>
-                                <tr class='extrato-row'>
-                                    <td class='extrato-cell-label'>(+) RENDIMENTOS (TOTAL)</td>
-                                    <td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td>
-                                </tr>
-                                <tr class='extrato-row'>
-                                    <td class='extrato-cell-label' style='padding-left: 28px; font-size: 11px; color: var(--text-muted); border-right: 1px dashed var(--card-border);'>↳ Receita (Rendimento {ano_atual_real})</td>
-                                    <td class='extrato-cell-val' style='font-size: 12px; color: var(--success-val);'>{fmt(rendimento_receita_f)}</td>
-                                </tr>
-                                <tr class='extrato-row'>
-                                    <td class='extrato-cell-label' style='padding-left: 28px; font-size: 11px; color: var(--text-muted); border-right: 1px dashed var(--card-border);'>↳ Superávit (Anos Anteriores)</td>
-                                    <td class='extrato-cell-val' style='font-size: 12px; color: var(--purple-val);'>{fmt(rendimento_superavit_f)}</td>
-                                </tr>
-                                <tr class='extrato-row'>
-                                    <td>(-) DESPESAS</td>
-                                    <td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td>
-                                </tr>
-                                <tr class='extrato-row-final'>
-                                    <td class='extrato-cell-label'>(=) SALDO REAL</td>
-                                    <td class='extrato-cell-val'>{fmt(sal_fonte)}</td>
-                                </tr>
-                            </table>''', unsafe_allow_html=True)
+                            st.markdown(f'''<table class='extrato-table'><tr class='extrato-row'><td class='extrato-cell-label'>(+) REPASSE</td><td class='extrato-cell-val' style='color:var(--success-val);'>{fmt(float(fluxo_f['repasse'].sum()))}</td></tr><tr class='extrato-row'><td class='extrato-cell-label'>(+) RENDIMENTOS</td><td class='extrato-cell-val' style='color:var(--blue-val);'>{fmt(float(fluxo_f['rendimento'].sum()))}</td></tr><tr class='extrato-row'><td>(-) DESPESAS</td><td class='extrato-cell-val' style='color:var(--danger-val);'>{fmt(float(fluxo_f['bruto'].sum()))}</td></tr><tr class='extrato-row-final'><td class='extrato-cell-label'>(=) SALDO REAL</td><td class='extrato-cell-val'>{fmt(sal_fonte)}</td></tr></table>''', unsafe_allow_html=True)
                         
                         secs_f = [s for s in df_f['secretaria'].unique() if s != '']
                         if len(secs_f) > 1:
