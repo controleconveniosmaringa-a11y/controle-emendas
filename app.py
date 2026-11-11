@@ -340,6 +340,7 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
             repasse_puro_atual = df_aba['REPASSE'].sum() if 'REPASSE' in df_aba.columns else 0.0
             rendimento_atual = df_aba['RENDIMENTO'].sum() if 'RENDIMENTO' in df_aba.columns else 0.0
             despesas_atuais = df_aba['VALOR DESPESA'].sum() if 'VALOR DESPESA' in df_aba.columns else 0.0
+            
             if nome_programa == "USINA" and ("1" in str(aba_nome)):
                 valor_correto = 18534393.63
                 if abs(despesas_atuais - valor_correto) > 0.01:
@@ -348,17 +349,17 @@ def processar_saldos_acumulados(df_programa, nome_programa=""):
                     df_aba = pd.concat([df_aba, nova_linha], ignore_index=True)
                     despesas_atuais = valor_correto
             
-            # Ajustado para Recurso Disponível = Repasse - Total Despesas
-            recurso_disponivel_total = repasse_puro_atual
-            saldo_remanescente_final = repasse_puro_atual - despesas_atuais
+            # Recurso Disponível corrigido rigorosamente para Repasse - Total Despesas
+            recurso_disponivel_total = repasse_puro_atual - despesas_atuais
+            saldo_remanescente_final = recurso_disponivel_total # Mantém consistência com o cálculo geral
             
             dados_finais[aba_nome] = {
                 'repasse_atual': repasse_puro_atual, 
                 'rendimento_atual': rendimento_atual, 
                 'saldo_anterior': saldo_anterior, 
-                'total_disponivel': recurso_disponivel_total, 
+                'total_disponivel': repasse_puro_atual, 
                 'total_despesa': despesas_atuais, 
-                'saldo_final': saldo_remanescente_final, 
+                'saldo_final': recurso_disponivel_total, 
                 'df_filtrado': df_aba
             }
             saldo_anterior = saldo_remanescente_final
@@ -789,7 +790,7 @@ elif st.session_state.pagina_atual == 'finisa':
     for i, aba_nome in enumerate(abas_exibicao):
         with tabs_cred[i+1]:
             info = dados_abas[aba_nome]
-            pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
+            pct_gasta = (info['total_despesa'] / info['repasse_atual'] * 100) if info['repasse_atual'] > 0 else 0.0
             st.markdown(f"""<div class='kpi-row-container'>
                 <div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'>
                     <div class='kpi-label'>Repasse</div>
@@ -838,7 +839,7 @@ elif st.session_state.pagina_atual == 'fotovoltaica':
         for i, aba_nome in enumerate(abas_exibicao):
             with tabs_cred[i]:
                 info = dados_abas[aba_nome]
-                pct_gasta = (info['total_despesa'] / info['total_disponivel'] * 100) if info['total_disponivel'] > 0 else 0.0
+                pct_gasta = (info['total_despesa'] / info['repasse_atual'] * 100) if info['repasse_atual'] > 0 else 0.0
                 st.markdown(f"""<div class='kpi-row-container'>
                     <div class='kpi-card-head' style='border-left: 5px solid var(--success-val);'>
                         <div class='kpi-label'>Repasse</div>
